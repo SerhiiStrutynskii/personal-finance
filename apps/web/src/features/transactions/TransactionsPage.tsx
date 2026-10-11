@@ -5,6 +5,7 @@ import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
+import { AddTransactionDialog } from './AddTransactionDialog.tsx';
 import { useTransactions } from './api.ts';
 import { ENTRY_CONFIG, type EntryType } from './config.ts';
 import { TransactionTable } from './TransactionTable.tsx';
@@ -30,10 +31,14 @@ export function TransactionsPage({ type }: { type: EntryType }) {
       <PageHeader
         title={config.title}
         action={
+          accounts.data &&
+          categories.data &&
           hasAccounts && (
-            <Button asChild>
-              <Link to={`${config.path}/add`}>Додати</Link>
-            </Button>
+            <AddTransactionDialog
+              type={type}
+              accounts={accounts.data}
+              categories={categories.data.filter((category) => category.kind === type)}
+            />
           )
         }
       />

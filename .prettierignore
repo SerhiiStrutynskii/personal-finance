@@ -4,3 +4,4 @@ coverage
 package-lock.json
 apps/api/drizzle
 apps/api/legacy-src
+.claude

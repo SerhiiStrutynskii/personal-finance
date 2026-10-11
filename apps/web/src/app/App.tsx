@@ -40,7 +40,6 @@ export function App() {
                 {ENTRY_TYPES.map((type) => (
                   <Route key={type} path={ENTRY_CONFIG[type].path}>
                     <Route index element={<TransactionsPage key={type} type={type} />} />
-                    <Route path="add" element={<TransactionFormPage key={type} type={type} />} />
                     <Route path=":id" element={<TransactionFormPage key={type} type={type} />} />
                   </Route>
                 ))}
