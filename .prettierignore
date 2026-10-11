@@ -4,5 +4,3 @@ coverage
 package-lock.json
 apps/api/drizzle
 apps/api/legacy-src
-# фронтенд ще не переведено на prettier
-apps/web
