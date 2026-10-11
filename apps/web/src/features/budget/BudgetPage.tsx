@@ -1,4 +1,12 @@
-import { localMonthKey, shiftMonth, type BudgetView } from '@hf/shared';
+import {
+  budgetPeriod,
+  getAllowedExpenseDateRange,
+  getPeriodState,
+  localMonthKey,
+  shiftMonth,
+  type BudgetView,
+} from '@hf/shared';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -11,39 +19,101 @@ import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
 import { TransactionDialog } from '../transactions/TransactionDialog.tsx';
-import type { TransactionFormValues } from '../transactions/transactionForm.ts';
+import { AddLimitDialog } from './AddLimitDialog.tsx';
 import { useBudget, useCreateBudget, useDeleteExpenseLine } from './api.ts';
 import { BudgetSummary } from './BudgetSummary.tsx';
 import { ExpenseSection } from './ExpenseSection.tsx';
 import { IncomeSection } from './IncomeSection.tsx';
-import { ExpenseLineDialog } from './LineDialogs.tsx';
-import { defaultEntryDate } from './month.ts';
+
+type ExpenseLine = BudgetView['expenseLines'][number];
 
 export function BudgetPage() {
   const { user } = useCurrentUser();
+  const accounts = useAccounts();
+  const categories = useCategories();
   const [month, setMonth] = useState(() => localMonthKey(new Date(), user.timeZone));
   const budget = useBudget(month);
+  const [expenseOpen, setExpenseOpen] = useState(false);
+
+  const accountList = accounts.data ?? [];
+  const expenseCategories = (categories.data ?? []).filter(
+    (category) => category.kind === 'expense',
+  );
+  // Те саме вікно, що й на сторінці видатків, із тими самими межами дат.
+  const expenseRange = getAllowedExpenseDateRange(new Date(), user.timeZone);
+  // Чи показувати кнопку, вирішує бекенд; саме правило ще раз перевіряє API видатків.
+  const canAddExpense = budget.data?.canAddExpense === true && accountList.length > 0;
 
   return (
     <div className="max-w-4xl space-y-6">
-      <PageHeader title="Бюджет" action={<MonthSwitcher month={month} onChange={setMonth} />} />
+      <PageHeader
+        title="Бюджет"
+        action={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <MonthSwitcher month={month} onChange={setMonth} />
+            {canAddExpense && (
+              <Button onClick={() => setExpenseOpen(true)}>
+                <Plus />
+                Видаток
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       <ErrorText>{budget.isError && errorMessage(budget.error)}</ErrorText>
+      <ErrorText>
+        {(accounts.error ?? categories.error) && 'Не вдалося завантажити довідники'}
+      </ErrorText>
       {budget.isPending && <Muted>Завантаження…</Muted>}
-      {budget.data === null && <EmptyBudget month={month} />}
+      {budget.data === null && <EmptyBudget month={month} timeZone={user.timeZone} />}
+      {budget.data && budget.data.canAddExpense && accounts.data && accountList.length === 0 && (
+        <Muted>
+          Щоб додавати видатки, спершу{' '}
+          <Link className="underline" to="/accounts">
+            створіть рахунок
+          </Link>
+          .
+        </Muted>
+      )}
       {/* key скидає стан вікон при переході на інший місяць */}
-      {budget.data && <BudgetContent key={budget.data.id} budget={budget.data} />}
+      {budget.data && (
+        <BudgetContent key={budget.data.id} budget={budget.data} categories={expenseCategories} />
+      )}
+
+      <TransactionDialog
+        type="expense"
+        open={expenseOpen}
+        onOpenChange={setExpenseOpen}
+        minDate={expenseRange.minDate}
+        maxDate={expenseRange.maxDate}
+        accounts={accountList}
+        categories={expenseCategories}
+      />
     </div>
   );
 }
 
-function EmptyBudget({ month }: { month: string }) {
+function EmptyBudget({ month, timeZone }: { month: string; timeZone: string }) {
   const create = useCreateBudget();
-  const previous = shiftMonth(month, -1);
+  const period = budgetPeriod(month, timeZone);
+  const isPast = getPeriodState(period.start, period.end, new Date()) === 'past';
+  const label = monthLabel(month).toLowerCase();
+
+  if (isPast) {
+    return (
+      <div className="rounded-lg border border-dashed p-6" data-testid="budget-empty">
+        <p>
+          Бюджету на {label} не було. Створити бюджет можна лише для поточного або майбутнього
+          місяця.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-3 rounded-lg border border-dashed p-6">
-      <p>Бюджету на {monthLabel(month).toLowerCase()} ще немає.</p>
+    <div className="space-y-3 rounded-lg border border-dashed p-6" data-testid="budget-empty">
+      <p>Бюджету на {label} ще немає.</p>
       <div className="flex flex-wrap gap-2">
         <Button disabled={create.isPending} onClick={() => create.mutate({ month })}>
           Створити
@@ -51,9 +121,9 @@ function EmptyBudget({ month }: { month: string }) {
         <Button
           variant="outline"
           disabled={create.isPending}
-          onClick={() => create.mutate({ month, copyFrom: previous })}
+          onClick={() => create.mutate({ month, copyFrom: shiftMonth(month, -1) })}
         >
-          Скопіювати з попереднього
+          Скопіювати ліміти з попереднього
         </Button>
       </div>
       <ErrorText>{create.isError && errorMessage(create.error)}</ErrorText>
@@ -61,82 +131,46 @@ function EmptyBudget({ month }: { month: string }) {
   );
 }
 
-type ExpenseLine = BudgetView['expenseLines'][number];
-
-function BudgetContent({ budget }: { budget: BudgetView }) {
-  const { user } = useCurrentUser();
-  const accounts = useAccounts();
-  const categories = useCategories();
+function BudgetContent({
+  budget,
+  categories,
+}: {
+  budget: BudgetView;
+  categories: React.ComponentProps<typeof AddLimitDialog>['categories'];
+}) {
   const deleteExpenseLine = useDeleteExpenseLine(budget.id);
 
   // Вміст вікон зберігається й після закриття, щоб не змінюватися під час анімації.
-  const [entry, setEntry] = useState<{
-    open: boolean;
-    defaults?: Partial<TransactionFormValues>;
-  }>({ open: false });
-  const [lineDialog, setLineDialog] = useState<{ open: boolean; line?: ExpenseLine }>({
+  const [limitDialog, setLimitDialog] = useState<{ open: boolean; categoryId?: string }>({
     open: false,
   });
   const [deletion, setDeletion] = useState<{ open: boolean; line?: ExpenseLine }>({ open: false });
 
-  const editable = true;
-  const accountList = accounts.data ?? [];
-  const expenseCategories = (categories.data ?? []).filter(
-    (category) => category.kind === 'expense',
-  );
-  const canAddTransactions = accountList.length > 0;
-
-  const error = accounts.error ?? categories.error ?? deleteExpenseLine.error;
-
   return (
     <>
-      <ErrorText>{error && errorMessage(error)}</ErrorText>
-      {accounts.data && !canAddTransactions && (
-        <Muted>
-          Щоб додавати витрати, спершу{' '}
-          <Link className="underline" to="/accounts">
-            створіть рахунок
-          </Link>
-          .
-        </Muted>
+      {budget.periodState === 'past' && (
+        <Muted>Цей місяць минув: бюджет доступний лише для перегляду.</Muted>
       )}
+      <ErrorText>{deleteExpenseLine.isError && errorMessage(deleteExpenseLine.error)}</ErrorText>
 
       <BudgetSummary budget={budget} />
 
       <ExpenseSection
         budget={budget}
-        editable={editable}
-        canAddTransactions={canAddTransactions}
-        onAddLine={() => setLineDialog({ open: true })}
-        onEditLine={(line) => setLineDialog({ open: true, line })}
-        onDeleteLine={(line) => setDeletion({ open: true, line })}
-        onAddExpense={(categoryId) =>
-          setEntry({
-            open: true,
-            defaults: {
-              date: defaultEntryDate(budget.month, new Date(), user.timeZone),
-              categoryId: categoryId ?? '',
-            },
-          })
+        onAddLimit={(categoryId) =>
+          setLimitDialog({ open: true, ...(categoryId && { categoryId }) })
         }
+        onDeleteLine={(line) => setDeletion({ open: true, line })}
       />
 
       <IncomeSection budget={budget} />
 
-      <TransactionDialog
-        type="expense"
-        open={entry.open}
-        onOpenChange={(open) => setEntry({ ...entry, open })}
-        defaults={entry.defaults}
-        accounts={accountList}
-        categories={expenseCategories}
-      />
-      <ExpenseLineDialog
-        open={lineDialog.open}
-        onOpenChange={(open) => setLineDialog({ ...lineDialog, open })}
+      <AddLimitDialog
+        open={limitDialog.open}
+        onOpenChange={(open) => setLimitDialog({ ...limitDialog, open })}
         budget={budget}
-        line={lineDialog.line}
-        categories={expenseCategories}
+        categories={categories}
+        defaultCategoryId={limitDialog.categoryId}
       />
       <ConfirmDialog
         open={deletion.open}

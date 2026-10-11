@@ -1,5 +1,5 @@
 import type { BudgetView, Category } from '@hf/shared';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -16,97 +16,51 @@ import {
 import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
 import { useSaveExpenseLine } from './api.ts';
-import { parsePlannedAmount, plannedAmountText } from './plannedAmount.ts';
+import { parsePlannedAmount } from './plannedAmount.ts';
 
-type ExpenseLine = BudgetView['expenseLines'][number];
-
-interface DialogProps {
+interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   budget: BudgetView;
+  /** Категорії витрат домогосподарства. */
+  categories: readonly Category[];
+  /** Категорія, обрана заздалегідь, — коли ліміт додають із незапланованих витрат. */
+  defaultCategoryId?: string | undefined;
 }
 
-function LineDialogShell({
-  open,
-  onOpenChange,
-  title,
-  description,
-  children,
-}: Omit<DialogProps, 'budget'> & { title: string; description: string; children: ReactNode }) {
+/** Вікно нового ліміту на категорію. Наявний ліміт редагується прямо в рядку. */
+export function AddLimitDialog({ open, onOpenChange, ...form }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Вміст монтується при кожному відкритті, тому форма починається з актуальних значень. */}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle>Новий ліміт витрат</DialogTitle>
+          <DialogDescription>
+            Скільки ви плануєте витратити в цій категорії протягом місяця.
+          </DialogDescription>
         </DialogHeader>
-        {children}
+        <AddLimitForm {...form} onSaved={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
 }
 
-function FormActions({ pending }: { pending: boolean }) {
-  return (
-    <DialogFooter>
-      <DialogClose asChild>
-        <Button variant="outline">Скасувати</Button>
-      </DialogClose>
-      <Button type="submit" disabled={pending}>
-        Зберегти
-      </Button>
-    </DialogFooter>
-  );
-}
-
-// --- Ліміт витрат ---
-
-export function ExpenseLineDialog({
-  line,
-  categories,
-  ...props
-}: DialogProps & {
-  line?: ExpenseLine | undefined;
-  /** Категорії витрат домогосподарства. */
-  categories: readonly Category[];
-}) {
-  return (
-    <LineDialogShell
-      {...props}
-      title={line ? `Ліміт: ${line.categoryName}` : 'Новий ліміт витрат'}
-      description="Скільки ви плануєте витратити в цій категорії протягом місяця."
-    >
-      <ExpenseLineForm
-        budget={props.budget}
-        line={line}
-        categories={categories}
-        onSaved={() => props.onOpenChange(false)}
-      />
-    </LineDialogShell>
-  );
-}
-
-function ExpenseLineForm({
+function AddLimitForm({
   budget,
-  line,
   categories,
+  defaultCategoryId,
   onSaved,
-}: {
-  budget: BudgetView;
-  line: ExpenseLine | undefined;
-  categories: readonly Category[];
-  onSaved: () => void;
-}) {
+}: Omit<Props, 'open' | 'onOpenChange'> & { onSaved: () => void }) {
   const save = useSaveExpenseLine(budget.id);
   // Категорія може мати лише один ліміт на місяць.
   const planned = new Set(budget.expenseLines.map((item) => item.categoryId));
   const available = categories.filter((category) => !planned.has(category.id));
 
-  const [categoryId, setCategoryId] = useState(line?.categoryId ?? available[0]?.id ?? '');
-  const [amount, setAmount] = useState(
-    line ? plannedAmountText(line.planned, budget.currency) : '',
+  const [categoryId, setCategoryId] = useState(
+    available.find((category) => category.id === defaultCategoryId)?.id ?? available[0]?.id ?? '',
   );
+  const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string>();
 
   function handleSubmit(event: FormEvent) {
@@ -117,10 +71,10 @@ function ExpenseLineForm({
       return;
     }
     setAmountError(undefined);
-    save.mutate({ lineId: line?.id, input: { categoryId, plannedAmount } }, { onSuccess: onSaved });
+    save.mutate({ input: { categoryId, plannedAmount } }, { onSuccess: onSaved });
   }
 
-  if (!line && available.length === 0) {
+  if (available.length === 0) {
     return (
       <Muted>
         На всі категорії витрат уже задано ліміти. Нову категорію можна додати на сторінці{' '}
@@ -134,15 +88,13 @@ function ExpenseLineForm({
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
-      {!line && (
-        <Field label="Категорія">
-          <SelectField
-            value={categoryId}
-            onChange={setCategoryId}
-            options={available.map((category) => ({ value: category.id, label: category.name }))}
-          />
-        </Field>
-      )}
+      <Field label="Категорія">
+        <SelectField
+          value={categoryId}
+          onChange={setCategoryId}
+          options={available.map((category) => ({ value: category.id, label: category.name }))}
+        />
+      </Field>
       <Field label={`Ліміт, ${budget.currency}`} error={amountError}>
         <Input
           autoFocus
@@ -154,7 +106,14 @@ function ExpenseLineForm({
         />
       </Field>
       <ErrorText>{save.isError && errorMessage(save.error)}</ErrorText>
-      <FormActions pending={save.isPending} />
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button variant="outline">Скасувати</Button>
+        </DialogClose>
+        <Button type="submit" disabled={save.isPending}>
+          Зберегти
+        </Button>
+      </DialogFooter>
     </form>
   );
 }

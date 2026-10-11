@@ -1,13 +1,17 @@
 import { formatMoney, type BudgetView } from '@hf/shared';
 import { Link } from 'react-router-dom';
 import { Button } from '../../shared/ui/button.tsx';
+import { Muted } from '../../shared/ui/controls.tsx';
+import { formatDateString } from '../../shared/ui/format.ts';
+import { OccurrenceStatusLabel } from '../incomes/OccurrenceStatusLabel.tsx';
+import { OCCURRENCE_ROW_CLASS } from '../incomes/occurrenceStyles.ts';
 
 /**
- * Доходи місяця в бюджеті: план — сума очікуваних надходжень, факт — усе отримане за місяць.
- * Самі доходи ведуться на сторінці «Доходи».
+ * Доходи місяця в бюджеті — лише перегляд: надходження з індикаторами статусу й сума разових.
+ * Додаються, отримуються й редагуються доходи на сторінці «Доходи».
  */
 export function IncomeSection({ budget }: { budget: BudgetView }) {
-  const { summary, currency } = budget;
+  const { incomes, currency } = budget;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
 
   return (
@@ -18,19 +22,39 @@ export function IncomeSection({ budget }: { budget: BudgetView }) {
           <Link to={`/incomes?month=${budget.month}`}>Перейти до доходів</Link>
         </Button>
       </div>
-      <dl
-        className="grid grid-cols-2 gap-4 rounded-lg border p-3 text-sm"
-        data-testid="budget-income"
-      >
-        <div>
-          <dt className="text-muted-foreground">Заплановано</dt>
-          <dd className="font-medium tabular-nums">{money(summary.plannedIncomeTotal)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Отримано</dt>
-          <dd className="font-medium tabular-nums">{money(summary.receivedIncomeTotal)}</dd>
-        </div>
-      </dl>
+
+      {incomes.occurrences.length === 0 ? (
+        <Muted>Регулярних надходжень цього місяця немає.</Muted>
+      ) : (
+        <ul className="space-y-2">
+          {incomes.occurrences.map((occurrence) => (
+            <li
+              key={`${occurrence.name}-${occurrence.plannedDate}`}
+              data-testid="budget-income-occurrence"
+              data-status={occurrence.status}
+              className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border p-3 text-sm ${OCCURRENCE_ROW_CLASS[occurrence.status]}`}
+            >
+              <div>
+                <span className="font-medium">{occurrence.name}</span>{' '}
+                <span className="text-muted-foreground">
+                  · {formatDateString(occurrence.plannedDate)} ·{' '}
+                  <span
+                    className={`tabular-nums ${occurrence.status === 'skipped' ? 'line-through' : ''}`}
+                  >
+                    {money(occurrence.plannedAmount)}
+                  </span>
+                </span>
+              </div>
+              <OccurrenceStatusLabel occurrence={occurrence} currency={currency} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="text-sm" data-testid="budget-one-time-income">
+        <span className="text-muted-foreground">Разові доходи: </span>
+        <span className="font-medium tabular-nums">{money(incomes.oneTimeTotal)}</span>
+      </p>
     </section>
   );
 }

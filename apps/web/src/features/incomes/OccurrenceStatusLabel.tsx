@@ -3,12 +3,18 @@ import { Ban, Check, Circle, CircleAlert, CircleDashed } from 'lucide-react';
 import { formatDayMonth } from '../../shared/ui/format.ts';
 import type { Occurrence } from './occurrenceStyles.ts';
 
+/** Поля надходження, потрібні для індикатора; їх має і надходження в бюджеті. */
+export type OccurrenceForLabel = Pick<
+  Occurrence,
+  'status' | 'plannedDate' | 'plannedAmount' | 'actualAmount'
+> & { diff?: number | undefined };
+
 /** Статус отримання словами й іконкою: колір ніколи не є єдиною ознакою. */
 export function OccurrenceStatusLabel({
   occurrence,
   currency,
 }: {
-  occurrence: Occurrence;
+  occurrence: OccurrenceForLabel;
   currency: string;
 }) {
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
