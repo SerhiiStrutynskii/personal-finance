@@ -1,3 +1,4 @@
+import type { Transaction } from '@hf/shared';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -5,9 +6,9 @@ import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
-import { AddTransactionDialog } from './AddTransactionDialog.tsx';
 import { useTransactions } from './api.ts';
 import { ENTRY_CONFIG, type EntryType } from './config.ts';
+import { TransactionDialog } from './TransactionDialog.tsx';
 import { TransactionTable } from './TransactionTable.tsx';
 import { Button } from '../../shared/ui/button.tsx';
 
@@ -17,6 +18,8 @@ export function TransactionsPage({ type }: { type: EntryType }) {
   const config = ENTRY_CONFIG[type];
   const { user } = useCurrentUser();
   const [offset, setOffset] = useState(0);
+  // Запис зберігається й після закриття, щоб заголовок вікна не змінювався під час анімації.
+  const [dialog, setDialog] = useState<{ open: boolean; original?: Transaction }>({ open: false });
 
   const accounts = useAccounts();
   const categories = useCategories();
@@ -25,22 +28,13 @@ export function TransactionsPage({ type }: { type: EntryType }) {
   const error = transactions.error ?? accounts.error ?? categories.error;
   const page = transactions.data;
   const hasAccounts = (accounts.data?.length ?? 0) > 0;
+  const entryCategories = (categories.data ?? []).filter((category) => category.kind === type);
 
   return (
     <div>
       <PageHeader
         title={config.title}
-        action={
-          accounts.data &&
-          categories.data &&
-          hasAccounts && (
-            <AddTransactionDialog
-              type={type}
-              accounts={accounts.data}
-              categories={categories.data.filter((category) => category.kind === type)}
-            />
-          )
-        }
+        action={hasAccounts && <Button onClick={() => setDialog({ open: true })}>Додати</Button>}
       />
       <ErrorText>{error && errorMessage(error)}</ErrorText>
 
@@ -64,11 +58,7 @@ export function TransactionsPage({ type }: { type: EntryType }) {
             accounts={accounts.data ?? []}
             categories={categories.data ?? []}
             timeZone={user.timeZone}
-            renderActions={(transaction) => (
-              <Button variant="outline" asChild>
-                <Link to={`${config.path}/${transaction.id}`}>Змінити</Link>
-              </Button>
-            )}
+            onEdit={(original) => setDialog({ open: true, original })}
           />
           {page.total > PAGE_SIZE && (
             <div className="mt-4 flex items-center gap-3 text-sm">
@@ -93,6 +83,15 @@ export function TransactionsPage({ type }: { type: EntryType }) {
           )}
         </>
       )}
+
+      <TransactionDialog
+        type={type}
+        open={dialog.open}
+        onOpenChange={(open) => setDialog({ ...dialog, open })}
+        original={dialog.original}
+        accounts={accounts.data ?? []}
+        categories={entryCategories}
+      />
     </div>
   );
 }

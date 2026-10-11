@@ -22,7 +22,7 @@ interface Props {
   renderActions: (submit: ReactNode) => ReactNode;
 }
 
-/** Поля витрати або доходу. Використовується і в модальному вікні, і на сторінці редагування. */
+/** Поля витрати або доходу для створення чи редагування запису. */
 export function TransactionForm({
   type,
   original,

@@ -1,15 +1,6 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from './alert-dialog.tsx';
+import { useState } from 'react';
 import { Button } from './button.tsx';
+import { ConfirmDialog } from './confirm-dialog.tsx';
 
 interface Props {
   /** Запитання в діалозі, наприклад «Видалити рахунок „Картка“?». */
@@ -23,34 +14,31 @@ interface Props {
 /** Кнопка небезпечної дії, яка виконується лише після підтвердження в діалозі. */
 export function ConfirmButton({
   title,
-  description = 'Цю дію не можна скасувати.',
+  description,
   label = 'Видалити',
   disabled,
   onConfirm,
 }: Props) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          disabled={disabled}
-        >
-          {label}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent size="sm">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Скасувати</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={onConfirm}>
-            {label}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      <Button
+        variant="ghost"
+        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        {label}
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={title}
+        description={description}
+        label={label}
+        onConfirm={onConfirm}
+      />
+    </>
   );
 }

@@ -3,7 +3,6 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from '../../shared/api/index.ts';
 
 const LIST_KEY = ['transactions'];
-const ITEM_KEY = ['transaction'];
 
 export interface TransactionPage {
   items: Transaction[];
@@ -20,21 +19,9 @@ export function useTransactions(query: Partial<ListTransactionsQuery>) {
   });
 }
 
-export function useTransaction(id: string | undefined) {
-  return useQuery({
-    queryKey: [...ITEM_KEY, id],
-    queryFn: () => api.get<Transaction>(`/api/transactions/${id}`),
-    enabled: id !== undefined,
-  });
-}
-
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: LIST_KEY }),
-      queryClient.invalidateQueries({ queryKey: ITEM_KEY }),
-    ]);
+  return () => queryClient.invalidateQueries({ queryKey: LIST_KEY });
 }
 
 /** Створює транзакцію або повністю замінює наявну, якщо передано id. */

@@ -8,6 +8,7 @@ export const ENTRY_CONFIG: Record<
     addTitle: string;
     addDescription: string;
     editTitle: string;
+    editDescription: string;
     empty: string;
   }
 > = {
@@ -17,6 +18,7 @@ export const ENTRY_CONFIG: Record<
     addTitle: 'Нова витрата',
     addDescription: 'Сума спишеться з обраного рахунку.',
     editTitle: 'Редагування витрати',
+    editDescription: 'Зміни замінять поточний запис про витрату.',
     empty: 'Витрат ще немає',
   },
   income: {
@@ -25,6 +27,7 @@ export const ENTRY_CONFIG: Record<
     addTitle: 'Новий дохід',
     addDescription: 'Сума зарахується на обраний рахунок.',
     editTitle: 'Редагування доходу',
+    editDescription: 'Зміни замінять поточний запис про дохід.',
     empty: 'Доходів ще немає',
   },
 };

@@ -6,7 +6,6 @@ import { LoginPage, RegisterPage } from '../features/auth/AuthPages.tsx';
 import { AuthProvider } from '../features/auth/AuthProvider.tsx';
 import { CategoriesPage } from '../features/categories/CategoriesPage.tsx';
 import { ENTRY_CONFIG, type EntryType } from '../features/transactions/config.ts';
-import { TransactionFormPage } from '../features/transactions/TransactionFormPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
 import { ApiError } from '../shared/api/index.ts';
 import { Layout } from '../shared/layout/Layout.tsx';
@@ -38,10 +37,11 @@ export function App() {
               <Route element={<Layout />}>
                 <Route index element={<DashboardPage />} />
                 {ENTRY_TYPES.map((type) => (
-                  <Route key={type} path={ENTRY_CONFIG[type].path}>
-                    <Route index element={<TransactionsPage key={type} type={type} />} />
-                    <Route path=":id" element={<TransactionFormPage key={type} type={type} />} />
-                  </Route>
+                  <Route
+                    key={type}
+                    path={ENTRY_CONFIG[type].path}
+                    element={<TransactionsPage key={type} type={type} />}
+                  />
                 ))}
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="categories" element={<CategoriesPage />} />
