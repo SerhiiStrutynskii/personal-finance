@@ -12,7 +12,8 @@
 ## Стек
 
 - Backend: Node.js + TypeScript, Express 5
-- Frontend: React + TypeScript, Vite, React Query, Tailwind
+- Frontend: React + TypeScript, Vite, React Query, Tailwind, shadcn/ui
+  (компоненти в apps/web/src/shared/ui; нові додавати через `npx shadcn@latest add <name>` в apps/web)
 - БД: PostgreSQL, ORM/міграції: Drizzle (drizzle-kit, міграції в apps/api/drizzle)
 - Авторизація: власна — JWT (jose) + refresh-токени з ротацією, паролі argon2id
 - Тести: Vitest (unit, зокрема логіка фронтенду без UI), Supertest (API, окрема база TEST_DATABASE_URL), Playwright (e2e)
