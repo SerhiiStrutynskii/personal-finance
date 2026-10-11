@@ -40,7 +40,7 @@ export function AccountsPage() {
         </ul>
       )}
 
-      {accounts.data && <TransfersSection key={accounts.data.length} accounts={accounts.data} />}
+      {accounts.data && <TransfersSection accounts={accounts.data} />}
     </div>
   );
 }
