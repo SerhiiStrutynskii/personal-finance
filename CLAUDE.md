@@ -32,6 +32,7 @@ docs/           — domain.md, api.md, decisions/ (ADR)
 ```
 npm run dev          # запуск усього локально
 npm run test         # усі тести
+npm run test:e2e     # Playwright; сам піднімає API і фронтенд на тестовій базі (порти 3100 і 5174)
 npm run lint         # eslint + prettier
 npm run typecheck    # tsc --noEmit
 npm run db:generate  # згенерувати міграцію зі змін у apps/api/src/db/schema.ts

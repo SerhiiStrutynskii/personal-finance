@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts",
-    "db:seed": "NODE_ENV=development tsx --env-file=.env src/db/seed.ts"
+    "db:seed": "NODE_ENV=development tsx --env-file=.env src/db/seed.ts",
+    "e2e:server": "tsx --env-file=.env src/test/e2e-server.ts"
   },
   "dependencies": {
     "@hf/shared": "*",

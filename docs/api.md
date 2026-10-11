@@ -71,13 +71,13 @@
 
 Об'єкт: `{ id, name, kind, createdAt }`, де `kind` — `income` \| `expense`.
 
-| Метод  | Шлях                  | Тіло             | Відповідь                           |
-| ------ | --------------------- | ---------------- | ----------------------------------- |
-| GET    | `/api/categories`     | —                | `200 { items: Category[] }`         |
-| POST   | `/api/categories`     | `{ name, kind }` | `201 Category`; `409` для дубліката |
-| GET    | `/api/categories/:id` | —                | `200 Category`                      |
-| PATCH  | `/api/categories/:id` | `{ name }`       | `200 Category`; `409` для дубліката |
-| DELETE | `/api/categories/:id` | —                | `204`; `409`, якщо використовується |
+| Метод  | Шлях                  | Тіло             | Відповідь                                                     |
+| ------ | --------------------- | ---------------- | ------------------------------------------------------------- |
+| GET    | `/api/categories`     | —                | `200 { items: Category[] }`                                   |
+| POST   | `/api/categories`     | `{ name, kind }` | `201 Category`; `409` для дубліката                           |
+| GET    | `/api/categories/:id` | —                | `200 Category`                                                |
+| PATCH  | `/api/categories/:id` | `{ name }`       | `200 Category`; `409` для дубліката                           |
+| DELETE | `/api/categories/:id` | —                | `204`; `409`, якщо використовується в транзакціях або бюджеті |
 
 ## Транзакції
 
@@ -90,6 +90,7 @@
   "accountId": "…",
   "toAccountId": null,
   "categoryId": "…",
+  "incomeLineId": null,
   "amountMinor": 128450,
   "currency": "UAH",
   "description": "Супермаркет",
@@ -103,8 +104,12 @@
 
 Тіло для створення й заміни:
 
-- дохід або витрата: `{ type: "income" | "expense", accountId, categoryId?, amountMinor, currency?, description?, occurredAt }`
+- витрата: `{ type: "expense", accountId, categoryId?, amountMinor, currency?, description?, occurredAt }`
+- дохід: `{ type: "income", accountId, categoryId?, incomeLineId?, amountMinor, currency?, description?, occurredAt }`
 - переказ: `{ type: "transfer", accountId, toAccountId, amountMinor, currency?, description?, occurredAt }`
+
+`incomeLineId` — стаття доходу місячного бюджету; дохід має бути у валюті цього бюджету, а його
+дата — у межах місяця бюджету, інакше `400`. Для витрат і переказів поле має бути відсутнім або `null`.
 
 `occurredAt` — ISO 8601 із часовим поясом. `currency` за замовчуванням `UAH` і має збігатися з
 валютою рахунку. Решта правил — у `docs/domain.md`.
@@ -129,3 +134,68 @@
 | `offset`     | За замовчуванням 0                                         |
 
 Сортування — від новіших до старіших.
+
+## Бюджети
+
+Місячний бюджет домогосподарства. Усі суми — цілі числа в мінімальних одиницях валюти. Правила
+розрахунків — у `docs/domain.md`. Кожен запит, що змінює бюджет, повертає `Budget` цілком.
+
+Об'єкт `Budget`:
+
+```json
+{
+  "id": "…",
+  "month": "2026-10",
+  "status": "active",
+  "currency": "UAH",
+  "periodStart": "2026-09-30T21:00:00.000Z",
+  "periodEnd": "2026-10-31T22:00:00.000Z",
+  "summary": {
+    "plannedIncomeTotal": 6000000,
+    "receivedIncomeTotal": 4500000,
+    "plannedExpenseTotal": 5200000,
+    "spentTotal": 3100000,
+    "plannedBalance": 800000,
+    "actualBalance": 1400000
+  },
+  "incomeLines": [
+    { "id": "…", "name": "Зарплата", "planned": 5000000, "received": 4500000, "diff": -500000 }
+  ],
+  "expenseLines": [
+    {
+      "id": "…",
+      "categoryId": "…",
+      "categoryName": "Продукти",
+      "planned": 1200000,
+      "spent": 1350000,
+      "remaining": -150000,
+      "usage": 1.125,
+      "status": "over"
+    }
+  ],
+  "unplannedExpenses": [
+    { "categoryId": "…", "categoryName": "Подарунки", "spent": 80000, "status": "over" }
+  ],
+  "otherIncome": 0
+}
+```
+
+- `status` бюджету — `draft` \| `active` \| `closed`; `status` рядка — `over` \| `surplus` \| `neutral`.
+- `usage` — частка використаного ліміту; `null`, якщо ліміт 0, а витрати є.
+- `unplannedExpenses[].categoryId` — `null` для витрат без категорії.
+
+| Метод  | Шлях                                     | Тіло                            | Відповідь                                                                              |
+| ------ | ---------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------- |
+| GET    | `/api/budgets?month=YYYY-MM`             | —                               | `200 Budget`; `404`, якщо бюджету на місяць немає                                      |
+| POST   | `/api/budgets`                           | `{ month, copyFrom? }`          | `201 Budget`; `409` на дубль місяця; `404`, якщо бюджету місяця `copyFrom` немає       |
+| PATCH  | `/api/budgets/:id`                       | `{ status }`                    | `200 Budget`                                                                           |
+| POST   | `/api/budgets/:id/income-lines`          | `{ name, plannedAmount }`       | `201 Budget`                                                                           |
+| PATCH  | `/api/budgets/:id/income-lines/:lineId`  | `{ name?, plannedAmount? }`     | `200 Budget`                                                                           |
+| DELETE | `/api/budgets/:id/income-lines/:lineId`  | —                               | `200 Budget`; транзакції статті переходять в «Інші доходи»                             |
+| POST   | `/api/budgets/:id/expense-lines`         | `{ categoryId, plannedAmount }` | `201 Budget`; `409`, якщо ліміт на категорію вже є; `400`, якщо це не категорія витрат |
+| PATCH  | `/api/budgets/:id/expense-lines/:lineId` | `{ plannedAmount }`             | `200 Budget`                                                                           |
+| DELETE | `/api/budgets/:id/expense-lines/:lineId` | —                               | `200 Budget`                                                                           |
+
+`copyFrom` копіює статті доходів і витрат з іншого місяця; транзакції не копіюються. Будь-яка зміна
+статей закритого бюджету — `409`. Чужий бюджет — `404`. Фактичні записи додаються через
+`/api/transactions`.

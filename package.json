@@ -11,13 +11,15 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint . && npm run lint -w @hf/web && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e",
     "db:generate": "npm run db:generate -w @hf/api",
     "db:migrate": "npm run db:migrate -w @hf/api",
-    "db:seed": "npm run db:seed -w @hf/api"
+    "db:seed": "npm run db:seed -w @hf/api",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
     "eslint": "^10.10.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.10",

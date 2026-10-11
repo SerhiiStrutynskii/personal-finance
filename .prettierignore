@@ -5,3 +5,5 @@ package-lock.json
 apps/api/drizzle
 apps/api/legacy-src
 .claude
+test-results
+playwright-report
