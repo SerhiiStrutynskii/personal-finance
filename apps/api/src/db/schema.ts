@@ -4,6 +4,7 @@ import {
   char,
   check,
   index,
+  integer,
   pgEnum,
   pgTable,
   primaryKey,
@@ -53,6 +54,8 @@ export const refreshTokens = pgTable(
 export const households = pgTable('households', {
   id: id(),
   name: text().notNull(),
+  // У цьому поясі рахуються межі місяця бюджету, спільні для всіх членів домогосподарства.
+  timeZone: text('time_zone').notNull().default('Europe/Kyiv'),
   createdAt: createdAt(),
 });
 
@@ -119,20 +122,89 @@ export const transactions = pgTable(
     currency: char({ length: 3 }).notNull().default('UAH'),
     description: text().notNull().default(''),
     occurredAt: instant().notNull(),
+    // Стаття доходу місячного бюджету; тільки для доходів.
+    incomeLineId: uuid('income_line_id').references(() => budgetIncomeLines.id, {
+      onDelete: 'set null',
+    }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: instant().notNull().defaultNow(),
   },
   (t) => [
-    index().on(t.householdId, t.occurredAt),
+    index().on(t.householdId, t.occurredAt, t.type, t.categoryId),
     index().on(t.accountId),
     index().on(t.toAccountId),
     index().on(t.categoryId),
+    index().on(t.incomeLineId),
+    check(
+      'transactions_income_line_only_for_income',
+      sql`${t.incomeLineId} IS NULL OR ${t.type} = 'income'`,
+    ),
     check('transactions_amount_positive', sql`${t.amountMinor} > 0`),
     check(
       'transactions_transfer_shape',
       sql`(${t.type} = 'transfer' AND ${t.toAccountId} IS NOT NULL AND ${t.toAccountId} <> ${t.accountId} AND ${t.categoryId} IS NULL)
         OR (${t.type} <> 'transfer' AND ${t.toAccountId} IS NULL)`,
     ),
+  ],
+);
+
+export const BUDGET_STATUSES = ['draft', 'active', 'closed'] as const;
+
+export const budgets = pgTable(
+  'budgets',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    // Перше число місяця 00:00 у часовому поясі домогосподарства; кінець — виключно.
+    periodStart: instant().notNull(),
+    periodEnd: instant().notNull(),
+    currency: char({ length: 3 }).notNull().default('UAH'),
+    status: text({ enum: BUDGET_STATUSES }).notNull().default('active'),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    unique().on(t.householdId, t.periodStart),
+    check('budgets_status_valid', sql`${t.status} IN ('draft', 'active', 'closed')`),
+    check('budgets_period_valid', sql`${t.periodEnd} > ${t.periodStart}`),
+  ],
+);
+
+export const budgetIncomeLines = pgTable(
+  'budget_income_lines',
+  {
+    id: id(),
+    budgetId: uuid('budget_id')
+      .notNull()
+      .references(() => budgets.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    plannedAmount: bigint('planned_amount', { mode: 'number' }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => [
+    index().on(t.budgetId),
+    check('budget_income_lines_planned_non_negative', sql`${t.plannedAmount} >= 0`),
+  ],
+);
+
+export const budgetExpenseLines = pgTable(
+  'budget_expense_lines',
+  {
+    id: id(),
+    budgetId: uuid('budget_id')
+      .notNull()
+      .references(() => budgets.id, { onDelete: 'cascade' }),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => categories.id),
+    plannedAmount: bigint('planned_amount', { mode: 'number' }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => [
+    unique().on(t.budgetId, t.categoryId),
+    check('budget_expense_lines_planned_non_negative', sql`${t.plannedAmount} >= 0`),
   ],
 );
