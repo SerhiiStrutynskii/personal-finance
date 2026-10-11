@@ -29,7 +29,9 @@ async function addExpenseCategory(page: Page, name: string) {
   await expect(page.getByText(name)).toBeVisible();
 }
 
-test('витрата понад ліміт робить рядок категорії червоним', async ({ page }) => {
+test('витрата понад ліміт робить рядок категорії червоним і не блокує наступні', async ({
+  page,
+}) => {
   await register(page);
   await addAccount(page, 'Картка');
   await addExpenseCategory(page, 'Продукти');
@@ -76,5 +78,13 @@ test('витрата понад ліміт робить рядок катего�
   expect(colors.border).toBe(colors.expected);
 
   await expect(page.getByText('150,00').first()).toBeVisible();
+
+  // Перевищений ліміт не блокує нові витрати в цій категорії.
+  await row.getByRole('button', { name: 'витрата' }).click();
+  await expenseDialog.getByLabel('Сума, UAH').fill('25');
+  await expenseDialog.getByRole('button', { name: 'Зберегти' }).click();
+  await expect(expenseDialog).toBeHidden();
+  await expect(row).toHaveAttribute('data-status', 'over');
+  await expect(row).toContainText('Перевищено на 75,00');
   await page.screenshot({ path: 'test-results/budget-over-limit.png', fullPage: true });
 });

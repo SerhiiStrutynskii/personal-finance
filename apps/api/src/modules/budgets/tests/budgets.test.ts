@@ -324,6 +324,27 @@ describe('розрахунки', () => {
     ]);
   });
 
+  it('перевищений ліміт не блокує нові витрати в цій категорії', async () => {
+    const actor = await createActor();
+    const f = await createFixtures(actor);
+    await plannedBudget(actor, f);
+
+    const first = await expense(actor, f, { categoryId: f.food.id, amountMinor: 1200001 });
+    expect(first.status).toBe(201);
+    const overLimit = (await actor.get(`/api/budgets?month=${FUTURE}`)).body.expenseLines[0];
+    expect(overLimit.status).toBe('over');
+
+    const second = await expense(actor, f, { categoryId: f.food.id, amountMinor: 500000 });
+    expect(second.status).toBe(201);
+
+    const { body } = await actor.get(`/api/budgets?month=${FUTURE}`);
+    expect(body.expenseLines[0]).toMatchObject({
+      spent: 1700001,
+      remaining: -500001,
+      status: 'over',
+    });
+  });
+
   it('після завершення періоду залишок дає surplus, рівно ліміт — neutral, перевищення — over', async () => {
     const actor = await createActor();
     const f = await createFixtures(actor);
