@@ -2,6 +2,7 @@ import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import { badRequest, notFound } from '../../http/errors.ts';
 import { findAccountsByIds } from '../accounts/repo.ts';
+import { findIncomeLineWithBudget } from '../budgets/repo.ts';
 import { findCategory } from '../categories/repo.ts';
 import * as repo from './repo.ts';
 import type { ListTransactionsQuery, Transaction, TransactionInput } from './schema.ts';
@@ -12,6 +13,7 @@ const toDto = (row: repo.TransactionRow): Transaction => ({
   accountId: row.accountId,
   toAccountId: row.toAccountId,
   categoryId: row.categoryId,
+  incomeLineId: row.incomeLineId,
   amountMinor: row.amountMinor,
   currency: row.currency,
   description: row.description,
@@ -54,7 +56,13 @@ async function resolveValues(
     if (toAccount.currency !== input.currency) {
       throw badRequest('Перекази між рахунками в різних валютах поки не підтримуються');
     }
-    return { ...base, type: 'transfer', toAccountId: input.toAccountId, categoryId: null };
+    return {
+      ...base,
+      type: 'transfer',
+      toAccountId: input.toAccountId,
+      categoryId: null,
+      incomeLineId: null,
+    };
   }
 
   if (input.categoryId) {
@@ -64,7 +72,27 @@ async function resolveValues(
       throw badRequest('Тип категорії не відповідає типу транзакції');
     }
   }
-  return { ...base, type: input.type, toAccountId: null, categoryId: input.categoryId };
+  const incomeLineId = input.type === 'income' ? input.incomeLineId : null;
+  if (incomeLineId) {
+    const line = await findIncomeLineWithBudget(db, auth.householdId, incomeLineId);
+    if (!line) throw badRequest('Статтю доходу не знайдено');
+    if (line.currency !== input.currency) {
+      throw badRequest('Валюта доходу має збігатися з валютою бюджету статті');
+    }
+    // Дохід, прив'язаний до статті, не може опинитися поза місяцем її бюджету.
+    if (base.occurredAt < line.periodStart || base.occurredAt >= line.periodEnd) {
+      throw badRequest(
+        'Дата доходу має бути в межах місяця бюджету, до статті якого він привʼязаний',
+      );
+    }
+  }
+  return {
+    ...base,
+    type: input.type,
+    toAccountId: null,
+    categoryId: input.categoryId,
+    incomeLineId,
+  };
 }
 
 export async function listTransactions(db: Db, auth: AuthContext, query: ListTransactionsQuery) {

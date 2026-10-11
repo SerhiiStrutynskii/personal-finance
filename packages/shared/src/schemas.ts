@@ -69,12 +69,26 @@ const transactionBase = {
 
 export const transactionInputSchema = z.discriminatedUnion('type', [
   z.object({
-    type: z.enum(['income', 'expense']),
+    type: z.literal('expense'),
     ...transactionBase,
     categoryId: idSchema.nullable().default(null),
+    // Статті бюджету є лише в доходів: будь-яке значення, крім null, — помилка.
+    incomeLineId: z.null().optional(),
+  }),
+  z.object({
+    type: z.literal('income'),
+    ...transactionBase,
+    categoryId: idSchema.nullable().default(null),
+    /** Стаття доходу місячного бюджету; дата доходу має бути в межах місяця цього бюджету. */
+    incomeLineId: idSchema.nullable().default(null),
   }),
   z
-    .object({ type: z.literal('transfer'), ...transactionBase, toAccountId: idSchema })
+    .object({
+      type: z.literal('transfer'),
+      ...transactionBase,
+      toAccountId: idSchema,
+      incomeLineId: z.null().optional(),
+    })
     .refine((value) => value.accountId !== value.toAccountId, {
       path: ['toAccountId'],
       message: 'Переказ має бути між різними рахунками',
@@ -100,6 +114,7 @@ export const transactionSchema = z.object({
   accountId: idSchema,
   toAccountId: idSchema.nullable(),
   categoryId: idSchema.nullable(),
+  incomeLineId: idSchema.nullable(),
   amountMinor: positiveAmountMinorSchema,
   currency: currencySchema,
   description: z.string(),

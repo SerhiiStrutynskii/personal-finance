@@ -7,6 +7,7 @@ import { accountsRouter } from './modules/accounts/routes.ts';
 import { createLoginLimiter, type RateLimiter } from './modules/auth/rate-limiter.ts';
 import { authRouter } from './modules/auth/routes.ts';
 import { createTokenService } from './modules/auth/tokens.ts';
+import { budgetsRouter } from './modules/budgets/routes.ts';
 import { categoriesRouter } from './modules/categories/routes.ts';
 import { transactionsRouter } from './modules/transactions/routes.ts';
 
@@ -37,6 +38,7 @@ export function createApp({ db, corsOrigin, jwtSecret, loginLimiter }: AppOption
   const api = Router();
   api.use(requireAuth(db, tokens));
   api.use('/accounts', accountsRouter(db));
+  api.use('/budgets', budgetsRouter(db));
   api.use('/categories', categoriesRouter(db));
   api.use('/transactions', transactionsRouter(db));
   app.use('/api', api);

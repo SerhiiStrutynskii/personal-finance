@@ -57,7 +57,9 @@ export async function deleteCategory(db: Db, auth: AuthContext, id: string): Pro
     if (!(await repo.deleteCategory(db, auth.householdId, id))) throw notFound('Категорія');
   } catch (error) {
     if (isForeignKeyViolation(error)) {
-      throw conflict('Категорія використовується в транзакціях, тому її не можна видалити');
+      throw conflict(
+        'Категорія використовується в транзакціях або бюджеті, тому її не можна видалити',
+      );
     }
     throw error;
   }

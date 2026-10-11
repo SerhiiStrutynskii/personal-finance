@@ -12,6 +12,7 @@ export type TransactionValues = Pick<
   | 'accountId'
   | 'toAccountId'
   | 'categoryId'
+  | 'incomeLineId'
   | 'amountMinor'
   | 'currency'
   | 'description'

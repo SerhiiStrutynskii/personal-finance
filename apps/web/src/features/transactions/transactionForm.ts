@@ -19,6 +19,8 @@ export interface TransactionFormValues {
   toAccountId: string;
   /** Порожній рядок — без категорії. */
   categoryId: string;
+  /** Стаття доходу місячного бюджету; порожній рядок — без статті. Тільки для доходів. */
+  incomeLineId: string;
   /** Сума у звичному записі: «1 234,50». */
   amount: string;
   /** Дата у форматі YYYY-MM-DD в часовому поясі користувача. */
@@ -47,6 +49,7 @@ export function initialValues(
       accountId: original.accountId,
       toAccountId: original.toAccountId ?? '',
       categoryId: original.categoryId ?? '',
+      incomeLineId: original.incomeLineId ?? '',
       amount: toDecimalString(original).replace('.', ','),
       date: localDateKey(new Date(original.occurredAt), timeZone),
       description: original.description,
@@ -56,6 +59,7 @@ export function initialValues(
     accountId: accounts[0]?.id ?? '',
     toAccountId: '',
     categoryId: '',
+    incomeLineId: '',
     amount: '',
     date: localDateKey(now, timeZone),
     description: '',
@@ -144,7 +148,12 @@ export function toTransactionInput(
   const candidate =
     type === 'transfer'
       ? { ...base, type, toAccountId: toAccount!.id }
-      : { ...base, type, categoryId: values.categoryId || null };
+      : {
+          ...base,
+          type,
+          categoryId: values.categoryId || null,
+          ...(type === 'income' && { incomeLineId: values.incomeLineId || null }),
+        };
 
   const parsed = transactionInputSchema.safeParse(candidate);
   if (!parsed.success) {
