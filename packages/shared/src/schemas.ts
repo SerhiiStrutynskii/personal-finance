@@ -108,3 +108,49 @@ export const transactionSchema = z.object({
   updatedAt: instantSchema,
 });
 export type Transaction = z.infer<typeof transactionSchema>;
+
+// --- Auth ---
+
+export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
+
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 128;
+const passwordSchema = z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH);
+
+export const registerSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  name: nameSchema,
+  householdName: nameSchema.default('Моє домогосподарство'),
+});
+export type RegisterInput = z.infer<typeof registerSchema>;
+
+// Під час входу довжину пароля не перевіряємо за правилами реєстрації: лише розумні межі.
+export const loginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+});
+export type LoginInput = z.infer<typeof loginSchema>;
+
+export const refreshSchema = z.object({ refreshToken: z.string().min(1).max(200) });
+export type RefreshInput = z.infer<typeof refreshSchema>;
+
+export const authTokensSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  /** Час життя access-токена в секундах. */
+  expiresIn: z.number().int().positive(),
+});
+export type AuthTokens = z.infer<typeof authTokensSchema>;
+
+export const memberRoleSchema = z.enum(['owner', 'member']);
+export type MemberRole = z.infer<typeof memberRoleSchema>;
+
+export const currentUserSchema = z.object({
+  user: z.object({ id: idSchema, email: z.string(), name: z.string(), timeZone: z.string() }),
+  household: z.object({ id: idSchema, name: z.string(), role: memberRoleSchema }),
+});
+export type CurrentUser = z.infer<typeof currentUserSchema>;
+
+export const authSessionSchema = currentUserSchema.extend(authTokensSchema.shape);
+export type AuthSession = z.infer<typeof authSessionSchema>;
