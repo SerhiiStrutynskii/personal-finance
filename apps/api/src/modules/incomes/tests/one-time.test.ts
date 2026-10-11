@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setupTestApp } from '../../../test/harness.ts';
 
-const { createActor } = setupTestApp();
+const { createActor, insertTransaction } = setupTestApp();
 const MISSING_ID = '11111111-1111-4111-8111-111111111111';
 
 async function setup() {
@@ -125,11 +125,13 @@ describe('разові доходи', () => {
     const ctx = await setup();
     const stranger = await setup();
     await oneTime(stranger);
-    await ctx.actor.post('/api/transactions', {
+    // видаток минулого місяця через API внести не можна, тому вставляється напряму
+    await insertTransaction(ctx.actor, {
       type: 'expense',
       accountId: ctx.card.id,
       amountMinor: 999,
-      occurredAt: '2020-03-09T10:00:00Z',
+      currency: 'UAH',
+      occurredAt: new Date('2020-03-09T10:00:00Z'),
     });
     await ctx.actor.post('/api/transactions', {
       type: 'income',

@@ -1,7 +1,9 @@
+import { getAllowedExpenseDateRange } from '@hf/shared';
 import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
-import { badRequest, notFound } from '../../http/errors.ts';
+import { badRequest, expensePeriodClosed, notFound } from '../../http/errors.ts';
 import { findAccountsByIds } from '../accounts/repo.ts';
+import { findHouseholdTimeZone } from '../budgets/repo.ts';
 import { findCategory } from '../categories/repo.ts';
 import { findOccurrenceForLink } from '../incomes/repo.ts';
 import * as repo from './repo.ts';
@@ -100,12 +102,48 @@ export async function getTransaction(db: Db, auth: AuthContext, id: string): Pro
   return toDto(row);
 }
 
+/**
+ * Обмеження видатків за періодом, спільне для всього застосунку: видаток можна створити чи
+ * перенести лише на дату від початку поточного місяця до цієї миті, а видатки минулих
+ * місяців не змінюються й не видаляються. Доходів і переказів це не стосується.
+ */
+async function expenseWindow(db: Db, auth: AuthContext, now: Date) {
+  const timeZone = await findHouseholdTimeZone(db, auth.householdId);
+  if (!timeZone) throw notFound('Домогосподарство');
+  return getAllowedExpenseDateRange(now, timeZone);
+}
+
+async function assertExpenseDateAllowed(db: Db, auth: AuthContext, occurredAt: Date, now: Date) {
+  const { start, end } = await expenseWindow(db, auth, now);
+  if (occurredAt < start) {
+    throw expensePeriodClosed('Видаток можна додати лише в поточному місяці');
+  }
+  if (occurredAt > end) {
+    throw expensePeriodClosed('Видаток не можна додати на майбутню дату');
+  }
+}
+
+async function assertExpenseNotInPastPeriod(
+  db: Db,
+  auth: AuthContext,
+  existing: repo.TransactionRow,
+  now: Date,
+) {
+  if (existing.type !== 'expense') return;
+  const { start } = await expenseWindow(db, auth, now);
+  if (existing.occurredAt < start) {
+    throw expensePeriodClosed('Видатки минулих місяців не можна змінювати чи видаляти');
+  }
+}
+
 export async function createTransaction(
   db: Db,
   auth: AuthContext,
   input: TransactionInput,
+  now: Date = new Date(),
 ): Promise<Transaction> {
   const values = await resolveValues(db, auth, input);
+  if (values.type === 'expense') await assertExpenseDateAllowed(db, auth, values.occurredAt, now);
   return toDto(await repo.insertTransaction(db, auth.householdId, auth.userId, values));
 }
 
@@ -114,13 +152,28 @@ export async function replaceTransaction(
   auth: AuthContext,
   id: string,
   input: TransactionInput,
+  now: Date = new Date(),
 ): Promise<Transaction> {
+  const existing = await repo.findTransaction(db, auth.householdId, id);
+  if (!existing) throw notFound('Транзакція');
+  await assertExpenseNotInPastPeriod(db, auth, existing, now);
+
   const values = await resolveValues(db, auth, input);
+  if (values.type === 'expense') await assertExpenseDateAllowed(db, auth, values.occurredAt, now);
+
   const row = await repo.replaceTransaction(db, auth.householdId, id, values);
   if (!row) throw notFound('Транзакція');
   return toDto(row);
 }
 
-export async function deleteTransaction(db: Db, auth: AuthContext, id: string): Promise<void> {
-  if (!(await repo.deleteTransaction(db, auth.householdId, id))) throw notFound('Транзакція');
+export async function deleteTransaction(
+  db: Db,
+  auth: AuthContext,
+  id: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const existing = await repo.findTransaction(db, auth.householdId, id);
+  if (!existing) throw notFound('Транзакція');
+  await assertExpenseNotInPastPeriod(db, auth, existing, now);
+  await repo.deleteTransaction(db, auth.householdId, id);
 }

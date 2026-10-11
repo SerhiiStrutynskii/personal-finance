@@ -21,9 +21,17 @@ export interface AppOptions {
   corsOrigin: string;
   jwtSecret: string;
   loginLimiter?: RateLimiter;
+  /** Поточний момент; підміняється в тестах, щоб перевіряти правила про періоди. */
+  now?: () => Date;
 }
 
-export function createApp({ db, corsOrigin, jwtSecret, loginLimiter }: AppOptions) {
+export function createApp({
+  db,
+  corsOrigin,
+  jwtSecret,
+  loginLimiter,
+  now = () => new Date(),
+}: AppOptions) {
   const tokens = createTokenService(jwtSecret);
 
   const app = express();
@@ -43,12 +51,12 @@ export function createApp({ db, corsOrigin, jwtSecret, loginLimiter }: AppOption
   const api = Router();
   api.use(requireAuth(db, tokens));
   api.use('/accounts', accountsRouter(db));
-  api.use('/budgets', budgetsRouter(db));
+  api.use('/budgets', budgetsRouter(db, now));
   api.use('/categories', categoriesRouter(db));
-  api.use('/income-occurrences', incomeOccurrencesRouter(db));
-  api.use('/income-sources', incomeSourcesRouter(db));
-  api.use('/incomes', incomesRouter(db));
-  api.use('/transactions', transactionsRouter(db));
+  api.use('/income-occurrences', incomeOccurrencesRouter(db, now));
+  api.use('/income-sources', incomeSourcesRouter(db, now));
+  api.use('/incomes', incomesRouter(db, now));
+  api.use('/transactions', transactionsRouter(db, now));
   app.use('/api', api);
 
   app.use(notFoundHandler);

@@ -1,9 +1,13 @@
 import { sql } from 'drizzle-orm';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { setupTestApp, type Actor } from '../../../test/harness.ts';
 
-const { app, db, createActor } = setupTestApp();
+const { app, db, createActor, setNow, insertTransaction } = setupTestApp();
+
+// «Зараз» — вечір 31 березня 2026 за Києвом: видатки з датами березня належать до поточного періоду.
+const NOW = '2026-03-31T20:30:00Z';
+beforeEach(() => setNow(NOW));
 const MISSING_ID = '11111111-1111-4111-8111-111111111111';
 
 async function createFixtures(actor: Actor) {
@@ -208,13 +212,15 @@ describe('список транзакцій', () => {
       '2026-03-31T20:59:59Z', // 23:59:59 31 березня (літній час)
       '2026-03-31T21:00:00Z', // 00:00 1 квітня
     ];
+    // Дати виходять за поточний місяць, тому записи вставляються напряму, оминаючи правило API.
     for (const [index, occurredAt] of dates.entries()) {
-      await actor.post('/api/transactions', {
+      await insertTransaction(actor, {
         type: 'expense',
         accountId: fixtures.card.id,
         categoryId: index === 2 ? fixtures.groceries.id : null,
         amountMinor: (index + 1) * 100,
-        occurredAt,
+        currency: 'UAH',
+        occurredAt: new Date(occurredAt),
       });
     }
     return fixtures;
@@ -389,5 +395,167 @@ describe('доступ', () => {
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Некоректний запит' } });
     expect((await request(app).get('/nope')).status).toBe(404);
+  });
+});
+
+describe('обмеження видатків за періодом', () => {
+  // Поточний період: березень 2026 за Києвом, [28.02 22:00 UTC, зараз].
+  const expenseAt = (actor: Actor, accountId: string, occurredAt: string, override: object = {}) =>
+    actor.post('/api/transactions', {
+      type: 'expense',
+      accountId,
+      amountMinor: 100,
+      occurredAt,
+      ...override,
+    });
+
+  it('видаток можна створити від початку поточного місяця до цієї миті', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+
+    expect((await expenseAt(actor, card.id, '2026-02-28T22:00:00Z')).status).toBe(201);
+    expect((await expenseAt(actor, card.id, '2026-03-15T10:00:00Z')).status).toBe(201);
+    expect((await expenseAt(actor, card.id, NOW)).status).toBe(201);
+  });
+
+  it('видаток з датою минулого місяця — 422 EXPENSE_PERIOD_CLOSED', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+
+    // 28 лютого 23:59:59 за Києвом — на секунду раніше початку березня
+    const res = await expenseAt(actor, card.id, '2026-02-28T21:59:59Z');
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('EXPENSE_PERIOD_CLOSED');
+    expect((await expenseAt(actor, card.id, '2025-12-31T10:00:00Z')).status).toBe(422);
+    expect((await actor.get('/api/transactions')).body.total).toBe(0);
+  });
+
+  it('видаток з майбутньою датою — 422, навіть у межах поточного місяця', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+
+    const laterToday = await expenseAt(actor, card.id, '2026-03-31T20:30:01Z');
+    expect(laterToday.status).toBe(422);
+    expect(laterToday.body.error.code).toBe('EXPENSE_PERIOD_CLOSED');
+    expect((await expenseAt(actor, card.id, '2026-04-10T10:00:00Z')).status).toBe(422);
+  });
+
+  it('редагування й видалення видатку минулого місяця — 422', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+    const past = await insertTransaction(actor, {
+      type: 'expense',
+      accountId: card.id,
+      amountMinor: 500,
+      currency: 'UAH',
+      occurredAt: new Date('2026-02-10T10:00:00Z'),
+    });
+
+    const edited = await actor.put(`/api/transactions/${past.id}`, {
+      type: 'expense',
+      accountId: card.id,
+      amountMinor: 999,
+      // навіть якщо нова дата в поточному місяці
+      occurredAt: '2026-03-10T10:00:00Z',
+    });
+    expect(edited.status).toBe(422);
+    expect(edited.body.error.code).toBe('EXPENSE_PERIOD_CLOSED');
+
+    const removed = await actor.delete(`/api/transactions/${past.id}`);
+    expect(removed.status).toBe(422);
+    expect(removed.body.error.code).toBe('EXPENSE_PERIOD_CLOSED');
+
+    // перетворити минулий видаток на дохід теж не можна
+    const converted = await actor.put(`/api/transactions/${past.id}`, {
+      type: 'income',
+      accountId: card.id,
+      amountMinor: 500,
+      occurredAt: '2026-02-10T10:00:00Z',
+    });
+    expect(converted.status).toBe(422);
+
+    expect((await actor.get(`/api/transactions/${past.id}`)).body).toMatchObject({
+      type: 'expense',
+      amountMinor: 500,
+      occurredAt: '2026-02-10T10:00:00.000Z',
+    });
+  });
+
+  it('дату видатку поточного місяця не можна винести за його межі', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+    const { body: created } = await expenseAt(actor, card.id, '2026-03-10T10:00:00Z');
+    const move = (occurredAt: string) =>
+      actor.put(`/api/transactions/${created.id}`, {
+        type: 'expense',
+        accountId: card.id,
+        amountMinor: 100,
+        occurredAt,
+      });
+
+    expect((await move('2026-02-20T10:00:00Z')).status).toBe(422);
+    expect((await move('2026-04-01T10:00:00Z')).status).toBe(422);
+    expect((await move('2026-03-20T10:00:00Z')).status).toBe(200);
+    expect((await actor.delete(`/api/transactions/${created.id}`)).status).toBe(204);
+  });
+
+  it('дохід не можна перетворити на видаток із датою поза поточним місяцем', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+    const { body: income } = await actor.post('/api/transactions', {
+      type: 'income',
+      accountId: card.id,
+      amountMinor: 100,
+      occurredAt: '2026-01-10T10:00:00Z',
+    });
+    const asExpense = (occurredAt: string) =>
+      actor.put(`/api/transactions/${income.id}`, {
+        type: 'expense',
+        accountId: card.id,
+        amountMinor: 100,
+        occurredAt,
+      });
+
+    expect((await asExpense('2026-01-10T10:00:00Z')).status).toBe(422);
+    expect((await asExpense('2026-03-10T10:00:00Z')).status).toBe(200);
+  });
+
+  it('доходів і переказів обмеження не стосується', async () => {
+    const actor = await createActor();
+    const { card, cash } = await createFixtures(actor);
+    const base = { accountId: card.id, amountMinor: 100 };
+
+    const responses = await Promise.all([
+      actor.post('/api/transactions', {
+        ...base,
+        type: 'income',
+        occurredAt: '2025-06-01T10:00:00Z',
+      }),
+      actor.post('/api/transactions', {
+        ...base,
+        type: 'income',
+        occurredAt: '2026-05-01T10:00:00Z',
+      }),
+      actor.post('/api/transactions', {
+        ...base,
+        type: 'transfer',
+        toAccountId: cash.id,
+        occurredAt: '2025-06-01T10:00:00Z',
+      }),
+    ]);
+    expect(responses.map((res) => res.status)).toEqual([201, 201, 201]);
+
+    const { body: pastIncome } = responses[0]!;
+    expect((await actor.delete(`/api/transactions/${pastIncome.id}`)).status).toBe(204);
+  });
+
+  it('межа періоду рахується в часовому поясі домогосподарства', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+    // 1 квітня 00:30 за Києвом (21:30 UTC 31 березня): поточний місяць уже квітень
+    setNow('2026-03-31T21:30:00Z');
+
+    expect((await expenseAt(actor, card.id, '2026-03-31T21:00:00Z')).status).toBe(201);
+    expect((await expenseAt(actor, card.id, '2026-03-31T20:59:59Z')).status).toBe(422);
   });
 });

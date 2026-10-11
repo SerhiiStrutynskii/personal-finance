@@ -16,6 +16,9 @@ export const notFound = (what: string) => new AppError(404, 'NOT_FOUND', `${what
 export const badRequest = (message: string) => new AppError(400, 'BAD_REQUEST', message);
 export const tooManyRequests = () =>
   new AppError(429, 'TOO_MANY_REQUESTS', 'Забагато спроб. Спробуйте пізніше');
+/** Видаток не можна створити чи змінити поза поточним періодом. */
+export const expensePeriodClosed = (message: string) =>
+  new AppError(422, 'EXPENSE_PERIOD_CLOSED', message);
 export const conflict = (message: string) => new AppError(409, 'CONFLICT', message);
 
 // ON DELETE RESTRICT повідомляє 23001, звичайний зовнішній ключ — 23503

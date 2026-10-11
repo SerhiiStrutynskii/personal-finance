@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setupTestApp } from '../../../test/harness.ts';
 
-const { createActor } = setupTestApp();
+const { createActor, setNow } = setupTestApp();
 const MISSING_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('accounts', () => {
@@ -60,6 +60,7 @@ describe('accounts', () => {
   });
 
   it('видаляє порожній рахунок, а рахунок із транзакціями — ні', async () => {
+    setNow('2026-03-15T12:00:00Z');
     const actor = await createActor();
     const { body: empty } = await actor.post('/api/accounts', { name: 'Порожній', type: 'cash' });
     const { body: used } = await actor.post('/api/accounts', { name: 'Картка', type: 'card' });

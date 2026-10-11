@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setupTestApp } from '../../../test/harness.ts';
 
-const { createActor } = setupTestApp();
+const { createActor, setNow } = setupTestApp();
 
 describe('categories', () => {
   it('створює, перейменовує і видаляє категорію', async () => {
@@ -64,6 +64,7 @@ describe('categories', () => {
   });
 
   it('не видаляє категорію, яка використовується', async () => {
+    setNow('2026-03-15T12:00:00Z');
     const actor = await createActor();
     const { body: account } = await actor.post('/api/accounts', { name: 'Картка', type: 'card' });
     const { body: category } = await actor.post('/api/categories', {

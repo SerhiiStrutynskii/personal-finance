@@ -2,7 +2,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { setupTestApp, type Actor } from '../../../test/harness.ts';
 
-const { app, createActor } = setupTestApp();
+const { app, createActor, setNow, insertTransaction } = setupTestApp();
 const MISSING_ID = '11111111-1111-4111-8111-111111111111';
 
 // Жовтень 2026 за Києвом: [30.09 21:00 UTC, 31.10 22:00 UTC). Тести прив'язані до фіксованих
@@ -31,13 +31,26 @@ type Fixtures = Awaited<ReturnType<typeof createFixtures>>;
 const createBudget = async (actor: Actor, month: string, copyFrom?: string) =>
   actor.post('/api/budgets', { month, ...(copyFrom && { copyFrom }) });
 
-const expense = (actor: Actor, f: Fixtures, override: object) =>
-  actor.post('/api/transactions', {
+interface ExpenseOverride {
+  accountId?: string;
+  categoryId?: string;
+  amountMinor?: number;
+  currency?: string;
+  occurredAt?: string;
+}
+
+/**
+ * Видаток за довільну дату. Через API видаток можна внести лише в поточному місяці,
+ * тому дані для інших місяців вставляються напряму.
+ */
+const expense = (actor: Actor, f: Fixtures, override: ExpenseOverride) =>
+  insertTransaction(actor, {
     type: 'expense',
-    accountId: f.card.id,
-    amountMinor: 100,
-    occurredAt: '2099-10-15T10:00:00Z',
-    ...override,
+    accountId: override.accountId ?? f.card.id,
+    categoryId: override.categoryId ?? null,
+    amountMinor: override.amountMinor ?? 100,
+    currency: override.currency ?? 'UAH',
+    occurredAt: new Date(override.occurredAt ?? '2099-10-15T10:00:00Z'),
   });
 
 const income = (actor: Actor, f: Fixtures, override: object) =>
@@ -342,17 +355,24 @@ describe('розрахунки', () => {
   });
 
   it('перевищений ліміт не блокує нові витрати в цій категорії', async () => {
+    setNow('2099-10-20T10:00:00Z');
     const actor = await createActor();
     const f = await createFixtures(actor);
     await plannedBudget(actor, f);
+    const viaApi = (amountMinor: number) =>
+      actor.post('/api/transactions', {
+        type: 'expense',
+        accountId: f.card.id,
+        categoryId: f.food.id,
+        amountMinor,
+        occurredAt: '2099-10-15T10:00:00Z',
+      });
 
-    const first = await expense(actor, f, { categoryId: f.food.id, amountMinor: 1200001 });
-    expect(first.status).toBe(201);
+    expect((await viaApi(1200001)).status).toBe(201);
     const overLimit = (await actor.get(`/api/budgets?month=${FUTURE}`)).body.expenseLines[0];
     expect(overLimit.status).toBe('over');
 
-    const second = await expense(actor, f, { categoryId: f.food.id, amountMinor: 500000 });
-    expect(second.status).toBe(201);
+    expect((await viaApi(500000)).status).toBe(201);
 
     const { body } = await actor.get(`/api/budgets?month=${FUTURE}`);
     expect(body.expenseLines[0]).toMatchObject({
@@ -418,28 +438,6 @@ describe('розрахунки', () => {
     expect(await spent('2026-09')).toBe(1);
     expect(await spent('2026-10')).toBe(705);
     expect(await spent('2026-11')).toBe(30);
-  });
-
-  it('перенесення дати транзакції переносить її в інший місяць', async () => {
-    const actor = await createActor();
-    const f = await createFixtures(actor);
-    await createBudget(actor, '2026-10');
-    await createBudget(actor, '2026-11');
-    const body = {
-      type: 'expense',
-      accountId: f.card.id,
-      amountMinor: 500,
-      occurredAt: '2026-10-10T10:00:00Z',
-    };
-    const { body: created } = await actor.post('/api/transactions', body);
-
-    await actor.put(`/api/transactions/${created.id}`, {
-      ...body,
-      occurredAt: '2026-11-10T10:00:00Z',
-    });
-
-    expect((await actor.get('/api/budgets?month=2026-10')).body.summary.spentTotal).toBe(0);
-    expect((await actor.get('/api/budgets?month=2026-11')).body.summary.spentTotal).toBe(500);
   });
 
   it('перекази й транзакції в іншій валюті не враховуються', async () => {

@@ -13,7 +13,7 @@ import {
 } from './schema.ts';
 import * as sources from './sources.service.ts';
 
-export function incomeSourcesRouter(db: Db): Router {
+export function incomeSourcesRouter(db: Db, now: () => Date): Router {
   const router = Router();
 
   router.get('/', async (_req, res) => {
@@ -28,12 +28,12 @@ export function incomeSourcesRouter(db: Db): Router {
   router.patch('/:id', async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
     const patch = updateIncomeSourceSchema.parse(req.body);
-    res.json(await sources.updateSource(db, getAuth(res), id, patch));
+    res.json(await sources.updateSource(db, getAuth(res), id, patch, now()));
   });
 
   router.post('/:id/deactivate', async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
-    res.json(await sources.deactivateSource(db, getAuth(res), id));
+    res.json(await sources.deactivateSource(db, getAuth(res), id, now()));
   });
 
   router.delete('/:id', async (req, res) => {
@@ -45,35 +45,35 @@ export function incomeSourcesRouter(db: Db): Router {
   return router;
 }
 
-export function incomesRouter(db: Db): Router {
+export function incomesRouter(db: Db, now: () => Date): Router {
   const router = Router();
 
   router.get('/', async (req, res) => {
     const { month } = incomesQuerySchema.parse(req.query);
-    res.json(await occurrences.getIncomes(db, getAuth(res), month));
+    res.json(await occurrences.getIncomes(db, getAuth(res), month, now()));
   });
 
   router.post('/one-time', async (req, res) => {
     const input = oneTimeIncomeSchema.parse(req.body);
-    res.status(201).json(await occurrences.createOneTimeIncome(db, getAuth(res), input));
+    res.status(201).json(await occurrences.createOneTimeIncome(db, getAuth(res), input, now()));
   });
 
   return router;
 }
 
-export function incomeOccurrencesRouter(db: Db): Router {
+export function incomeOccurrencesRouter(db: Db, now: () => Date): Router {
   const router = Router();
 
   router.patch('/:id', async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
     const patch = updateOccurrenceSchema.parse(req.body);
-    res.json(await occurrences.updateOccurrence(db, getAuth(res), id, patch));
+    res.json(await occurrences.updateOccurrence(db, getAuth(res), id, patch, now()));
   });
 
   router.post('/:id/receive', async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
     const input = receiveOccurrenceSchema.parse(req.body ?? {});
-    res.status(201).json(await occurrences.receiveOccurrence(db, getAuth(res), id, input));
+    res.status(201).json(await occurrences.receiveOccurrence(db, getAuth(res), id, input, now()));
   });
 
   return router;

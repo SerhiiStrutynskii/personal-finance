@@ -3,7 +3,7 @@ import request from 'supertest';
 import { afterAll, beforeEach } from 'vitest';
 import { createApp } from '../app.ts';
 import { createDb } from '../db/client.ts';
-import { householdMembers, households, users } from '../db/schema.ts';
+import { householdMembers, households, transactions, users } from '../db/schema.ts';
 import { createLoginLimiter } from '../modules/auth/rate-limiter.ts';
 import { createTokenService } from '../modules/auth/tokens.ts';
 import { testDatabaseUrl } from './database-url.ts';
@@ -27,17 +27,21 @@ export function setupTestApp() {
   const { db, pool } = createDb(testDatabaseUrl());
   const tokens = createTokenService(TEST_JWT_SECRET);
   const clock = { now: Date.now() };
+  // Поточний момент для правил про періоди; без setNow — справжній час.
+  const time: { fixed: Date | undefined } = { fixed: undefined };
   const app = createApp({
     db,
     corsOrigin: 'http://localhost',
     jwtSecret: TEST_JWT_SECRET,
     loginLimiter: createLoginLimiter(() => clock.now),
+    now: () => time.fixed ?? new Date(),
   });
 
   beforeEach(async () => {
     await db.execute(sql`TRUNCATE users, households RESTART IDENTITY CASCADE`);
     // Зсув часу скидає лічильник невдалих входів між тестами.
     clock.now += 24 * 60 * 60 * 1000;
+    time.fixed = undefined;
   });
   afterAll(() => pool.end());
 
@@ -77,5 +81,22 @@ export function setupTestApp() {
     return { userId, householdId, accessToken, ...client(accessToken) };
   }
 
-  return { app, db, tokens, clock, client, createActor };
+  /** Фіксує «зараз» для застосунку до кінця тесту. */
+  function setNow(iso: string): void {
+    time.fixed = new Date(iso);
+  }
+
+  /** Вставляє транзакцію напряму в базу, оминаючи правила API (наприклад, видаток минулого місяця). */
+  async function insertTransaction(
+    actor: Actor,
+    values: Omit<typeof transactions.$inferInsert, 'householdId' | 'createdBy'>,
+  ) {
+    const [row] = await db
+      .insert(transactions)
+      .values({ ...values, householdId: actor.householdId, createdBy: actor.userId })
+      .returning();
+    return row!;
+  }
+
+  return { app, db, tokens, clock, client, createActor, setNow, insertTransaction };
 }
