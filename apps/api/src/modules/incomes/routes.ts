@@ -53,6 +53,11 @@ export function incomesRouter(db: Db): Router {
     res.json(await occurrences.getIncomes(db, getAuth(res), month));
   });
 
+  router.post('/one-time', async (req, res) => {
+    const input = oneTimeIncomeSchema.parse(req.body);
+    res.status(201).json(await occurrences.createOneTimeIncome(db, getAuth(res), input));
+  });
+
   return router;
 }
 
