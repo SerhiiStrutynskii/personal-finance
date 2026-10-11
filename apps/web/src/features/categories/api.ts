@@ -1,8 +1,14 @@
-import type { Category, CreateCategoryInput } from '@hf/shared';
+import type { Category, CategoryKind, CreateCategoryInput } from '@hf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
 
 const KEY = ['categories'];
+
+export const CATEGORY_KIND_LABELS: Record<CategoryKind, string> = {
+  expense: 'Витрати',
+  income: 'Доходи',
+};
+export const CATEGORY_KINDS = Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[];
 
 export function useCategories() {
   return useQuery({
