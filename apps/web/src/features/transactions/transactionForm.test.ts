@@ -276,3 +276,39 @@ describe('дохід і надходження', () => {
     expect(transfer.ok && 'occurrenceId' in transfer.input).toBe(false);
   });
 });
+
+describe('межі дат (minDate / maxDate)', () => {
+  // Сьогодні 15 березня 2026: видаток можна внести з 1 по 15 березня.
+  const limited = { ...context, minDate: '2026-03-01', maxDate: '2026-03-15' };
+  const dateError = (date: string) => {
+    const result = toTransactionInput('expense', values({ date }), limited);
+    return result.ok ? undefined : result.errors.date;
+  };
+
+  it('приймає дати в межах включно', () => {
+    expect(dateError('2026-03-01')).toBeUndefined();
+    expect(dateError('2026-03-10')).toBeUndefined();
+    expect(dateError('2026-03-15')).toBeUndefined();
+  });
+
+  it('відхиляє минулий місяць і майбутні дати', () => {
+    const message = 'Дата має бути в поточному місяці й не пізніше сьогодні';
+    expect(dateError('2026-02-28')).toBe(message);
+    expect(dateError('2026-03-16')).toBe(message);
+    expect(dateError('2026-04-01')).toBe(message);
+  });
+
+  it('порожня дата лишається окремою помилкою', () => {
+    expect(dateError('')).toBe('Вкажіть дату');
+  });
+
+  it('без меж обмежень немає', () => {
+    const result = toTransactionInput('income', values({ date: '2025-01-01' }), context);
+    expect(result.ok).toBe(true);
+  });
+
+  it('сьогоднішня дата отримує поточний час, тож не виходить у майбутнє', () => {
+    const result = toTransactionInput('expense', values({ date: '2026-03-15' }), limited);
+    expect(result.ok && result.input.occurredAt).toBe(now.toISOString());
+  });
+});

@@ -36,6 +36,12 @@ export interface FormContext {
   now: Date;
   /** Транзакція, яку редагують. */
   original?: Transaction | undefined;
+  /**
+   * Межі дозволених дат (YYYY-MM-DD, включно). Для видатків це поточний місяць до сьогодні —
+   * див. getAllowedExpenseDateRange; остаточно правило перевіряє API.
+   */
+  minDate?: string | undefined;
+  maxDate?: string | undefined;
 }
 
 export function initialValues(
@@ -126,6 +132,12 @@ export function toTransactionInput(
 
   const occurredAt = resolveOccurredAt(values.date, context);
   if (!occurredAt) errors.date = 'Вкажіть дату';
+  else if (
+    (context.minDate && values.date < context.minDate) ||
+    (context.maxDate && values.date > context.maxDate)
+  ) {
+    errors.date = 'Дата має бути в поточному місяці й не пізніше сьогодні';
+  }
 
   const description = values.description.trim();
   if (description.length > 500) errors.description = 'Опис задовгий (до 500 символів)';

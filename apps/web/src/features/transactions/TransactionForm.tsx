@@ -24,6 +24,9 @@ interface Props {
   categories: Category[];
   /** Початкові значення нового запису, наприклад категорія чи дата з екрана бюджету. */
   defaults?: Partial<TransactionFormValues> | undefined;
+  /** Межі вибору дати (YYYY-MM-DD, включно); для видатків — поточний місяць до сьогодні. */
+  minDate?: string | undefined;
+  maxDate?: string | undefined;
   onSaved: () => void;
   /** Розміщує кнопку збереження поруч із власними діями (наприклад, «Скасувати»). */
   renderActions: (submit: ReactNode) => ReactNode;
@@ -36,13 +39,22 @@ export function TransactionForm({
   accounts,
   categories,
   defaults,
+  minDate,
+  maxDate,
   onSaved,
   renderActions,
 }: Props) {
   const { user } = useCurrentUser();
   const save = useSaveTransaction();
 
-  const context = () => ({ accounts, timeZone: user.timeZone, now: new Date(), original });
+  const context = () => ({
+    accounts,
+    timeZone: user.timeZone,
+    now: new Date(),
+    original,
+    minDate,
+    maxDate,
+  });
   const [values, setValues] = useState(() => initialValues(context(), defaults));
   const [errors, setErrors] = useState<FormErrors>({});
   const set = (patch: Partial<typeof values>) => setValues({ ...values, ...patch });
@@ -96,6 +108,8 @@ export function TransactionForm({
       <Field label="Дата" error={errors.date}>
         <Input
           type="date"
+          min={minDate}
+          max={maxDate}
           value={values.date}
           aria-invalid={errors.date ? true : undefined}
           onChange={(e) => set({ date: e.target.value })}

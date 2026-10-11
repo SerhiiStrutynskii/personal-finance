@@ -1,4 +1,4 @@
-import type { Transaction } from '@hf/shared';
+import { getAllowedExpenseDateRange, type Transaction } from '@hf/shared';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -29,6 +29,9 @@ export function TransactionsPage({ type }: { type: EntryType }) {
   const page = transactions.data;
   const hasAccounts = (accounts.data?.length ?? 0) > 0;
   const entryCategories = (categories.data ?? []).filter((category) => category.kind === type);
+  // Видатки можна вносити й змінювати лише в поточному місяці до сьогодні; для доходів меж немає.
+  const expenseRange =
+    type === 'expense' ? getAllowedExpenseDateRange(new Date(), user.timeZone) : undefined;
 
   return (
     <div>
@@ -50,6 +53,12 @@ export function TransactionsPage({ type }: { type: EntryType }) {
 
       {!page && !error && <Muted>Завантаження…</Muted>}
       {page && page.total === 0 && hasAccounts && <Muted>{config.empty}</Muted>}
+      {type === 'expense' && (
+        <Muted>
+          Видаток можна додати лише в поточному місяці й не на майбутню дату. Видатки минулих
+          місяців доступні тільки для перегляду.
+        </Muted>
+      )}
 
       {page && page.total > 0 && (
         <>
@@ -59,6 +68,9 @@ export function TransactionsPage({ type }: { type: EntryType }) {
             categories={categories.data ?? []}
             timeZone={user.timeZone}
             onEdit={(original) => setDialog({ open: true, original })}
+            isLocked={(transaction) =>
+              expenseRange !== undefined && new Date(transaction.occurredAt) < expenseRange.start
+            }
           />
           {page.total > PAGE_SIZE && (
             <div className="mt-4 flex items-center gap-3 text-sm">
@@ -89,6 +101,8 @@ export function TransactionsPage({ type }: { type: EntryType }) {
         open={dialog.open}
         onOpenChange={(open) => setDialog({ ...dialog, open })}
         original={dialog.original}
+        minDate={expenseRange?.minDate}
+        maxDate={expenseRange?.maxDate}
         accounts={accounts.data ?? []}
         categories={entryCategories}
       />

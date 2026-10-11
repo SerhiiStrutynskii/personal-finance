@@ -24,6 +24,9 @@ interface Props {
   categories: Category[];
   /** Початкові значення нового запису. */
   defaults?: Partial<TransactionFormValues> | undefined;
+  /** Межі вибору дати (YYYY-MM-DD, включно). */
+  minDate?: string | undefined;
+  maxDate?: string | undefined;
 }
 
 /** Модальне вікно з формою витрати або доходу: створення або редагування. Керується ззовні. */
@@ -35,6 +38,8 @@ export function TransactionDialog({
   accounts,
   categories,
   defaults,
+  minDate,
+  maxDate,
 }: Props) {
   const config = ENTRY_CONFIG[type];
   return (
@@ -53,6 +58,8 @@ export function TransactionDialog({
           accounts={accounts}
           categories={categories}
           defaults={defaults}
+          minDate={minDate}
+          maxDate={maxDate}
           onSaved={() => onOpenChange(false)}
           renderActions={(submit) => (
             <DialogFooter>
