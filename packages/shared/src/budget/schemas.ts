@@ -15,13 +15,11 @@ export const plannedAmountSchema = z
   .nonnegative()
   .refine(Number.isSafeInteger, 'Сума завелика');
 
-const lineNameSchema = z.string().trim().min(1).max(100);
-
 export const budgetQuerySchema = z.object({ month: monthSchema });
 
 export const createBudgetSchema = z.object({
   month: monthSchema,
-  /** Місяць, з якого скопіювати статті доходів і витрат (без транзакцій). */
+  /** Місяць, з якого скопіювати ліміти витрат (без транзакцій). */
   copyFrom: monthSchema.optional(),
 });
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
@@ -30,17 +28,6 @@ export const updateBudgetSchema = z.object({ status: budgetStatusSchema });
 export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
 
 export const budgetLineParamsSchema = z.object({ id: idSchema, lineId: idSchema });
-
-export const createIncomeLineSchema = z.object({
-  name: lineNameSchema,
-  plannedAmount: plannedAmountSchema,
-});
-export type CreateIncomeLineInput = z.infer<typeof createIncomeLineSchema>;
-
-export const updateIncomeLineSchema = createIncomeLineSchema
-  .partial()
-  .refine((value) => Object.keys(value).length > 0, 'Потрібне хоча б одне поле');
-export type UpdateIncomeLineInput = z.infer<typeof updateIncomeLineSchema>;
 
 export const createExpenseLineSchema = z.object({
   categoryId: idSchema,
@@ -67,15 +54,6 @@ export const budgetViewSchema = z.object({
     plannedBalance: z.number().int(),
     actualBalance: z.number().int(),
   }),
-  incomeLines: z.array(
-    z.object({
-      id: idSchema,
-      name: z.string(),
-      planned: z.number().int(),
-      received: z.number().int(),
-      diff: z.number().int(),
-    }),
-  ),
   expenseLines: z.array(
     z.object({
       id: idSchema,
@@ -98,6 +76,5 @@ export const budgetViewSchema = z.object({
       status: categoryStatusSchema,
     }),
   ),
-  otherIncome: z.number().int(),
 });
 export type BudgetView = z.infer<typeof budgetViewSchema>;

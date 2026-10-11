@@ -1,9 +1,8 @@
-import { sql } from 'drizzle-orm';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { setupTestApp, type Actor } from '../../../test/harness.ts';
 
-const { app, db, createActor } = setupTestApp();
+const { app, createActor } = setupTestApp();
 const MISSING_ID = '11111111-1111-4111-8111-111111111111';
 
 // Жовтень 2026 за Києвом: [30.09 21:00 UTC, 31.10 22:00 UTC). Тести прив'язані до фіксованих
@@ -62,10 +61,8 @@ describe('створення й читання бюджету', () => {
       currency: 'UAH',
       periodStart: '2026-09-30T21:00:00.000Z',
       periodEnd: '2026-10-31T22:00:00.000Z',
-      incomeLines: [],
       expenseLines: [],
       unplannedExpenses: [],
-      otherIncome: 0,
       summary: {
         plannedIncomeTotal: 0,
         receivedIncomeTotal: 0,
@@ -127,29 +124,6 @@ describe('створення й читання бюджету', () => {
 });
 
 describe('статті', () => {
-  it('додає, змінює і видаляє статті доходів', async () => {
-    const actor = await createActor();
-    const { body: budget } = await createBudget(actor, FUTURE);
-    const base = `/api/budgets/${budget.id}/income-lines`;
-
-    const added = await actor.post(base, { name: '  Зарплата ', plannedAmount: 5000000 });
-    expect(added.status).toBe(201);
-    await actor.post(base, { name: 'Фріланс', plannedAmount: 0 });
-    const lines = (await actor.get(`/api/budgets?month=${FUTURE}`)).body.incomeLines;
-    expect(lines).toEqual([
-      expect.objectContaining({ name: 'Зарплата', planned: 5000000, received: 0, diff: -5000000 }),
-      expect.objectContaining({ name: 'Фріланс', planned: 0, received: 0, diff: 0 }),
-    ]);
-
-    const updated = await actor.patch(`${base}/${lines[0].id}`, { plannedAmount: 6000000 });
-    expect(updated.body.incomeLines[0]).toMatchObject({ name: 'Зарплата', planned: 6000000 });
-    expect(updated.body.summary.plannedIncomeTotal).toBe(6000000);
-
-    const removed = await actor.delete(`${base}/${lines[1].id}`);
-    expect(removed.status).toBe(200);
-    expect(removed.body.incomeLines).toHaveLength(1);
-  });
-
   it('додає, змінює і видаляє ліміти витрат', async () => {
     const actor = await createActor();
     const f = await createFixtures(actor);
@@ -178,40 +152,47 @@ describe('статті', () => {
     expect((await actor.delete(`${base}/${lineId}`)).status).toBe(404);
   });
 
-  it('відхиляє некоректні статті', async () => {
+  it('відхиляє некоректні ліміти', async () => {
     const actor = await createActor();
     const stranger = await createActor();
     const f = await createFixtures(actor);
     const foreign = await createFixtures(stranger);
     const { body: budget } = await createBudget(actor, FUTURE);
-    const incomeLines = `/api/budgets/${budget.id}/income-lines`;
     const expenseLines = `/api/budgets/${budget.id}/expense-lines`;
 
-    const statuses = async (requests: Promise<{ status: number }>[]) =>
-      (await Promise.all(requests)).map((res) => res.status);
-
-    expect(
-      await statuses([
-        actor.post(incomeLines, { name: 'Зарплата', plannedAmount: -1 }),
-        actor.post(incomeLines, { name: 'Зарплата', plannedAmount: 100.5 }),
-        actor.post(incomeLines, { name: 'Зарплата', plannedAmount: '100' }),
-        actor.post(incomeLines, { name: ' ', plannedAmount: 100 }),
-        actor.post(incomeLines, { plannedAmount: 100 }),
-        actor.post(expenseLines, { categoryId: 'abc', plannedAmount: 100 }),
-        actor.post(expenseLines, { categoryId: f.food.id, plannedAmount: -5 }),
-        // категорія доходів, чужа категорія, неіснуюча категорія
-        actor.post(expenseLines, { categoryId: f.salaryCategory.id, plannedAmount: 100 }),
-        actor.post(expenseLines, { categoryId: foreign.food.id, plannedAmount: 100 }),
-        actor.post(expenseLines, { categoryId: MISSING_ID, plannedAmount: 100 }),
-      ]),
-    ).toEqual(Array(10).fill(400));
+    const responses = await Promise.all([
+      actor.post(expenseLines, { categoryId: 'abc', plannedAmount: 100 }),
+      actor.post(expenseLines, { categoryId: f.food.id, plannedAmount: -5 }),
+      actor.post(expenseLines, { categoryId: f.food.id, plannedAmount: 100.5 }),
+      actor.post(expenseLines, { categoryId: f.food.id, plannedAmount: '100' }),
+      actor.post(expenseLines, { categoryId: f.food.id }),
+      // категорія доходів, чужа категорія, неіснуюча категорія
+      actor.post(expenseLines, { categoryId: f.salaryCategory.id, plannedAmount: 100 }),
+      actor.post(expenseLines, { categoryId: foreign.food.id, plannedAmount: 100 }),
+      actor.post(expenseLines, { categoryId: MISSING_ID, plannedAmount: 100 }),
+    ]);
+    expect(responses.map((res) => res.status)).toEqual(Array(8).fill(400));
 
     await actor.post(expenseLines, { categoryId: f.food.id, plannedAmount: 100 });
     const duplicate = await actor.post(expenseLines, { categoryId: f.food.id, plannedAmount: 200 });
     expect(duplicate.status).toBe(409);
 
-    expect((await actor.patch(`${incomeLines}/${MISSING_ID}`, { name: 'x' })).status).toBe(404);
-    expect((await actor.patch(`${incomeLines}/${MISSING_ID}`, {})).status).toBe(400);
+    expect((await actor.patch(`${expenseLines}/${MISSING_ID}`, { plannedAmount: 1 })).status).toBe(
+      404,
+    );
+    expect((await actor.patch(`${expenseLines}/${MISSING_ID}`, {})).status).toBe(400);
+  });
+
+  it('статей доходу в бюджеті більше немає', async () => {
+    const actor = await createActor();
+    const { body: budget } = await createBudget(actor, FUTURE);
+    const res = await actor.post(`/api/budgets/${budget.id}/income-lines`, {
+      name: 'Зарплата',
+      plannedAmount: 1,
+    });
+    expect(res.status).toBe(404);
+    expect(budget).not.toHaveProperty('incomeLines');
+    expect(budget).not.toHaveProperty('otherIncome');
   });
 
   it('не дає видалити категорію, на яку задано ліміт', async () => {
@@ -235,36 +216,37 @@ describe('розрахунки', () => {
       categoryId: f.food.id,
       plannedAmount: 1200000,
     });
-    await actor.post(`/api/budgets/${budget.id}/expense-lines`, {
+    const { body } = await actor.post(`/api/budgets/${budget.id}/expense-lines`, {
       categoryId: f.transport.id,
       plannedAmount: 300000,
     });
-    const { body } = await actor.post(`/api/budgets/${budget.id}/income-lines`, {
-      name: 'Зарплата',
-      plannedAmount: 5000000,
-    });
-    return body as {
-      id: string;
-      incomeLines: { id: string }[];
-      expenseLines: { id: string; categoryId: string }[];
-    };
+    return body as { id: string; expenseLines: { id: string; categoryId: string }[] };
   }
 
-  it('рахує витрати, перевищення, незаплановані витрати, доходи й підсумки', async () => {
+  const salarySource = (actor: Actor, f: Fixtures, override: object = {}) =>
+    actor.post('/api/income-sources', {
+      name: 'Зарплата',
+      accountId: f.card.id,
+      plannedAmount: 5000000,
+      frequency: 'monthly',
+      dayOfMonth: 5,
+      startDate: '2020-01-01',
+      ...override,
+    });
+
+  it('рахує витрати, перевищення, незаплановані витрати й підсумки', async () => {
     const actor = await createActor();
     const f = await createFixtures(actor);
-    const budget = await plannedBudget(actor, f);
-    const salaryLine = budget.incomeLines[0]!.id;
+    await plannedBudget(actor, f, PAST);
+    const at = { occurredAt: '2020-03-10T10:00:00Z' };
 
-    await expense(actor, f, { categoryId: f.food.id, amountMinor: 1000000 });
-    await expense(actor, f, { categoryId: f.food.id, amountMinor: 350000 });
-    await expense(actor, f, { categoryId: f.transport.id, amountMinor: 120000 });
-    await expense(actor, f, { categoryId: f.gifts.id, amountMinor: 80000 });
-    await expense(actor, f, { amountMinor: 5000 });
-    await income(actor, f, { incomeLineId: salaryLine, amountMinor: 4500000 });
-    await income(actor, f, { amountMinor: 20000, categoryId: f.salaryCategory.id });
+    await expense(actor, f, { ...at, categoryId: f.food.id, amountMinor: 1000000 });
+    await expense(actor, f, { ...at, categoryId: f.food.id, amountMinor: 350000 });
+    await expense(actor, f, { ...at, categoryId: f.transport.id, amountMinor: 120000 });
+    await expense(actor, f, { ...at, categoryId: f.gifts.id, amountMinor: 80000 });
+    await expense(actor, f, { ...at, amountMinor: 5000 });
 
-    const { body } = await actor.get(`/api/budgets?month=${FUTURE}`);
+    const { body } = await actor.get(`/api/budgets?month=${PAST}`);
 
     expect(body.expenseLines).toEqual([
       expect.objectContaining({
@@ -280,7 +262,7 @@ describe('розрахунки', () => {
         spent: 120000,
         remaining: 180000,
         usage: 0.4,
-        status: 'neutral',
+        status: 'surplus',
       }),
     ]);
     expect(body.unplannedExpenses).toEqual(
@@ -290,23 +272,58 @@ describe('розрахунки', () => {
       ]),
     );
     expect(body.unplannedExpenses).toHaveLength(2);
-    expect(body.incomeLines).toEqual([
-      expect.objectContaining({
-        name: 'Зарплата',
-        planned: 5000000,
-        received: 4500000,
-        diff: -500000,
-      }),
-    ]);
-    expect(body.otherIncome).toBe(20000);
     expect(body.summary).toEqual({
-      plannedIncomeTotal: 5000000,
-      receivedIncomeTotal: 4520000,
+      plannedIncomeTotal: 0,
+      receivedIncomeTotal: 0,
       plannedExpenseTotal: 1500000,
       spentTotal: 1555000,
-      plannedBalance: 3500000,
-      actualBalance: 2965000,
+      plannedBalance: -1500000,
+      actualBalance: -1555000,
     });
+  });
+
+  it('запланований і фактичний дохід місяця беруться з доходів', async () => {
+    const actor = await createActor();
+    const f = await createFixtures(actor);
+    await plannedBudget(actor, f, PAST);
+    await salarySource(actor, f);
+    await salarySource(actor, f, { name: 'Аванс', plannedAmount: 1000000, dayOfMonth: 20 });
+
+    const incomes = (await actor.get(`/api/incomes?month=${PAST}`)).body;
+    const salary = incomes.occurrences.find((item: { name: string }) => item.name === 'Зарплата');
+    await actor.post(`/api/income-occurrences/${salary.id}/receive`, {
+      amount: 4500000,
+      date: '2020-03-05',
+    });
+    await actor.post('/api/incomes/one-time', {
+      name: 'Продаж велосипеда',
+      amount: 750000,
+      date: '2020-03-09',
+      accountId: f.card.id,
+    });
+    await expense(actor, f, {
+      categoryId: f.food.id,
+      amountMinor: 250000,
+      occurredAt: '2020-03-10T10:00:00Z',
+    });
+
+    const { body } = await actor.get(`/api/budgets?month=${PAST}`);
+    expect(body.summary).toEqual({
+      // зарплата 50 000 + аванс 10 000
+      plannedIncomeTotal: 6000000,
+      // отримана зарплата 45 000 + разовий дохід 7 500
+      receivedIncomeTotal: 5250000,
+      plannedExpenseTotal: 1500000,
+      spentTotal: 250000,
+      plannedBalance: 4500000,
+      actualBalance: 5000000,
+    });
+
+    // пропущене надходження зменшує запланований дохід бюджету
+    const advance = incomes.occurrences.find((item: { name: string }) => item.name === 'Аванс');
+    await actor.patch(`/api/income-occurrences/${advance.id}`, { status: 'skipped' });
+    const after = (await actor.get(`/api/budgets?month=${PAST}`)).body;
+    expect(after.summary).toMatchObject({ plannedIncomeTotal: 5000000, plannedBalance: 3500000 });
   });
 
   it('перевищення на 1 копійку — over; рівно ліміт — neutral', async () => {
@@ -444,52 +461,11 @@ describe('розрахунки', () => {
     const { body } = await actor.get(`/api/budgets?month=${FUTURE}`);
     expect(body.summary).toMatchObject({ spentTotal: 250, receivedIncomeTotal: 0 });
     expect(body.unplannedExpenses).toEqual([]);
-    expect(body.otherIncome).toBe(0);
-  });
-
-  it('зміна й видалення доходу зменшують отримане за статтею', async () => {
-    const actor = await createActor();
-    const f = await createFixtures(actor);
-    const budget = await plannedBudget(actor, f);
-    const incomeLineId = budget.incomeLines[0]!.id;
-    const body = {
-      type: 'income',
-      accountId: f.card.id,
-      incomeLineId,
-      amountMinor: 4500000,
-      occurredAt: '2099-10-05T10:00:00Z',
-    };
-    const { body: created } = await actor.post('/api/transactions', body);
-    expect(created.incomeLineId).toBe(incomeLineId);
-
-    await actor.put(`/api/transactions/${created.id}`, { ...body, amountMinor: 4000000 });
-    const received = async () =>
-      (await actor.get(`/api/budgets?month=${FUTURE}`)).body.incomeLines[0].received;
-    expect(await received()).toBe(4000000);
-
-    await actor.delete(`/api/transactions/${created.id}`);
-    expect(await received()).toBe(0);
-  });
-
-  it('видалення статті доходу переводить її транзакції в «Інші доходи»', async () => {
-    const actor = await createActor();
-    const f = await createFixtures(actor);
-    const budget = await plannedBudget(actor, f);
-    const incomeLineId = budget.incomeLines[0]!.id;
-    const { body: created } = await income(actor, f, { incomeLineId, amountMinor: 4500000 });
-
-    const { body } = await actor.delete(`/api/budgets/${budget.id}/income-lines/${incomeLineId}`);
-
-    expect(body.incomeLines).toEqual([]);
-    expect(body.otherIncome).toBe(4500000);
-    expect(body.summary.receivedIncomeTotal).toBe(4500000);
-    const transaction = await actor.get(`/api/transactions/${created.id}`);
-    expect(transaction.body).toMatchObject({ incomeLineId: null, amountMinor: 4500000 });
   });
 });
 
 describe('копіювання з попереднього місяця', () => {
-  it('переносить статті, але не транзакції', async () => {
+  it('переносить ліміти, але не транзакції', async () => {
     const actor = await createActor();
     const f = await createFixtures(actor);
     const { body: september } = await createBudget(actor, '2099-09');
@@ -497,22 +473,13 @@ describe('копіювання з попереднього місяця', () => 
       categoryId: f.food.id,
       plannedAmount: 1200000,
     });
-    await actor.post(`/api/budgets/${september.id}/expense-lines`, {
+    const { body: source } = await actor.post(`/api/budgets/${september.id}/expense-lines`, {
       categoryId: f.transport.id,
       plannedAmount: 300000,
-    });
-    const { body: withIncome } = await actor.post(`/api/budgets/${september.id}/income-lines`, {
-      name: 'Зарплата',
-      plannedAmount: 5000000,
     });
     await expense(actor, f, {
       categoryId: f.food.id,
       amountMinor: 999,
-      occurredAt: '2099-09-10T10:00:00Z',
-    });
-    await income(actor, f, {
-      incomeLineId: withIncome.incomeLines[0].id,
-      amountMinor: 888,
       occurredAt: '2099-09-10T10:00:00Z',
     });
 
@@ -524,15 +491,12 @@ describe('копіювання з попереднього місяця', () => 
       expect.objectContaining({ categoryName: 'Продукти', planned: 1200000, spent: 0 }),
       expect.objectContaining({ categoryName: 'Транспорт', planned: 300000, spent: 0 }),
     ]);
-    expect(res.body.incomeLines).toEqual([
-      expect.objectContaining({ name: 'Зарплата', planned: 5000000, received: 0 }),
-    ]);
-    // нові статті — окремі записи, а не посилання на вересневі
-    expect(res.body.incomeLines[0].id).not.toBe(withIncome.incomeLines[0].id);
-    expect(res.body.summary).toMatchObject({ spentTotal: 0, receivedIncomeTotal: 0 });
+    // нові ліміти — окремі записи, а не посилання на вересневі
+    expect(res.body.expenseLines[0].id).not.toBe(source.expenseLines[0].id);
+    expect(res.body.summary.spentTotal).toBe(0);
 
-    const source = await actor.get('/api/budgets?month=2099-09');
-    expect(source.body.summary).toMatchObject({ spentTotal: 999, receivedIncomeTotal: 888 });
+    const original = await actor.get('/api/budgets?month=2099-09');
+    expect(original.body.summary.spentTotal).toBe(999);
   });
 
   it('404, якщо місяця-джерела немає, і бюджет не створюється', async () => {
@@ -559,33 +523,25 @@ describe('статус бюджету', () => {
       categoryId: f.food.id,
       plannedAmount: 1000,
     });
-    const { body: withIncome } = await actor.post(`/api/budgets/${budget.id}/income-lines`, {
-      name: 'Зарплата',
-      plannedAmount: 5000,
-    });
     const expenseLine = withLines.expenseLines[0].id;
-    const incomeLine = withIncome.incomeLines[0].id;
 
     const closed = await actor.patch(`/api/budgets/${budget.id}`, { status: 'closed' });
     expect(closed.body.status).toBe('closed');
 
     const base = `/api/budgets/${budget.id}`;
     const attempts = await Promise.all([
-      actor.post(`${base}/income-lines`, { name: 'Фріланс', plannedAmount: 1 }),
-      actor.patch(`${base}/income-lines/${incomeLine}`, { plannedAmount: 1 }),
-      actor.delete(`${base}/income-lines/${incomeLine}`),
       actor.post(`${base}/expense-lines`, { categoryId: f.transport.id, plannedAmount: 1 }),
       actor.patch(`${base}/expense-lines/${expenseLine}`, { plannedAmount: 1 }),
       actor.delete(`${base}/expense-lines/${expenseLine}`),
     ]);
-    expect(attempts.map((res) => res.status)).toEqual(Array(6).fill(409));
+    expect(attempts.map((res) => res.status)).toEqual([409, 409, 409]);
 
     // транзакції заднім числом дозволені, розрахунки оновлюються
     await expense(actor, f, { categoryId: f.food.id, amountMinor: 1500 });
-    await income(actor, f, { incomeLineId: incomeLine, amountMinor: 700 });
+    await income(actor, f, { amountMinor: 700 });
     const { body } = await actor.get(`/api/budgets?month=${FUTURE}`);
     expect(body.expenseLines[0]).toMatchObject({ planned: 1000, spent: 1500, status: 'over' });
-    expect(body.incomeLines[0]).toMatchObject({ planned: 5000, received: 700 });
+    expect(body.summary.receivedIncomeTotal).toBe(700);
   });
 
   it('закритий бюджет можна відкрити знову', async () => {
@@ -596,8 +552,9 @@ describe('статус бюджету', () => {
     expect((await actor.patch(`/api/budgets/${budget.id}`, { status: 'draft' })).body.status).toBe(
       'draft',
     );
-    const added = await actor.post(`/api/budgets/${budget.id}/income-lines`, {
-      name: 'Зарплата',
+    const f = await createFixtures(actor);
+    const added = await actor.post(`/api/budgets/${budget.id}/expense-lines`, {
+      categoryId: f.food.id,
       plannedAmount: 1,
     });
     expect(added.status).toBe(201);
@@ -620,24 +577,16 @@ describe('ізоляція домогосподарств', () => {
     const ownerData = await createFixtures(owner);
     const strangerData = await createFixtures(stranger);
     const { body: budget } = await createBudget(owner, FUTURE);
-    const { body: withLine } = await owner.post(`/api/budgets/${budget.id}/income-lines`, {
-      name: 'Зарплата',
-      plannedAmount: 5000,
-    });
     const { body: withExpense } = await owner.post(`/api/budgets/${budget.id}/expense-lines`, {
       categoryId: ownerData.food.id,
       plannedAmount: 1000,
     });
-    const incomeLine = withLine.incomeLines[0].id;
     const expenseLine = withExpense.expenseLines[0].id;
     const base = `/api/budgets/${budget.id}`;
 
     expect((await stranger.get(`/api/budgets?month=${FUTURE}`)).status).toBe(404);
     const attempts = await Promise.all([
       stranger.patch(base, { status: 'closed' }),
-      stranger.post(`${base}/income-lines`, { name: 'x', plannedAmount: 1 }),
-      stranger.patch(`${base}/income-lines/${incomeLine}`, { plannedAmount: 1 }),
-      stranger.delete(`${base}/income-lines/${incomeLine}`),
       stranger.post(`${base}/expense-lines`, {
         categoryId: strangerData.food.id,
         plannedAmount: 1,
@@ -645,11 +594,10 @@ describe('ізоляція домогосподарств', () => {
       stranger.patch(`${base}/expense-lines/${expenseLine}`, { plannedAmount: 1 }),
       stranger.delete(`${base}/expense-lines/${expenseLine}`),
     ]);
-    expect(attempts.map((res) => res.status)).toEqual(Array(7).fill(404));
+    expect(attempts.map((res) => res.status)).toEqual([404, 404, 404, 404]);
 
     const untouched = await owner.get(`/api/budgets?month=${FUTURE}`);
     expect(untouched.body).toMatchObject({ status: 'active' });
-    expect(untouched.body.incomeLines[0].planned).toBe(5000);
     expect(untouched.body.expenseLines[0].planned).toBe(1000);
   });
 
@@ -665,108 +613,20 @@ describe('ізоляція домогосподарств', () => {
     expect(body.summary).toMatchObject({ spentTotal: 0, receivedIncomeTotal: 0 });
   });
 
-  it('статті одного бюджету не можна змінити через адресу іншого', async () => {
+  it('ліміт одного бюджету не можна змінити через адресу іншого', async () => {
     const actor = await createActor();
+    const f = await createFixtures(actor);
     const { body: october } = await createBudget(actor, '2099-10');
     const { body: november } = await createBudget(actor, '2099-11');
-    const { body } = await actor.post(`/api/budgets/${october.id}/income-lines`, {
-      name: 'Зарплата',
+    const { body } = await actor.post(`/api/budgets/${october.id}/expense-lines`, {
+      categoryId: f.food.id,
       plannedAmount: 1,
     });
 
     const res = await actor.patch(
-      `/api/budgets/${november.id}/income-lines/${body.incomeLines[0].id}`,
+      `/api/budgets/${november.id}/expense-lines/${body.expenseLines[0].id}`,
       { plannedAmount: 2 },
     );
     expect(res.status).toBe(404);
-  });
-});
-
-describe('привʼязка доходу до статті', () => {
-  async function setup() {
-    const actor = await createActor();
-    const f = await createFixtures(actor);
-    const { body: budget } = await createBudget(actor, '2026-10');
-    const { body } = await actor.post(`/api/budgets/${budget.id}/income-lines`, {
-      name: 'Зарплата',
-      plannedAmount: 5000000,
-    });
-    return { actor, f, incomeLineId: body.incomeLines[0].id as string };
-  }
-
-  it('дата доходу має бути в межах місяця бюджету статті', async () => {
-    const { actor, f, incomeLineId } = await setup();
-    const at = (occurredAt: string) => income(actor, f, { incomeLineId, occurredAt });
-
-    expect((await at('2026-09-30T20:59:59Z')).status).toBe(400);
-    expect((await at('2026-09-30T21:00:00Z')).status).toBe(201);
-    expect((await at('2026-10-31T21:59:59Z')).status).toBe(201);
-    expect((await at('2026-10-31T22:00:00Z')).status).toBe(400);
-  });
-
-  it('не дає перенести привʼязаний дохід на дату поза місяцем', async () => {
-    const { actor, f, incomeLineId } = await setup();
-    const body = {
-      type: 'income',
-      accountId: f.card.id,
-      incomeLineId,
-      amountMinor: 100,
-      occurredAt: '2026-10-10T10:00:00Z',
-    };
-    const { body: created } = await actor.post('/api/transactions', body);
-
-    const moved = await actor.put(`/api/transactions/${created.id}`, {
-      ...body,
-      occurredAt: '2026-11-10T10:00:00Z',
-    });
-    expect(moved.status).toBe(400);
-    expect(moved.body.error.code).toBe('BAD_REQUEST');
-    expect((await actor.get(`/api/transactions/${created.id}`)).body.occurredAt).toBe(
-      '2026-10-10T10:00:00.000Z',
-    );
-
-    // у межах місяця дату міняти можна; без статті — можна перенести будь-куди
-    expect(
-      (
-        await actor.put(`/api/transactions/${created.id}`, {
-          ...body,
-          occurredAt: '2026-10-20T10:00:00Z',
-        })
-      ).status,
-    ).toBe(200);
-    const unlinked = await actor.put(`/api/transactions/${created.id}`, {
-      ...body,
-      incomeLineId: null,
-      occurredAt: '2026-11-10T10:00:00Z',
-    });
-    expect(unlinked.status).toBe(200);
-    expect(unlinked.body.incomeLineId).toBeNull();
-  });
-
-  it('відхиляє чужу й неіснуючу статтю, статтю для витрати й переказу, іншу валюту', async () => {
-    const { actor, f, incomeLineId } = await setup();
-    const stranger = await createActor();
-    const foreign = await createFixtures(stranger);
-    const at = { occurredAt: '2026-10-10T10:00:00Z' };
-
-    const responses = await Promise.all([
-      income(stranger, foreign, { ...at, incomeLineId }),
-      income(actor, f, { ...at, incomeLineId: MISSING_ID }),
-      income(actor, f, { ...at, incomeLineId: 'abc' }),
-      expense(actor, f, { ...at, incomeLineId }),
-      actor.post('/api/transactions', {
-        type: 'transfer',
-        accountId: f.card.id,
-        toAccountId: f.cash.id,
-        amountMinor: 100,
-        incomeLineId,
-        ...at,
-      }),
-      income(actor, f, { ...at, incomeLineId, accountId: f.usd.id, currency: 'USD' }),
-    ]);
-    expect(responses.map((res) => res.status)).toEqual(Array(6).fill(400));
-
-    const count = await db.execute(sql`SELECT count(*)::int AS n FROM transactions`);
-    expect(count.rows).toEqual([{ n: 0 }]);
   });
 });

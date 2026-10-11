@@ -3,12 +3,9 @@ import type {
   BudgetView,
   CreateBudgetInput,
   CreateExpenseLineInput,
-  CreateIncomeLineInput,
-  UpdateIncomeLineInput,
 } from '@hf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../shared/api/index.ts';
-import { TRANSACTIONS_KEY } from '../transactions/api.ts';
 
 const budgetKey = (month: string) => ['budget', month];
 
@@ -43,30 +40,6 @@ export const useSetBudgetStatus = (budgetId: string) =>
   useBudgetMutation((status: BudgetStatus) =>
     api.patch<BudgetView>(`/api/budgets/${budgetId}`, { status }),
   );
-
-export const useSaveIncomeLine = (budgetId: string) =>
-  useBudgetMutation(
-    ({ lineId, input }: { lineId?: string | undefined; input: CreateIncomeLineInput }) =>
-      lineId
-        ? api.patch<BudgetView>(
-            `/api/budgets/${budgetId}/income-lines/${lineId}`,
-            input satisfies UpdateIncomeLineInput,
-          )
-        : api.post<BudgetView>(`/api/budgets/${budgetId}/income-lines`, input),
-  );
-
-export function useDeleteIncomeLine(budgetId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (lineId: string) =>
-      api.delete<BudgetView>(`/api/budgets/${budgetId}/income-lines/${lineId}`),
-    onSuccess: (budget) => {
-      queryClient.setQueryData(budgetKey(budget.month), budget);
-      // Доходи видаленої статті втратили прив'язку — списки транзакцій застаріли.
-      return queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
-    },
-  });
-}
 
 export const useSaveExpenseLine = (budgetId: string) =>
   useBudgetMutation(

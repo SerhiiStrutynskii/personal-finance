@@ -31,7 +31,6 @@ const values = (override: Partial<TransactionFormValues> = {}): TransactionFormV
   accountId: card.id,
   toAccountId: '',
   categoryId: '',
-  incomeLineId: '',
   amount: '100',
   date: '2026-03-15',
   description: '',
@@ -126,7 +125,6 @@ describe('редагування', () => {
     accountId: cash.id,
     toAccountId: null,
     categoryId: id(7),
-    incomeLineId: null,
     occurrenceId: null,
     amountMinor: 128450,
     currency: 'UAH',
@@ -143,7 +141,6 @@ describe('редагування', () => {
       accountId: cash.id,
       toAccountId: '',
       categoryId: id(7),
-      incomeLineId: '',
       amount: '1284,50',
       date: '2026-03-10',
       description: 'Ринок',
@@ -239,56 +236,43 @@ describe('переказ', () => {
   });
 });
 
-describe('стаття доходу', () => {
-  const incomeInput = (override: Partial<TransactionFormValues> = {}) =>
-    toTransactionInput('income', values(override), context);
+describe('дохід і надходження', () => {
+  const original: Transaction = {
+    id: id(9),
+    type: 'income',
+    accountId: card.id,
+    toAccountId: null,
+    categoryId: null,
+    occurrenceId: id(6),
+    amountMinor: 4500000,
+    currency: 'UAH',
+    description: 'Зарплата',
+    occurredAt: '2026-03-05T08:00:00.000Z',
+    createdAt: '2026-03-05T08:00:00.000Z',
+    updatedAt: '2026-03-05T08:00:00.000Z',
+  };
 
-  it('дохід передає обрану статтю, порожня стає null', () => {
-    expect(incomeInput({ incomeLineId: id(5) })).toMatchObject({
-      ok: true,
-      input: { type: 'income', incomeLineId: id(5) },
-    });
-    expect(incomeInput()).toMatchObject({ ok: true, input: { incomeLineId: null } });
-  });
-
-  it('редагування доходу зберігає його статтю', () => {
-    const original: Transaction = {
-      id: id(9),
-      type: 'income',
-      accountId: card.id,
-      toAccountId: null,
-      categoryId: null,
-      incomeLineId: id(5),
-      occurrenceId: id(6),
-      amountMinor: 4500000,
-      currency: 'UAH',
-      description: 'Зарплата',
-      occurredAt: '2026-03-05T08:00:00.000Z',
-      createdAt: '2026-03-05T08:00:00.000Z',
-      updatedAt: '2026-03-05T08:00:00.000Z',
-    };
+  it('редагування доходу зберігає його звʼязок із надходженням', () => {
     const ctx = { ...context, original };
-
-    expect(initialValues(ctx).incomeLineId).toBe(id(5));
     expect(toTransactionInput('income', initialValues(ctx), ctx)).toMatchObject({
       ok: true,
-      input: {
-        incomeLineId: id(5),
-        occurrenceId: id(6),
-        occurredAt: '2026-03-05T08:00:00.000Z',
-      },
+      input: { occurrenceId: id(6), occurredAt: '2026-03-05T08:00:00.000Z' },
     });
   });
 
-  it('витрата й переказ статтю не передають', () => {
-    const result = toTransactionInput('expense', values({ incomeLineId: id(5) }), context);
-    expect(result.ok && 'incomeLineId' in result.input).toBe(false);
+  it('новий дохід не привʼязаний до надходження', () => {
+    expect(toTransactionInput('income', values(), context)).toMatchObject({
+      ok: true,
+      input: { type: 'income', occurrenceId: null },
+    });
+  });
 
-    const transfer = toTransactionInput(
-      'transfer',
-      values({ incomeLineId: id(5), toAccountId: cash.id }),
-      context,
-    );
-    expect(transfer.ok && 'incomeLineId' in transfer.input).toBe(false);
+  it('витрата й переказ надходження не передають', () => {
+    const ctx = { ...context, original };
+    const result = toTransactionInput('expense', values(), ctx);
+    expect(result.ok && 'occurrenceId' in result.input).toBe(false);
+
+    const transfer = toTransactionInput('transfer', values({ toAccountId: cash.id }), ctx);
+    expect(transfer.ok && 'occurrenceId' in transfer.input).toBe(false);
   });
 });

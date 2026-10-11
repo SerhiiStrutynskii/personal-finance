@@ -2,12 +2,13 @@ import {
   budgetPeriod,
   formatMoney,
   localMonthKey,
+  monthSchema,
   type IncomesView,
   type Transaction,
 } from '@hf/shared';
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
@@ -43,7 +44,12 @@ import { OneTimeDialog } from './OneTimeDialog.tsx';
 
 export function IncomesPage() {
   const { user } = useCurrentUser();
-  const [month, setMonth] = useState(() => localMonthKey(new Date(), user.timeZone));
+  // Місяць можна передати в адресі (?month=2026-10) — так сюди веде екран бюджету.
+  const [searchParams] = useSearchParams();
+  const [month, setMonth] = useState(() => {
+    const requested = monthSchema.safeParse(searchParams.get('month'));
+    return requested.success ? requested.data : localMonthKey(new Date(), user.timeZone);
+  });
   const incomes = useIncomes(month);
 
   return (

@@ -15,10 +15,9 @@ import {
 } from '../../shared/ui/dialog.tsx';
 import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
-import { useSaveExpenseLine, useSaveIncomeLine } from './api.ts';
+import { useSaveExpenseLine } from './api.ts';
 import { parsePlannedAmount, plannedAmountText } from './plannedAmount.ts';
 
-type IncomeLine = BudgetView['incomeLines'][number];
 type ExpenseLine = BudgetView['expenseLines'][number];
 
 interface DialogProps {
@@ -58,82 +57,6 @@ function FormActions({ pending }: { pending: boolean }) {
         Зберегти
       </Button>
     </DialogFooter>
-  );
-}
-
-// --- Стаття доходу ---
-
-export function IncomeLineDialog({
-  line,
-  ...props
-}: DialogProps & { line?: IncomeLine | undefined }) {
-  return (
-    <LineDialogShell
-      {...props}
-      title={line ? 'Стаття доходу' : 'Нова стаття доходу'}
-      description="Скільки ви плануєте отримати за цією статтею протягом місяця."
-    >
-      <IncomeLineForm budget={props.budget} line={line} onSaved={() => props.onOpenChange(false)} />
-    </LineDialogShell>
-  );
-}
-
-function IncomeLineForm({
-  budget,
-  line,
-  onSaved,
-}: {
-  budget: BudgetView;
-  line: IncomeLine | undefined;
-  onSaved: () => void;
-}) {
-  const save = useSaveIncomeLine(budget.id);
-  const [name, setName] = useState(line?.name ?? '');
-  const [amount, setAmount] = useState(
-    line ? plannedAmountText(line.planned, budget.currency) : '',
-  );
-  const [errors, setErrors] = useState<{ name?: string; amount?: string }>({});
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    const plannedAmount = parsePlannedAmount(amount, budget.currency);
-    const trimmed = name.trim();
-    const next = {
-      ...((trimmed === '' || trimmed.length > 100) && { name: 'Вкажіть назву до 100 символів' }),
-      ...(typeof plannedAmount === 'string' && { amount: plannedAmount }),
-    };
-    setErrors(next);
-    if (Object.keys(next).length > 0 || typeof plannedAmount !== 'number') return;
-
-    save.mutate(
-      { lineId: line?.id, input: { name: trimmed, plannedAmount } },
-      { onSuccess: onSaved },
-    );
-  }
-
-  return (
-    <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
-      <Field label="Назва" error={errors.name}>
-        <Input
-          autoFocus
-          placeholder="Зарплата"
-          value={name}
-          aria-invalid={errors.name ? true : undefined}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </Field>
-      <Field label={`Запланована сума, ${budget.currency}`} error={errors.amount}>
-        <Input
-          inputMode="decimal"
-          placeholder="0,00"
-          value={amount}
-          aria-invalid={errors.amount ? true : undefined}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-      </Field>
-      <ErrorText>{save.isError && errorMessage(save.error)}</ErrorText>
-      <FormActions pending={save.isPending} />
-    </form>
   );
 }
 

@@ -1,8 +1,7 @@
-import { and, asc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import {
   budgetExpenseLines,
-  budgetIncomeLines,
   budgets,
   categories,
   households,
@@ -11,7 +10,6 @@ import {
 import type { BudgetStatus } from './schema.ts';
 
 export type BudgetRow = typeof budgets.$inferSelect;
-export type IncomeLineRow = typeof budgetIncomeLines.$inferSelect;
 export type ExpenseLineRow = typeof budgetExpenseLines.$inferSelect;
 
 export async function findHouseholdTimeZone(db: DbOrTx, householdId: string) {
@@ -62,14 +60,6 @@ export async function updateBudgetStatus(
 
 // --- Статті ---
 
-export function listIncomeLines(db: DbOrTx, budgetId: string) {
-  return db
-    .select()
-    .from(budgetIncomeLines)
-    .where(eq(budgetIncomeLines.budgetId, budgetId))
-    .orderBy(asc(budgetIncomeLines.sortOrder), asc(budgetIncomeLines.id));
-}
-
 export function listExpenseLines(db: DbOrTx, budgetId: string) {
   return db
     .select({
@@ -85,54 +75,14 @@ export function listExpenseLines(db: DbOrTx, budgetId: string) {
     .orderBy(asc(budgetExpenseLines.sortOrder), asc(budgetExpenseLines.id));
 }
 
-async function nextSortOrder(
-  db: DbOrTx,
-  table: typeof budgetIncomeLines | typeof budgetExpenseLines,
-  budgetId: string,
-) {
+async function nextSortOrder(db: DbOrTx, budgetId: string) {
   const [row] = await db
-    .select({ next: sql<number>`coalesce(max(${table.sortOrder}), -1) + 1`.mapWith(Number) })
-    .from(table)
-    .where(eq(table.budgetId, budgetId));
-  return row?.next ?? 0;
-}
-
-export async function insertIncomeLine(
-  db: DbOrTx,
-  budgetId: string,
-  values: { name: string; plannedAmount: number },
-) {
-  const sortOrder = await nextSortOrder(db, budgetIncomeLines, budgetId);
-  const [row] = await db
-    .insert(budgetIncomeLines)
-    .values({ ...values, budgetId, sortOrder })
-    .returning();
-  return row!;
-}
-
-export async function updateIncomeLine(
-  db: DbOrTx,
-  budgetId: string,
-  lineId: string,
-  patch: { name?: string | undefined; plannedAmount?: number | undefined },
-) {
-  const [row] = await db
-    .update(budgetIncomeLines)
-    .set({
-      ...(patch.name !== undefined && { name: patch.name }),
-      ...(patch.plannedAmount !== undefined && { plannedAmount: patch.plannedAmount }),
+    .select({
+      next: sql<number>`coalesce(max(${budgetExpenseLines.sortOrder}), -1) + 1`.mapWith(Number),
     })
-    .where(and(eq(budgetIncomeLines.budgetId, budgetId), eq(budgetIncomeLines.id, lineId)))
-    .returning();
-  return row;
-}
-
-export async function deleteIncomeLine(db: DbOrTx, budgetId: string, lineId: string) {
-  const rows = await db
-    .delete(budgetIncomeLines)
-    .where(and(eq(budgetIncomeLines.budgetId, budgetId), eq(budgetIncomeLines.id, lineId)))
-    .returning({ id: budgetIncomeLines.id });
-  return rows.length > 0;
+    .from(budgetExpenseLines)
+    .where(eq(budgetExpenseLines.budgetId, budgetId));
+  return row?.next ?? 0;
 }
 
 export async function insertExpenseLine(
@@ -140,7 +90,7 @@ export async function insertExpenseLine(
   budgetId: string,
   values: { categoryId: string; plannedAmount: number },
 ) {
-  const sortOrder = await nextSortOrder(db, budgetExpenseLines, budgetId);
+  const sortOrder = await nextSortOrder(db, budgetId);
   const [row] = await db
     .insert(budgetExpenseLines)
     .values({ ...values, budgetId, sortOrder })
@@ -170,22 +120,9 @@ export async function deleteExpenseLine(db: DbOrTx, budgetId: string, lineId: st
   return rows.length > 0;
 }
 
-/** Копіює статті доходів і витрат з одного бюджету в інший; транзакції не чіпає. */
+/** Копіює ліміти витрат з одного бюджету в інший; транзакції не чіпає. */
 export async function copyLines(db: DbOrTx, fromBudgetId: string, toBudgetId: string) {
-  const [incomeLines, expenseLines] = await Promise.all([
-    listIncomeLines(db, fromBudgetId),
-    listExpenseLines(db, fromBudgetId),
-  ]);
-  if (incomeLines.length > 0) {
-    await db.insert(budgetIncomeLines).values(
-      incomeLines.map(({ name, plannedAmount, sortOrder }) => ({
-        budgetId: toBudgetId,
-        name,
-        plannedAmount,
-        sortOrder,
-      })),
-    );
-  }
+  const expenseLines = await listExpenseLines(db, fromBudgetId);
   if (expenseLines.length > 0) {
     await db.insert(budgetExpenseLines).values(
       expenseLines.map(({ categoryId, plannedAmount, sortOrder }) => ({
@@ -198,26 +135,11 @@ export async function copyLines(db: DbOrTx, fromBudgetId: string, toBudgetId: st
   }
 }
 
-/** Стаття доходу разом із періодом і валютою її бюджету, якщо він належить домогосподарству. */
-export async function findIncomeLineWithBudget(db: DbOrTx, householdId: string, lineId: string) {
-  const [row] = await db
-    .select({
-      id: budgetIncomeLines.id,
-      periodStart: budgets.periodStart,
-      periodEnd: budgets.periodEnd,
-      currency: budgets.currency,
-    })
-    .from(budgetIncomeLines)
-    .innerJoin(budgets, eq(budgets.id, budgetIncomeLines.budgetId))
-    .where(and(eq(budgetIncomeLines.id, lineId), eq(budgets.householdId, householdId)));
-  return row;
-}
-
 /**
- * Фактичні доходи й витрати домогосподарства за період [start, end) у валюті бюджету,
- * згруповані одним запитом. Перекази не враховуються.
+ * Фактичні витрати домогосподарства за період [start, end) у валюті бюджету,
+ * згруповані за категоріями одним запитом.
  */
-export function aggregateFacts(
+export function aggregateSpending(
   db: DbOrTx,
   householdId: string,
   period: { start: Date; end: Date },
@@ -225,10 +147,8 @@ export function aggregateFacts(
 ) {
   return db
     .select({
-      type: transactions.type,
       categoryId: transactions.categoryId,
       categoryName: categories.name,
-      incomeLineId: transactions.incomeLineId,
       total: sql<number>`sum(${transactions.amountMinor})`.mapWith(Number),
     })
     .from(transactions)
@@ -239,13 +159,8 @@ export function aggregateFacts(
         gte(transactions.occurredAt, period.start),
         lt(transactions.occurredAt, period.end),
         eq(transactions.currency, currency),
-        inArray(transactions.type, ['income', 'expense']),
+        eq(transactions.type, 'expense'),
       ),
     )
-    .groupBy(
-      transactions.type,
-      transactions.categoryId,
-      categories.name,
-      transactions.incomeLineId,
-    );
+    .groupBy(transactions.categoryId, categories.name);
 }

@@ -6,11 +6,9 @@ import {
   budgetQuerySchema,
   createBudgetSchema,
   createExpenseLineSchema,
-  createIncomeLineSchema,
   idParamsSchema,
   updateBudgetSchema,
   updateExpenseLineSchema,
-  updateIncomeLineSchema,
 } from './schema.ts';
 import * as service from './service.ts';
 
@@ -32,23 +30,6 @@ export function budgetsRouter(db: Db): Router {
     const { id } = idParamsSchema.parse(req.params);
     const { status } = updateBudgetSchema.parse(req.body);
     res.json(await service.updateBudgetStatus(db, getAuth(res), id, status));
-  });
-
-  router.post('/:id/income-lines', async (req, res) => {
-    const { id } = idParamsSchema.parse(req.params);
-    const input = createIncomeLineSchema.parse(req.body);
-    res.status(201).json(await service.addIncomeLine(db, getAuth(res), id, input));
-  });
-
-  router.patch('/:id/income-lines/:lineId', async (req, res) => {
-    const { id, lineId } = budgetLineParamsSchema.parse(req.params);
-    const input = updateIncomeLineSchema.parse(req.body);
-    res.json(await service.updateIncomeLine(db, getAuth(res), id, lineId, input));
-  });
-
-  router.delete('/:id/income-lines/:lineId', async (req, res) => {
-    const { id, lineId } = budgetLineParamsSchema.parse(req.params);
-    res.json(await service.deleteIncomeLine(db, getAuth(res), id, lineId));
   });
 
   router.post('/:id/expense-lines', async (req, res) => {

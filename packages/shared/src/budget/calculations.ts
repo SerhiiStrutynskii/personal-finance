@@ -37,12 +37,6 @@ export interface PlannedExpenseLine {
   planned: number;
 }
 
-export interface PlannedIncomeLine {
-  id: string;
-  name: string;
-  planned: number;
-}
-
 /** Фактичні витрати однієї категорії за період; categoryId = null — витрати без категорії. */
 export interface CategorySpending {
   categoryId: string | null;
@@ -50,15 +44,10 @@ export interface CategorySpending {
   spent: number;
 }
 
-/** Фактичні доходи однієї статті за період; incomeLineId = null — доходи без статті. */
-export interface LineIncome {
-  incomeLineId: string | null;
-  received: number;
-}
-
 export interface BudgetFacts {
   spending: readonly CategorySpending[];
-  income: readonly LineIncome[];
+  /** Усі доходи з датою в періоді. */
+  receivedIncome: number;
 }
 
 export interface ExpenseLineResult extends PlannedExpenseLine {
@@ -67,11 +56,6 @@ export interface ExpenseLineResult extends PlannedExpenseLine {
   remaining: number;
   usage: number | null;
   status: CategoryStatus;
-}
-
-export interface IncomeLineResult extends PlannedIncomeLine {
-  received: number;
-  diff: number;
 }
 
 export interface UnplannedExpense extends CategorySpending {
@@ -89,17 +73,15 @@ export interface BudgetSummary {
 
 export interface BudgetCalculation {
   summary: BudgetSummary;
-  incomeLines: IncomeLineResult[];
   expenseLines: ExpenseLineResult[];
   /** Категорії з витратами, на які немає запланованої статті. */
   unplannedExpenses: UnplannedExpense[];
-  /** Доходи, не прив'язані до жодної статті цього бюджету. */
-  otherIncome: number;
 }
 
 export interface BudgetCalculationInput extends BudgetFacts {
   expenseLines: readonly PlannedExpenseLine[];
-  incomeLines: readonly PlannedIncomeLine[];
+  /** Запланований дохід місяця: сума очікуваних надходжень (див. розрахунки доходів). */
+  plannedIncome: number;
   now: Date;
   periodEnd: Date;
 }
@@ -108,9 +90,9 @@ const sum = (values: readonly number[]) => values.reduce((total, value) => total
 
 export function calculateBudget({
   expenseLines,
-  incomeLines,
+  plannedIncome,
   spending,
-  income,
+  receivedIncome,
   now,
   periodEnd,
 }: BudgetCalculationInput): BudgetCalculation {
@@ -136,44 +118,20 @@ export function calculateBudget({
       status: getCategoryStatus(0, item.spent, now, periodEnd),
     }));
 
-  const lineIds = new Set(incomeLines.map((line) => line.id));
-  const receivedByLine = new Map<string, number>();
-  let otherIncome = 0;
-  for (const item of income) {
-    // Дохід, прив'язаний до статті іншого бюджету, для цього бюджету — «інший».
-    if (item.incomeLineId !== null && lineIds.has(item.incomeLineId)) {
-      receivedByLine.set(
-        item.incomeLineId,
-        (receivedByLine.get(item.incomeLineId) ?? 0) + item.received,
-      );
-    } else {
-      otherIncome += item.received;
-    }
-  }
-
-  const incomeResults = incomeLines.map((line): IncomeLineResult => {
-    const received = receivedByLine.get(line.id) ?? 0;
-    return { ...line, received, diff: received - line.planned };
-  });
-
-  const plannedIncomeTotal = sum(incomeLines.map((line) => line.planned));
   const plannedExpenseTotal = sum(expenseLines.map((line) => line.planned));
-  const receivedIncomeTotal = sum(income.map((item) => item.received));
   const spentTotal = sum(spending.map((item) => item.spent));
 
   return {
     summary: {
-      plannedIncomeTotal,
-      receivedIncomeTotal,
+      plannedIncomeTotal: plannedIncome,
+      receivedIncomeTotal: receivedIncome,
       plannedExpenseTotal,
       spentTotal,
-      plannedBalance: plannedIncomeTotal - plannedExpenseTotal,
-      actualBalance: receivedIncomeTotal - spentTotal,
+      plannedBalance: plannedIncome - plannedExpenseTotal,
+      actualBalance: receivedIncome - spentTotal,
     },
-    incomeLines: incomeResults,
     expenseLines: expenseResults,
     unplannedExpenses,
-    otherIncome,
   };
 }
 
@@ -185,13 +143,12 @@ export interface BudgetTransaction {
   occurredAt: Date;
   categoryId: string | null;
   categoryName?: string | null;
-  incomeLineId?: string | null;
 }
 
 export const UNCATEGORIZED_NAME = 'Без категорії';
 
 /**
- * Зводить транзакції до фактів бюджету: витрати по категоріях і доходи по статтях за період
+ * Зводить транзакції до фактів бюджету: витрати по категоріях і суму доходів за період
  * [start, end) у валюті бюджету. Перекази не враховуються. Бекенд робить те саме одним
  * SQL-запитом; ця функція — еталон правил відбору.
  */
@@ -201,7 +158,7 @@ export function summarizeTransactions(
   currency: string,
 ): BudgetFacts {
   const spending = new Map<string | null, CategorySpending>();
-  const income = new Map<string | null, LineIncome>();
+  let receivedIncome = 0;
 
   for (const transaction of transactions) {
     if (transaction.currency !== currency || !isInPeriod(transaction.occurredAt, period)) continue;
@@ -215,11 +172,8 @@ export function summarizeTransactions(
       entry.spent += transaction.amountMinor;
       spending.set(transaction.categoryId, entry);
     } else if (transaction.type === 'income') {
-      const incomeLineId = transaction.incomeLineId ?? null;
-      const entry = income.get(incomeLineId) ?? { incomeLineId, received: 0 };
-      entry.received += transaction.amountMinor;
-      income.set(incomeLineId, entry);
+      receivedIncome += transaction.amountMinor;
     }
   }
-  return { spending: [...spending.values()], income: [...income.values()] };
+  return { spending: [...spending.values()], receivedIncome };
 }

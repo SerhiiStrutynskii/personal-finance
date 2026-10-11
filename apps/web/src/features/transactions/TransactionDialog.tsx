@@ -24,8 +24,6 @@ interface Props {
   categories: Category[];
   /** Початкові значення нового запису. */
   defaults?: Partial<TransactionFormValues> | undefined;
-  /** Статті доходу бюджету, до яких можна прив'язати дохід. */
-  incomeLines?: readonly { id: string; name: string }[] | undefined;
 }
 
 /** Модальне вікно з формою витрати або доходу: створення або редагування. Керується ззовні. */
@@ -37,7 +35,6 @@ export function TransactionDialog({
   accounts,
   categories,
   defaults,
-  incomeLines,
 }: Props) {
   const config = ENTRY_CONFIG[type];
   return (
@@ -56,7 +53,6 @@ export function TransactionDialog({
           accounts={accounts}
           categories={categories}
           defaults={defaults}
-          incomeLines={incomeLines}
           onSaved={() => onOpenChange(false)}
           renderActions={(submit) => (
             <DialogFooter>

@@ -1,33 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-
-async function register(page: Page) {
-  await page.goto('/register');
-  await page.getByLabel('Імʼя').fill('Тест');
-  await page.getByLabel('Email').fill(`e2e-${Date.now()}@example.com`);
-  await page.getByLabel('Пароль').fill('e2e-password-123');
-  await page.getByRole('button', { name: 'Зареєструватися' }).click();
-  await expect(page.getByRole('heading', { name: /Вітаємо/ })).toBeVisible();
-}
-
-async function addAccount(page: Page, name: string) {
-  await page.getByRole('link', { name: 'Рахунки' }).click();
-  await page.getByRole('button', { name: 'Додати рахунок' }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Назва').fill(name);
-  await dialog.getByRole('button', { name: 'Додати' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText(name).first()).toBeVisible();
-}
-
-async function addExpenseCategory(page: Page, name: string) {
-  await page.getByRole('link', { name: 'Категорії' }).click();
-  await page.getByRole('button', { name: 'Додати категорію' }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Назва').fill(name);
-  await dialog.getByRole('button', { name: 'Додати' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText(name)).toBeVisible();
-}
+import { expect, test } from '@playwright/test';
+import { addAccount, addExpenseCategory, register } from './helpers.ts';
 
 test('витрата понад ліміт робить рядок категорії червоним і не блокує наступні', async ({
   page,

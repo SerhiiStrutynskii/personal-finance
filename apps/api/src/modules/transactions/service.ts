@@ -2,7 +2,6 @@ import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import { badRequest, notFound } from '../../http/errors.ts';
 import { findAccountsByIds } from '../accounts/repo.ts';
-import { findIncomeLineWithBudget } from '../budgets/repo.ts';
 import { findCategory } from '../categories/repo.ts';
 import { findOccurrenceForLink } from '../incomes/repo.ts';
 import * as repo from './repo.ts';
@@ -14,7 +13,6 @@ const toDto = (row: repo.TransactionRow): Transaction => ({
   accountId: row.accountId,
   toAccountId: row.toAccountId,
   categoryId: row.categoryId,
-  incomeLineId: row.incomeLineId,
   occurrenceId: row.occurrenceId,
   amountMinor: row.amountMinor,
   currency: row.currency,
@@ -63,7 +61,6 @@ async function resolveValues(
       type: 'transfer',
       toAccountId: input.toAccountId,
       categoryId: null,
-      incomeLineId: null,
       occurrenceId: null,
     };
   }
@@ -75,21 +72,6 @@ async function resolveValues(
       throw badRequest('Тип категорії не відповідає типу транзакції');
     }
   }
-  const incomeLineId = input.type === 'income' ? input.incomeLineId : null;
-  if (incomeLineId) {
-    const line = await findIncomeLineWithBudget(db, auth.householdId, incomeLineId);
-    if (!line) throw badRequest('Статтю доходу не знайдено');
-    if (line.currency !== input.currency) {
-      throw badRequest('Валюта доходу має збігатися з валютою бюджету статті');
-    }
-    // Дохід, прив'язаний до статті, не може опинитися поза місяцем її бюджету.
-    if (base.occurredAt < line.periodStart || base.occurredAt >= line.periodEnd) {
-      throw badRequest(
-        'Дата доходу має бути в межах місяця бюджету, до статті якого він привʼязаний',
-      );
-    }
-  }
-
   const occurrenceId = input.type === 'income' ? input.occurrenceId : null;
   if (occurrenceId) {
     const occurrence = await findOccurrenceForLink(db, auth.householdId, occurrenceId);
@@ -103,7 +85,6 @@ async function resolveValues(
     type: input.type,
     toAccountId: null,
     categoryId: input.categoryId,
-    incomeLineId,
     occurrenceId,
   };
 }

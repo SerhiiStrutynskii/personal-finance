@@ -1,4 +1,4 @@
-import { localMonthKey, shiftMonth, type BudgetView, type Transaction } from '@hf/shared';
+import { localMonthKey, shiftMonth, type BudgetView } from '@hf/shared';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -11,22 +11,13 @@ import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
 import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
-import { useTransactions } from '../transactions/api.ts';
-import type { EntryType } from '../transactions/config.ts';
 import { TransactionDialog } from '../transactions/TransactionDialog.tsx';
 import type { TransactionFormValues } from '../transactions/transactionForm.ts';
-import { TransactionTable } from '../transactions/TransactionTable.tsx';
-import {
-  useBudget,
-  useCreateBudget,
-  useDeleteExpenseLine,
-  useDeleteIncomeLine,
-  useSetBudgetStatus,
-} from './api.ts';
+import { useBudget, useCreateBudget, useDeleteExpenseLine, useSetBudgetStatus } from './api.ts';
 import { BudgetSummary } from './BudgetSummary.tsx';
 import { ExpenseSection } from './ExpenseSection.tsx';
 import { IncomeSection } from './IncomeSection.tsx';
-import { ExpenseLineDialog, IncomeLineDialog } from './LineDialogs.tsx';
+import { ExpenseLineDialog } from './LineDialogs.tsx';
 import { defaultEntryDate } from './month.ts';
 
 const STATUS_LABELS: Record<BudgetView['status'], string> = {
@@ -77,60 +68,33 @@ function EmptyBudget({ month }: { month: string }) {
   );
 }
 
-type EntryDialogState = {
-  open: boolean;
-  type: EntryType;
-  original?: Transaction | undefined;
-  defaults?: Partial<TransactionFormValues> | undefined;
-};
-
-type LineTarget =
-  | { kind: 'income'; line?: BudgetView['incomeLines'][number] | undefined }
-  | { kind: 'expense'; line?: BudgetView['expenseLines'][number] | undefined };
+type ExpenseLine = BudgetView['expenseLines'][number];
 
 function BudgetContent({ budget }: { budget: BudgetView }) {
   const { user } = useCurrentUser();
   const accounts = useAccounts();
   const categories = useCategories();
-  const incomes = useTransactions({
-    type: 'income',
-    from: budget.periodStart,
-    to: budget.periodEnd,
-    limit: 200,
-  });
   const setStatus = useSetBudgetStatus(budget.id);
-  const deleteIncomeLine = useDeleteIncomeLine(budget.id);
   const deleteExpenseLine = useDeleteExpenseLine(budget.id);
 
   // Вміст вікон зберігається й після закриття, щоб не змінюватися під час анімації.
-  const [entry, setEntry] = useState<EntryDialogState>({ open: false, type: 'expense' });
-  const [lineDialog, setLineDialog] = useState<{ open: boolean; target: LineTarget }>({
+  const [entry, setEntry] = useState<{
+    open: boolean;
+    defaults?: Partial<TransactionFormValues>;
+  }>({ open: false });
+  const [lineDialog, setLineDialog] = useState<{ open: boolean; line?: ExpenseLine }>({
     open: false,
-    target: { kind: 'income' },
   });
-  const [deletion, setDeletion] = useState<{ open: boolean; target?: Required<LineTarget> }>({
-    open: false,
-  });
+  const [deletion, setDeletion] = useState<{ open: boolean; line?: ExpenseLine }>({ open: false });
 
   const editable = budget.status !== 'closed';
   const accountList = accounts.data ?? [];
-  const categoryList = categories.data ?? [];
+  const expenseCategories = (categories.data ?? []).filter(
+    (category) => category.kind === 'expense',
+  );
   const canAddTransactions = accountList.length > 0;
 
-  const openEntry = (type: EntryType, defaults: Partial<TransactionFormValues>) =>
-    setEntry({
-      open: true,
-      type,
-      defaults: { date: defaultEntryDate(budget.month, new Date(), user.timeZone), ...defaults },
-    });
-
-  const error =
-    accounts.error ??
-    categories.error ??
-    incomes.error ??
-    setStatus.error ??
-    deleteIncomeLine.error ??
-    deleteExpenseLine.error;
+  const error = accounts.error ?? categories.error ?? setStatus.error ?? deleteExpenseLine.error;
 
   return (
     <>
@@ -152,7 +116,7 @@ function BudgetContent({ budget }: { budget: BudgetView }) {
       <ErrorText>{error && errorMessage(error)}</ErrorText>
       {accounts.data && !canAddTransactions && (
         <Muted>
-          Щоб додавати доходи й витрати, спершу{' '}
+          Щоб додавати витрати, спершу{' '}
           <Link className="underline" to="/accounts">
             створіть рахунок
           </Link>
@@ -166,80 +130,43 @@ function BudgetContent({ budget }: { budget: BudgetView }) {
         budget={budget}
         editable={editable}
         canAddTransactions={canAddTransactions}
-        onAddLine={() => setLineDialog({ open: true, target: { kind: 'expense' } })}
-        onEditLine={(line) => setLineDialog({ open: true, target: { kind: 'expense', line } })}
-        onDeleteLine={(line) => setDeletion({ open: true, target: { kind: 'expense', line } })}
-        onAddExpense={(categoryId) => openEntry('expense', { categoryId: categoryId ?? '' })}
-      />
-
-      <IncomeSection
-        budget={budget}
-        editable={editable}
-        canAddTransactions={canAddTransactions}
-        onAddLine={() => setLineDialog({ open: true, target: { kind: 'income' } })}
-        onEditLine={(line) => setLineDialog({ open: true, target: { kind: 'income', line } })}
-        onDeleteLine={(line) => setDeletion({ open: true, target: { kind: 'income', line } })}
-        onAddIncome={(incomeLineId) => openEntry('income', { incomeLineId: incomeLineId ?? '' })}
-        records={
-          incomes.data &&
-          incomes.data.total > 0 && (
-            <div className="space-y-2 pt-2">
-              <h3 className="font-heading font-semibold">Записи доходів за місяць</h3>
-              <TransactionTable
-                items={incomes.data.items}
-                accounts={accountList}
-                categories={categoryList}
-                timeZone={user.timeZone}
-                onEdit={(original) => setEntry({ open: true, type: 'income', original })}
-              />
-            </div>
-          )
+        onAddLine={() => setLineDialog({ open: true })}
+        onEditLine={(line) => setLineDialog({ open: true, line })}
+        onDeleteLine={(line) => setDeletion({ open: true, line })}
+        onAddExpense={(categoryId) =>
+          setEntry({
+            open: true,
+            defaults: {
+              date: defaultEntryDate(budget.month, new Date(), user.timeZone),
+              categoryId: categoryId ?? '',
+            },
+          })
         }
       />
 
+      <IncomeSection budget={budget} />
+
       <TransactionDialog
-        type={entry.type}
+        type="expense"
         open={entry.open}
         onOpenChange={(open) => setEntry({ ...entry, open })}
-        original={entry.original}
         defaults={entry.defaults}
-        incomeLines={budget.incomeLines}
         accounts={accountList}
-        categories={categoryList.filter((category) => category.kind === entry.type)}
-      />
-
-      <IncomeLineDialog
-        open={lineDialog.open && lineDialog.target.kind === 'income'}
-        onOpenChange={(open) => setLineDialog({ ...lineDialog, open })}
-        budget={budget}
-        line={lineDialog.target.kind === 'income' ? lineDialog.target.line : undefined}
+        categories={expenseCategories}
       />
       <ExpenseLineDialog
-        open={lineDialog.open && lineDialog.target.kind === 'expense'}
+        open={lineDialog.open}
         onOpenChange={(open) => setLineDialog({ ...lineDialog, open })}
         budget={budget}
-        line={lineDialog.target.kind === 'expense' ? lineDialog.target.line : undefined}
-        categories={categoryList.filter((category) => category.kind === 'expense')}
+        line={lineDialog.line}
+        categories={expenseCategories}
       />
-
       <ConfirmDialog
         open={deletion.open}
         onOpenChange={(open) => setDeletion({ ...deletion, open })}
-        title={
-          deletion.target?.kind === 'income'
-            ? `Видалити статтю «${deletion.target.line.name}»?`
-            : `Видалити ліміт «${deletion.target?.line.categoryName ?? ''}»?`
-        }
-        description={
-          deletion.target?.kind === 'income'
-            ? 'Записи доходів лишаться й перейдуть в «Інші доходи».'
-            : 'Витрати цієї категорії лишаться й стануть незапланованими.'
-        }
-        onConfirm={() => {
-          const target = deletion.target;
-          if (target?.kind === 'income') deleteIncomeLine.mutate(target.line.id);
-          else if (target) deleteExpenseLine.mutate(target.line.id);
-        }}
+        title={`Видалити ліміт «${deletion.line?.categoryName ?? ''}»?`}
+        description="Витрати цієї категорії лишаться й стануть незапланованими."
+        onConfirm={() => deletion.line && deleteExpenseLine.mutate(deletion.line.id)}
       />
     </>
   );

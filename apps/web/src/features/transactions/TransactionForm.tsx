@@ -24,8 +24,6 @@ interface Props {
   categories: Category[];
   /** Початкові значення нового запису, наприклад категорія чи дата з екрана бюджету. */
   defaults?: Partial<TransactionFormValues> | undefined;
-  /** Статті доходу бюджету; якщо передані, дохід можна прив'язати до статті. */
-  incomeLines?: readonly { id: string; name: string }[] | undefined;
   onSaved: () => void;
   /** Розміщує кнопку збереження поруч із власними діями (наприклад, «Скасувати»). */
   renderActions: (submit: ReactNode) => ReactNode;
@@ -38,7 +36,6 @@ export function TransactionForm({
   accounts,
   categories,
   defaults,
-  incomeLines,
   onSaved,
   renderActions,
 }: Props) {
@@ -96,18 +93,6 @@ export function TransactionForm({
           ]}
         />
       </Field>
-      {type === 'income' && incomeLines && incomeLines.length > 0 && (
-        <Field label="Стаття доходу" error={errors.incomeLineId}>
-          <SelectField
-            value={values.incomeLineId}
-            onChange={(incomeLineId) => set({ incomeLineId })}
-            options={[
-              { value: '', label: 'Без статті' },
-              ...incomeLines.map((line) => ({ value: line.id, label: line.name })),
-            ]}
-          />
-        </Field>
-      )}
       <Field label="Дата" error={errors.date}>
         <Input
           type="date"

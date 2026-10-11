@@ -1,10 +1,4 @@
-import {
-  UNCATEGORIZED_NAME,
-  budgetPeriod,
-  calculateBudget,
-  localMonthKey,
-  type BudgetFacts,
-} from '@hf/shared';
+import { UNCATEGORIZED_NAME, budgetPeriod, calculateBudget, localMonthKey } from '@hf/shared';
 import type { Db, DbOrTx } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import {
@@ -15,15 +9,14 @@ import {
   notFound,
 } from '../../http/errors.ts';
 import { findCategory } from '../categories/repo.ts';
+import { getIncomes } from '../incomes/occurrences.service.ts';
 import * as repo from './repo.ts';
 import type {
   BudgetStatus,
   BudgetView,
   CreateBudgetInput,
   CreateExpenseLineInput,
-  CreateIncomeLineInput,
   UpdateExpenseLineInput,
-  UpdateIncomeLineInput,
 } from './schema.ts';
 
 const budgetNotFound = () => notFound('Бюджет');
@@ -34,62 +27,55 @@ async function householdTimeZone(db: DbOrTx, auth: AuthContext): Promise<string>
   return timeZone;
 }
 
-async function loadFacts(db: DbOrTx, budget: repo.BudgetRow): Promise<BudgetFacts> {
-  const rows = await repo.aggregateFacts(
+async function loadSpending(db: DbOrTx, budget: repo.BudgetRow) {
+  const rows = await repo.aggregateSpending(
     db,
     budget.householdId,
     { start: budget.periodStart, end: budget.periodEnd },
     budget.currency,
   );
-  for (const row of rows) {
+  return rows.map((row) => {
     if (!Number.isSafeInteger(row.total)) throw new Error('Сума бюджету поза безпечним діапазоном');
-  }
-  return {
-    spending: rows
-      .filter((row) => row.type === 'expense')
-      .map((row) => ({
-        categoryId: row.categoryId,
-        categoryName: row.categoryName ?? UNCATEGORIZED_NAME,
-        spent: row.total,
-      })),
-    income: rows
-      .filter((row) => row.type === 'income')
-      .map((row) => ({ incomeLineId: row.incomeLineId, received: row.total })),
-  };
+    return {
+      categoryId: row.categoryId,
+      categoryName: row.categoryName ?? UNCATEGORIZED_NAME,
+      spent: row.total,
+    };
+  });
 }
 
 async function buildView(
-  db: DbOrTx,
+  db: Db,
+  auth: AuthContext,
   budget: repo.BudgetRow,
   timeZone: string,
   now: Date,
 ): Promise<BudgetView> {
-  const [incomeLines, expenseLines, facts] = await Promise.all([
-    repo.listIncomeLines(db, budget.id),
+  const month = localMonthKey(budget.periodStart, timeZone);
+  // Запланований і фактичний дохід місяця бюджет бере з фічі доходів.
+  const [expenseLines, spending, incomes] = await Promise.all([
     repo.listExpenseLines(db, budget.id),
-    loadFacts(db, budget),
+    loadSpending(db, budget),
+    getIncomes(db, auth, month, now),
   ]);
 
   const result = calculateBudget({
-    incomeLines: incomeLines.map((line) => ({
-      id: line.id,
-      name: line.name,
-      planned: line.plannedAmount,
-    })),
+    plannedIncome: incomes.summary.plannedTotal,
+    receivedIncome: incomes.summary.receivedTotal,
     expenseLines: expenseLines.map((line) => ({
       id: line.id,
       categoryId: line.categoryId,
       categoryName: line.categoryName,
       planned: line.plannedAmount,
     })),
-    ...facts,
+    spending,
     now,
     periodEnd: budget.periodEnd,
   });
 
   return {
     id: budget.id,
-    month: localMonthKey(budget.periodStart, timeZone),
+    month,
     status: budget.status,
     currency: budget.currency,
     periodStart: budget.periodStart.toISOString(),
@@ -101,7 +87,7 @@ async function buildView(
 async function viewById(db: Db, auth: AuthContext, id: string, now: Date): Promise<BudgetView> {
   const budget = await repo.findBudgetById(db, auth.householdId, id);
   if (!budget) throw budgetNotFound();
-  return buildView(db, budget, await householdTimeZone(db, auth), now);
+  return buildView(db, auth, budget, await householdTimeZone(db, auth), now);
 }
 
 /** Бюджет, у якому можна змінювати статті: він має існувати в домогосподарстві й не бути закритим. */
@@ -124,7 +110,7 @@ export async function getBudgetByMonth(
   const period = budgetPeriod(month, timeZone);
   const budget = await repo.findBudgetByPeriodStart(db, auth.householdId, period.start);
   if (!budget) throw budgetNotFound();
-  return buildView(db, budget, timeZone, now);
+  return buildView(db, auth, budget, timeZone, now);
 }
 
 export async function createBudget(
@@ -153,7 +139,7 @@ export async function createBudget(
       if (source) await repo.copyLines(tx, source.id, created.id);
       return created;
     });
-    return await buildView(db, budget, timeZone, now);
+    return await buildView(db, auth, budget, timeZone, now);
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Бюджет на цей місяць уже існує');
     throw error;
@@ -169,49 +155,7 @@ export async function updateBudgetStatus(
 ): Promise<BudgetView> {
   const budget = await repo.updateBudgetStatus(db, auth.householdId, id, status);
   if (!budget) throw budgetNotFound();
-  return buildView(db, budget, await householdTimeZone(db, auth), now);
-}
-
-// --- Статті доходів ---
-
-export async function addIncomeLine(
-  db: Db,
-  auth: AuthContext,
-  budgetId: string,
-  input: CreateIncomeLineInput,
-  now: Date = new Date(),
-): Promise<BudgetView> {
-  const budget = await editableBudget(db, auth, budgetId);
-  await repo.insertIncomeLine(db, budget.id, input);
-  return viewById(db, auth, budget.id, now);
-}
-
-export async function updateIncomeLine(
-  db: Db,
-  auth: AuthContext,
-  budgetId: string,
-  lineId: string,
-  input: UpdateIncomeLineInput,
-  now: Date = new Date(),
-): Promise<BudgetView> {
-  const budget = await editableBudget(db, auth, budgetId);
-  if (!(await repo.updateIncomeLine(db, budget.id, lineId, input))) {
-    throw notFound('Стаття доходу');
-  }
-  return viewById(db, auth, budget.id, now);
-}
-
-/** Транзакції статті лишаються й переходять в «Інші доходи» (зовнішній ключ обнуляється). */
-export async function deleteIncomeLine(
-  db: Db,
-  auth: AuthContext,
-  budgetId: string,
-  lineId: string,
-  now: Date = new Date(),
-): Promise<BudgetView> {
-  const budget = await editableBudget(db, auth, budgetId);
-  if (!(await repo.deleteIncomeLine(db, budget.id, lineId))) throw notFound('Стаття доходу');
-  return viewById(db, auth, budget.id, now);
+  return buildView(db, auth, budget, await householdTimeZone(db, auth), now);
 }
 
 // --- Статті витрат ---

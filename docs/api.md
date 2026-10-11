@@ -90,7 +90,7 @@
   "accountId": "…",
   "toAccountId": null,
   "categoryId": "…",
-  "incomeLineId": null,
+  "occurrenceId": null,
   "amountMinor": 128450,
   "currency": "UAH",
   "description": "Супермаркет",
@@ -105,11 +105,11 @@
 Тіло для створення й заміни:
 
 - витрата: `{ type: "expense", accountId, categoryId?, amountMinor, currency?, description?, occurredAt }`
-- дохід: `{ type: "income", accountId, categoryId?, incomeLineId?, amountMinor, currency?, description?, occurredAt }`
+- дохід: `{ type: "income", accountId, categoryId?, occurrenceId?, amountMinor, currency?, description?, occurredAt }`
 - переказ: `{ type: "transfer", accountId, toAccountId, amountMinor, currency?, description?, occurredAt }`
 
-`incomeLineId` — стаття доходу місячного бюджету; дохід має бути у валюті цього бюджету, а його
-дата — у межах місяця бюджету, інакше `400`. Для витрат і переказів поле має бути відсутнім або `null`.
+`occurrenceId` — надходження періодичного доходу, яке оплачує ця транзакція; валюта має збігатися з
+валютою джерела. Для витрат і переказів поле має бути відсутнім або `null`.
 
 `occurredAt` — ISO 8601 із часовим поясом. `currency` за замовчуванням `UAH` і має збігатися з
 валютою рахунку. Решта правил — у `docs/domain.md`.
@@ -124,14 +124,15 @@
 
 Параметри `GET /api/transactions`:
 
-| Параметр     | Опис                                                       |
-| ------------ | ---------------------------------------------------------- |
-| `type`       | `income` \| `expense` \| `transfer`                        |
-| `accountId`  | Транзакції рахунку; переказ знаходиться за обома рахунками |
-| `categoryId` | Транзакції категорії                                       |
-| `from`, `to` | Період за `occurredAt`: `from` включно, `to` виключно      |
-| `limit`      | 1–200, за замовчуванням 50                                 |
-| `offset`     | За замовчуванням 0                                         |
+| Параметр       | Опис                                                       |
+| -------------- | ---------------------------------------------------------- |
+| `type`         | `income` \| `expense` \| `transfer`                        |
+| `accountId`    | Транзакції рахунку; переказ знаходиться за обома рахунками |
+| `categoryId`   | Транзакції категорії                                       |
+| `occurrenceId` | Платежі одного надходження періодичного доходу             |
+| `from`, `to`   | Період за `occurredAt`: `from` включно, `to` виключно      |
+| `limit`        | 1–200, за замовчуванням 50                                 |
+| `offset`       | За замовчуванням 0                                         |
 
 Сортування — від новіших до старіших.
 
@@ -158,9 +159,6 @@
     "plannedBalance": 800000,
     "actualBalance": 1400000
   },
-  "incomeLines": [
-    { "id": "…", "name": "Зарплата", "planned": 5000000, "received": 4500000, "diff": -500000 }
-  ],
   "expenseLines": [
     {
       "id": "…",
@@ -175,27 +173,108 @@
   ],
   "unplannedExpenses": [
     { "categoryId": "…", "categoryName": "Подарунки", "spent": 80000, "status": "over" }
-  ],
-  "otherIncome": 0
+  ]
 }
 ```
 
 - `status` бюджету — `draft` \| `active` \| `closed`; `status` рядка — `over` \| `surplus` \| `neutral`.
 - `usage` — частка використаного ліміту; `null`, якщо ліміт 0, а витрати є.
 - `unplannedExpenses[].categoryId` — `null` для витрат без категорії.
+- `plannedIncomeTotal` і `receivedIncomeTotal` — це `plannedTotal` і `receivedTotal` доходів того ж
+  місяця (див. «Доходи»). Окремих статей доходу в бюджеті немає.
 
 | Метод  | Шлях                                     | Тіло                            | Відповідь                                                                              |
 | ------ | ---------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------- |
 | GET    | `/api/budgets?month=YYYY-MM`             | —                               | `200 Budget`; `404`, якщо бюджету на місяць немає                                      |
 | POST   | `/api/budgets`                           | `{ month, copyFrom? }`          | `201 Budget`; `409` на дубль місяця; `404`, якщо бюджету місяця `copyFrom` немає       |
 | PATCH  | `/api/budgets/:id`                       | `{ status }`                    | `200 Budget`                                                                           |
-| POST   | `/api/budgets/:id/income-lines`          | `{ name, plannedAmount }`       | `201 Budget`                                                                           |
-| PATCH  | `/api/budgets/:id/income-lines/:lineId`  | `{ name?, plannedAmount? }`     | `200 Budget`                                                                           |
-| DELETE | `/api/budgets/:id/income-lines/:lineId`  | —                               | `200 Budget`; транзакції статті переходять в «Інші доходи»                             |
 | POST   | `/api/budgets/:id/expense-lines`         | `{ categoryId, plannedAmount }` | `201 Budget`; `409`, якщо ліміт на категорію вже є; `400`, якщо це не категорія витрат |
 | PATCH  | `/api/budgets/:id/expense-lines/:lineId` | `{ plannedAmount }`             | `200 Budget`                                                                           |
 | DELETE | `/api/budgets/:id/expense-lines/:lineId` | —                               | `200 Budget`                                                                           |
 
-`copyFrom` копіює статті доходів і витрат з іншого місяця; транзакції не копіюються. Будь-яка зміна
-статей закритого бюджету — `409`. Чужий бюджет — `404`. Фактичні записи додаються через
+`copyFrom` копіює ліміти витрат з іншого місяця; транзакції не копіюються. Будь-яка зміна лімітів
+закритого бюджету — `409`. Чужий бюджет — `404`. Фактичні записи додаються через
 `/api/transactions`.
+
+## Доходи
+
+Періодичні доходи задаються джерелами з правилом повторення; кожне очікуване надходження — окремий
+запис із запланованими датою й сумою. Разовий дохід — звичайна транзакція доходу. Усі суми — цілі
+числа в мінімальних одиницях валюти, дати — `YYYY-MM-DD` у часовому поясі домогосподарства. Доходи
+підтримуються лише у валюті `UAH`. Правила — у `docs/domain.md`.
+
+### Джерела доходу
+
+Об'єкт `IncomeSource`:
+`{ id, name, accountId, currency, plannedAmount, frequency, dayOfMonth, dayOfWeek, intervalMonths, startDate, endDate, isActive }`.
+
+- `frequency` — `monthly` \| `weekly` \| `biweekly` \| `every_n_months`.
+- `dayOfMonth` (1–31) обов'язковий для `monthly` і `every_n_months`; `dayOfWeek` (1–7, понеділок = 1) —
+  для `weekly` і `biweekly`; `intervalMonths` — для `every_n_months`. Зайві для частоти поля відкидаються.
+- `endDate` — необов'язковий, включно.
+
+| Метод  | Шлях                                 | Тіло                                                                                                           | Відповідь                                                                               |
+| ------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| GET    | `/api/income-sources`                | —                                                                                                              | `200 { items: IncomeSource[] }`                                                         |
+| POST   | `/api/income-sources`                | `{ name, accountId, plannedAmount, frequency, dayOfMonth?, dayOfWeek?, intervalMonths?, startDate, endDate? }` | `201 IncomeSource`; `400`, якщо рахунок чужий або не в `UAH`                            |
+| PATCH  | `/api/income-sources/:id`            | будь-які з полів створення                                                                                     | `200 IncomeSource`; зміна суми чи графіка перегенеровує майбутні неотримані надходження |
+| POST   | `/api/income-sources/:id/deactivate` | —                                                                                                              | `200 IncomeSource`; майбутні неотримані надходження видаляються                         |
+| DELETE | `/api/income-sources/:id`            | —                                                                                                              | `204`; `409`, якщо є отримані доходи                                                    |
+
+### Доходи місяця
+
+`GET /api/incomes?month=YYYY-MM` створює відсутні надходження активних джерел за цей місяць (не далі
+ніж на рік уперед) і повертає:
+
+```json
+{
+  "month": "2026-10",
+  "currency": "UAH",
+  "today": "2026-10-11",
+  "summary": {
+    "plannedTotal": 6000000,
+    "receivedTotal": 5250000,
+    "receivedRecurring": 4500000,
+    "oneTimeTotal": 750000,
+    "expectedRemaining": 1500000,
+    "counts": { "received": 1, "partial": 0, "pending": 1, "overdue": 0, "skipped": 0 }
+  },
+  "occurrences": [
+    {
+      "id": "…",
+      "sourceId": "…",
+      "name": "Зарплата",
+      "accountId": "…",
+      "plannedDate": "2026-10-05",
+      "plannedAmount": 4500000,
+      "actualDate": "2026-10-05",
+      "actualAmount": 4500000,
+      "status": "received",
+      "diff": 0
+    }
+  ],
+  "oneTime": [
+    {
+      "transactionId": "…",
+      "name": "Продаж велосипеда",
+      "date": "2026-10-09",
+      "amount": 750000,
+      "status": "received"
+    }
+  ]
+}
+```
+
+- `status` надходження — `received` \| `partial` \| `pending` \| `overdue` \| `skipped`; його рахує бекенд.
+- `diff` (отримано мінус заплановано) є лише в отриманих надходжень.
+- Надходження належить до місяця за `plannedDate`, а суми `received*` рахуються за датою транзакцій.
+
+| Метод | Шлях                                  | Тіло                                                                 | Відповідь                                                                       |
+| ----- | ------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| PATCH | `/api/income-occurrences/:id`         | `{ plannedDate?, plannedAmount?, status?: "expected" \| "skipped" }` | `200` надходження; `409`, якщо в джерела вже є надходження на цю дату           |
+| POST  | `/api/income-occurrences/:id/receive` | `{ amount?, date?, accountId? }`                                     | `201 Transaction`; за замовчуванням запланована сума, сьогодні, рахунок джерела |
+| POST  | `/api/incomes/one-time`               | `{ amount, date, accountId, name, categoryId? }`                     | `201 Transaction`                                                               |
+
+`receive` можна викликати кілька разів — так записуються часткові виплати; пропущене надходження
+після `receive` знову стає очікуваним. Фактичні записи змінюються й видаляються через
+`/api/transactions/:id`; платежі одного надходження — `GET /api/transactions?occurrenceId=…`.

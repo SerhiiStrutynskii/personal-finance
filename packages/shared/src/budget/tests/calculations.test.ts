@@ -79,14 +79,14 @@ describe('summarizeTransactions', () => {
       [
         tx({ amountMinor: 300 }),
         tx({ type: 'transfer', amountMinor: 999999, categoryId: null }),
-        tx({ type: 'income', amountMinor: 5000, categoryId: null, incomeLineId: 'salary' }),
+        tx({ type: 'income', amountMinor: 5000, categoryId: null }),
       ],
       october,
       'UAH',
     );
 
     expect(facts.spending).toEqual([{ categoryId: 'food', categoryName: 'Продукти', spent: 300 }]);
-    expect(facts.income).toEqual([{ incomeLineId: 'salary', received: 5000 }]);
+    expect(facts.receivedIncome).toBe(5000);
   });
 
   it('період — півінтервал у часовому поясі домогосподарства', () => {
@@ -108,16 +108,15 @@ describe('summarizeTransactions', () => {
     expect(facts.spending).toEqual([{ categoryId: 'food', categoryName: 'Продукти', spent: 110 }]);
   });
 
-  it('групує за категоріями й статтями, окремо рахує записи без них', () => {
+  it('групує витрати за категоріями, окремо рахує витрати без категорії, сумує доходи', () => {
     const facts = summarizeTransactions(
       [
         tx({ amountMinor: 100 }),
         tx({ amountMinor: 50 }),
         tx({ amountMinor: 70, categoryId: 'fuel', categoryName: 'Пальне' }),
         tx({ amountMinor: 5, categoryId: null, categoryName: null }),
-        tx({ type: 'income', amountMinor: 1000, categoryId: null, incomeLineId: 'salary' }),
-        tx({ type: 'income', amountMinor: 2000, categoryId: null, incomeLineId: 'salary' }),
-        tx({ type: 'income', amountMinor: 300, categoryId: null }),
+        tx({ type: 'income', amountMinor: 1000, categoryId: null }),
+        tx({ type: 'income', amountMinor: 2000, categoryId: 'salary' }),
       ],
       october,
       'UAH',
@@ -128,28 +127,28 @@ describe('summarizeTransactions', () => {
       { categoryId: 'fuel', categoryName: 'Пальне', spent: 70 },
       { categoryId: null, categoryName: 'Без категорії', spent: 5 },
     ]);
-    expect(facts.income).toEqual([
-      { incomeLineId: 'salary', received: 3000 },
-      { incomeLineId: null, received: 300 },
-    ]);
+    expect(facts.receivedIncome).toBe(3000);
   });
 
   it('не змішує валюти: враховує лише валюту бюджету', () => {
     const facts = summarizeTransactions(
-      [tx({ amountMinor: 100 }), tx({ amountMinor: 999, currency: 'USD' })],
+      [
+        tx({ amountMinor: 100 }),
+        tx({ amountMinor: 999, currency: 'USD' }),
+        tx({ type: 'income', amountMinor: 888, currency: 'USD' }),
+      ],
       october,
       'UAH',
     );
     expect(facts.spending[0]!.spent).toBe(100);
+    expect(facts.receivedIncome).toBe(0);
   });
 });
 
 describe('calculateBudget', () => {
   const input = {
-    incomeLines: [
-      { id: 'salary', name: 'Зарплата', planned: 5000000 },
-      { id: 'freelance', name: 'Фріланс', planned: 1000000 },
-    ],
+    plannedIncome: 6000000,
+    receivedIncome: 4550000,
     expenseLines: [
       { id: 'l1', categoryId: 'food', categoryName: 'Продукти', planned: 1200000 },
       { id: 'l2', categoryId: 'transport', categoryName: 'Транспорт', planned: 300000 },
@@ -162,11 +161,6 @@ describe('calculateBudget', () => {
       { categoryId: 'utilities', categoryName: 'Комунальні', spent: 400000 },
       { categoryId: 'gifts', categoryName: 'Подарунки', spent: 80000 },
       { categoryId: null, categoryName: 'Без категорії', spent: 5000 },
-    ],
-    income: [
-      { incomeLineId: 'salary', received: 4500000 },
-      { incomeLineId: null, received: 20000 },
-      { incomeLineId: 'line-of-another-budget', received: 30000 },
     ],
     periodEnd,
   };
@@ -213,17 +207,7 @@ describe('calculateBudget', () => {
     ]);
   });
 
-  it('рахує доходи по статтях; доходи без статті цього бюджету — «інші»', () => {
-    const result = calculateBudget({ ...input, now: during });
-
-    expect(result.incomeLines).toEqual([
-      { id: 'salary', name: 'Зарплата', planned: 5000000, received: 4500000, diff: -500000 },
-      { id: 'freelance', name: 'Фріланс', planned: 1000000, received: 0, diff: -1000000 },
-    ]);
-    expect(result.otherIncome).toBe(50000);
-  });
-
-  it('рахує підсумки й баланси', () => {
+  it('рахує підсумки й баланси; доходи беруться готовими з розрахунку доходів', () => {
     expect(calculateBudget({ ...input, now: during }).summary).toEqual({
       plannedIncomeTotal: 6000000,
       receivedIncomeTotal: 4550000,
@@ -237,8 +221,8 @@ describe('calculateBudget', () => {
   it('баланси можуть бути відʼємними', () => {
     const { summary } = calculateBudget({
       ...input,
-      incomeLines: [{ id: 'salary', name: 'Зарплата', planned: 1000000 }],
-      income: [{ incomeLineId: 'salary', received: 500000 }],
+      plannedIncome: 1000000,
+      receivedIncome: 500000,
       now: during,
     });
     expect(summary.plannedBalance).toBe(-900000);
@@ -247,10 +231,10 @@ describe('calculateBudget', () => {
 
   it('порожній бюджет дає нулі', () => {
     const result = calculateBudget({
-      incomeLines: [],
+      plannedIncome: 0,
+      receivedIncome: 0,
       expenseLines: [],
       spending: [],
-      income: [],
       now: during,
       periodEnd,
     });
@@ -263,10 +247,8 @@ describe('calculateBudget', () => {
         plannedBalance: 0,
         actualBalance: 0,
       },
-      incomeLines: [],
       expenseLines: [],
       unplannedExpenses: [],
-      otherIncome: 0,
     });
   });
 });
