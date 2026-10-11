@@ -3,11 +3,32 @@
 Базова адреса: `http://localhost:3000`. Формат — JSON. Спільні типи й zod-схеми —
 `packages/shared/src/schemas.ts`.
 
-## Авторизація (тимчасова)
+## Авторизація
 
-Справжньої авторизації ще немає. У `development` і `test` користувач береться із заголовка
-`X-Dev-User-Id` або зі змінної середовища `DEV_USER_ID`; домогосподарство визначається за його
-членством. У `production` усі маршрути `/api/*` відповідають `401`.
+Усі маршрути `/api/*`, крім `/api/auth/register`, `/api/auth/login`, `/api/auth/refresh` і
+`/api/auth/logout`, потребують заголовка `Authorization: Bearer <accessToken>`.
+
+- Access-токен — JWT (HS256), діє 15 хвилин.
+- Refresh-токен — випадковий рядок, діє 30 днів і одноразовий: кожне оновлення видає нову пару.
+  Повторне використання вже використаного токена відкликає всі токени цього входу.
+
+Об'єкти:
+
+- `CurrentUser`: `{ user: { id, email, name, timeZone }, household: { id, name, role } }`
+- `AuthTokens`: `{ accessToken, refreshToken, expiresIn }` (`expiresIn` — секунди життя access-токена)
+- `AuthSession`: `CurrentUser` разом з `AuthTokens`
+
+| Метод | Шлях                 | Тіло                                        | Відповідь                                                                              |
+| ----- | -------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| POST  | `/api/auth/register` | `{ email, password, name, householdName? }` | `201 AuthSession`; `409`, якщо email зайнятий                                          |
+| POST  | `/api/auth/login`    | `{ email, password }`                       | `200 AuthSession`; `401` для невірних даних; `429` після 5 невдалих спроб за 15 хвилин |
+| POST  | `/api/auth/refresh`  | `{ refreshToken }`                          | `200 AuthTokens`; `401` для невідомого, використаного чи простроченого токена          |
+| POST  | `/api/auth/logout`   | `{ refreshToken }`                          | `204` завжди                                                                           |
+| GET   | `/api/auth/me`       | —                                           | `200 CurrentUser`                                                                      |
+
+Пароль — від 10 до 128 символів. Email зводиться до нижнього регістру. Реєстрація створює
+користувача й окреме домогосподарство, у якому він `owner`; `householdName` за замовчуванням —
+«Моє домогосподарство».
 
 ## Помилки
 
