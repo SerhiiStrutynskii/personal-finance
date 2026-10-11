@@ -26,9 +26,29 @@ export const users = pgTable('users', {
   id: id(),
   email: text().notNull().unique(),
   name: text().notNull(),
+  // argon2id; порожній, якщо користувач ще не має пароля
+  passwordHash: text('password_hash'),
   timeZone: text('time_zone').notNull().default('Europe/Kyiv'),
   createdAt: createdAt(),
 });
+
+export const refreshTokens = pgTable(
+  'refresh_tokens',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // SHA-256 від токена; сам токен ніде не зберігається
+    tokenHash: text('token_hash').notNull().unique(),
+    // Ланцюжок ротацій одного входу: повторне використання старого токена відкликає всю родину
+    familyId: uuid('family_id').notNull(),
+    expiresAt: instant().notNull(),
+    revokedAt: instant(),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.userId), index().on(t.familyId)],
+);
 
 export const households = pgTable('households', {
   id: id(),

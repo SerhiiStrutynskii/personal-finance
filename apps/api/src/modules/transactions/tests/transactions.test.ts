@@ -1,8 +1,6 @@
 import { sql } from 'drizzle-orm';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { createApp } from '../../../app.ts';
-import { DEV_USER_HEADER } from '../../../http/auth.ts';
 import { setupTestApp, type Actor } from '../../../test/harness.ts';
 
 const { app, db, createActor } = setupTestApp();
@@ -374,35 +372,17 @@ describe('ізоляція домогосподарств', () => {
 });
 
 describe('доступ', () => {
-  it('відповідає 401 без користувача, з невідомим користувачем і з некоректним id', async () => {
-    expect((await request(app).get('/api/transactions')).status).toBe(401);
-    expect(
-      (await request(app).get('/api/transactions').set(DEV_USER_HEADER, MISSING_ID)).status,
-    ).toBe(401);
-    expect((await request(app).get('/api/transactions').set(DEV_USER_HEADER, 'abc')).status).toBe(
-      401,
-    );
-  });
-
-  it('поза development/test dev-авторизація вимкнена', async () => {
-    const actor = await createActor();
-    const production = createApp({
-      db,
-      corsOrigin: 'http://localhost',
-      devAuth: { enabled: false, defaultUserId: actor.userId },
-    });
-
-    const res = await request(production)
-      .get('/api/transactions')
-      .set(DEV_USER_HEADER, actor.userId);
-    expect(res.status).toBe(401);
+  it('відповідає 401 без токена', async () => {
+    for (const path of ['/api/transactions', '/api/accounts', '/api/categories']) {
+      expect((await request(app).get(path)).status).toBe(401);
+    }
   });
 
   it('не розкриває внутрішні деталі в помилках', async () => {
     const actor = await createActor();
     const res = await request(app)
       .post('/api/transactions')
-      .set(DEV_USER_HEADER, actor.userId)
+      .set('Authorization', `Bearer ${actor.accessToken}`)
       .set('Content-Type', 'application/json')
       .send('{ не json');
 

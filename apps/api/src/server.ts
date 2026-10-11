@@ -5,11 +5,7 @@ import { createDb } from './db/client.ts';
 const env = loadEnv();
 const { db, pool } = createDb(env.DATABASE_URL);
 
-const app = createApp({
-  db,
-  corsOrigin: env.CORS_ORIGIN,
-  devAuth: { enabled: env.NODE_ENV !== 'production', defaultUserId: env.DEV_USER_ID },
-});
+const app = createApp({ db, corsOrigin: env.CORS_ORIGIN, jwtSecret: env.JWT_SECRET });
 
 const server = app.listen(env.PORT, () => {
   console.log(`API слухає порт ${env.PORT} (${env.NODE_ENV})`);

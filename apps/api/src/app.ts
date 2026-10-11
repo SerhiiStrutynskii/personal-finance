@@ -1,19 +1,25 @@
 import cors from 'cors';
 import express, { Router } from 'express';
 import type { Db } from './db/client.ts';
-import { devAuth, type DevAuthOptions } from './http/auth.ts';
+import { requireAuth } from './http/auth.ts';
 import { errorHandler, notFoundHandler } from './http/error-handler.ts';
 import { accountsRouter } from './modules/accounts/routes.ts';
+import { createLoginLimiter, type RateLimiter } from './modules/auth/rate-limiter.ts';
+import { authRouter } from './modules/auth/routes.ts';
+import { createTokenService } from './modules/auth/tokens.ts';
 import { categoriesRouter } from './modules/categories/routes.ts';
 import { transactionsRouter } from './modules/transactions/routes.ts';
 
 export interface AppOptions {
   db: Db;
   corsOrigin: string;
-  devAuth: DevAuthOptions;
+  jwtSecret: string;
+  loginLimiter?: RateLimiter;
 }
 
-export function createApp({ db, corsOrigin, devAuth: devAuthOptions }: AppOptions) {
+export function createApp({ db, corsOrigin, jwtSecret, loginLimiter }: AppOptions) {
+  const tokens = createTokenService(jwtSecret);
+
   const app = express();
   app.disable('x-powered-by');
   app.use(cors({ origin: corsOrigin }));
@@ -23,8 +29,13 @@ export function createApp({ db, corsOrigin, devAuth: devAuthOptions }: AppOption
     res.json({ status: 'ok' });
   });
 
+  app.use(
+    '/api/auth',
+    authRouter({ db, tokens, loginLimiter: loginLimiter ?? createLoginLimiter() }),
+  );
+
   const api = Router();
-  api.use(devAuth(db, devAuthOptions));
+  api.use(requireAuth(db, tokens));
   api.use('/accounts', accountsRouter(db));
   api.use('/categories', categoriesRouter(db));
   api.use('/transactions', transactionsRouter(db));

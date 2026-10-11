@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { parseMoney } from '@hf/shared';
 import { loadEnv } from '../config/env.ts';
+import { hashPassword } from '../modules/auth/password.ts';
 import { createDb } from './client.ts';
 import {
   accounts,
@@ -11,7 +12,9 @@ import {
   users,
 } from './schema.ts';
 
-// Усі дані вигадані. Цей користувач — значення DEV_USER_ID за замовчуванням для локальної розробки.
+// Усі дані вигадані; обліковий запис призначений лише для локальної розробки.
+export const DEMO_EMAIL = 'demo@example.com';
+export const DEMO_PASSWORD = 'demo-password';
 export const DEMO_USER_ID = '00000000-0000-4000-8000-000000000001';
 
 const env = loadEnv();
@@ -24,12 +27,17 @@ const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 10
 try {
   const [existing] = await db.select().from(users).where(eq(users.id, DEMO_USER_ID));
   if (existing) {
+    if (!existing.passwordHash) {
+      const passwordHash = await hashPassword(DEMO_PASSWORD);
+      await db.update(users).set({ passwordHash }).where(eq(users.id, DEMO_USER_ID));
+    }
     console.log('Демо-дані вже є, пропускаю');
   } else {
+    const passwordHash = await hashPassword(DEMO_PASSWORD);
     await db.transaction(async (tx) => {
       await tx
         .insert(users)
-        .values({ id: DEMO_USER_ID, email: 'demo@example.com', name: 'Демо Користувач' });
+        .values({ id: DEMO_USER_ID, email: DEMO_EMAIL, name: 'Демо Користувач', passwordHash });
       const [household] = await tx.insert(households).values({ name: 'Демо-родина' }).returning();
       const householdId = household!.id;
       await tx
@@ -131,8 +139,9 @@ try {
         },
       ]);
     });
-    console.log(`Демо-дані створено. DEV_USER_ID=${DEMO_USER_ID}`);
+    console.log('Демо-дані створено');
   }
+  console.log(`Вхід для розробки: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
 } finally {
   await pool.end();
 }

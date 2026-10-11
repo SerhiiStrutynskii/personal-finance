@@ -10,9 +10,12 @@ export class AppError extends Error {
   }
 }
 
-export const unauthorized = () => new AppError(401, 'UNAUTHORIZED', 'Потрібна авторизація');
+export const unauthorized = (message = 'Потрібна авторизація') =>
+  new AppError(401, 'UNAUTHORIZED', message);
 export const notFound = (what: string) => new AppError(404, 'NOT_FOUND', `${what}: не знайдено`);
 export const badRequest = (message: string) => new AppError(400, 'BAD_REQUEST', message);
+export const tooManyRequests = () =>
+  new AppError(429, 'TOO_MANY_REQUESTS', 'Забагато спроб. Спробуйте пізніше');
 export const conflict = (message: string) => new AppError(409, 'CONFLICT', message);
 
 // ON DELETE RESTRICT повідомляє 23001, звичайний зовнішній ключ — 23503
