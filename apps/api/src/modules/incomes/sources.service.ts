@@ -1,8 +1,10 @@
-import { DEFAULT_CURRENCY } from '@hf/shared';
+import { DEFAULT_CURRENCY, localDateKey } from '@hf/shared';
 import type { Db, DbOrTx } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import { badRequest, conflict, notFound } from '../../http/errors.ts';
 import { findAccount } from '../accounts/repo.ts';
+import { findHouseholdTimeZone } from '../budgets/repo.ts';
+import { materializeHistory } from './occurrences.service.ts';
 import * as repo from './repo.ts';
 import {
   incomeSourceInputSchema,
@@ -51,11 +53,29 @@ export async function createSource(
   return toSourceDto(await repo.insertSource(db, auth.householdId, { ...input, currency }));
 }
 
+/** Поля, зміна яких впливає на майбутні надходження. */
+const SCHEDULE_FIELDS = [
+  'plannedAmount',
+  'frequency',
+  'dayOfMonth',
+  'dayOfWeek',
+  'intervalMonths',
+  'startDate',
+  'endDate',
+] as const;
+
+async function todayOf(db: DbOrTx, auth: AuthContext, now: Date): Promise<string> {
+  const timeZone = await findHouseholdTimeZone(db, auth.householdId);
+  if (!timeZone) throw sourceNotFound();
+  return localDateKey(now, timeZone);
+}
+
 export async function updateSource(
   db: Db,
   auth: AuthContext,
   id: string,
   patch: UpdateIncomeSourceInput,
+  now: Date = new Date(),
 ): Promise<IncomeSource> {
   const existing = await repo.findSource(db, auth.householdId, id);
   if (!existing) throw sourceNotFound();
@@ -66,18 +86,39 @@ export async function updateSource(
     ...patch,
   });
   const currency = await resolveAccountCurrency(db, auth, merged.accountId);
+  const scheduleChanged = SCHEDULE_FIELDS.some((field) => merged[field] !== existing[field]);
+  const today = await todayOf(db, auth, now);
 
-  const row = await repo.updateSource(db, auth.householdId, id, { ...merged, currency });
+  const row = await db.transaction(async (tx) => {
+    if (!scheduleChanged) {
+      return repo.updateSource(tx, auth.householdId, id, { ...merged, currency });
+    }
+    // Минулі надходження фіксуються за старим правилом; майбутні неотримані видаляються
+    // і згенеруються заново вже за новим. Отримані й минулі не змінюються.
+    await materializeHistory(tx, existing, today);
+    await repo.deleteUnpaidOccurrencesFrom(tx, existing.id, today);
+    return repo.updateSource(tx, auth.householdId, id, { ...merged, currency, ruleFrom: today });
+  });
   if (!row) throw sourceNotFound();
   return toSourceDto(row);
 }
 
+/** Деактивоване джерело не дає нових надходжень; історія й отримані доходи лишаються. */
 export async function deactivateSource(
   db: Db,
   auth: AuthContext,
   id: string,
+  now: Date = new Date(),
 ): Promise<IncomeSource> {
-  const row = await repo.updateSource(db, auth.householdId, id, { isActive: false });
+  const existing = await repo.findSource(db, auth.householdId, id);
+  if (!existing) throw sourceNotFound();
+  const today = await todayOf(db, auth, now);
+
+  const row = await db.transaction(async (tx) => {
+    await materializeHistory(tx, existing, today);
+    await repo.deleteUnpaidOccurrencesFrom(tx, existing.id, today);
+    return repo.updateSource(tx, auth.householdId, id, { isActive: false });
+  });
   if (!row) throw sourceNotFound();
   return toSourceDto(row);
 }

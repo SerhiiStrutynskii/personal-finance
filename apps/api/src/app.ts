@@ -8,7 +8,11 @@ import { createLoginLimiter, type RateLimiter } from './modules/auth/rate-limite
 import { authRouter } from './modules/auth/routes.ts';
 import { createTokenService } from './modules/auth/tokens.ts';
 import { budgetsRouter } from './modules/budgets/routes.ts';
-import { incomeSourcesRouter } from './modules/incomes/routes.ts';
+import {
+  incomeOccurrencesRouter,
+  incomeSourcesRouter,
+  incomesRouter,
+} from './modules/incomes/routes.ts';
 import { categoriesRouter } from './modules/categories/routes.ts';
 import { transactionsRouter } from './modules/transactions/routes.ts';
 
@@ -41,7 +45,9 @@ export function createApp({ db, corsOrigin, jwtSecret, loginLimiter }: AppOption
   api.use('/accounts', accountsRouter(db));
   api.use('/budgets', budgetsRouter(db));
   api.use('/categories', categoriesRouter(db));
+  api.use('/income-occurrences', incomeOccurrencesRouter(db));
   api.use('/income-sources', incomeSourcesRouter(db));
+  api.use('/incomes', incomesRouter(db));
   api.use('/transactions', transactionsRouter(db));
   app.use('/api', api);
 

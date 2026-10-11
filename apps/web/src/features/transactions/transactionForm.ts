@@ -152,7 +152,11 @@ export function toTransactionInput(
           ...base,
           type,
           categoryId: values.categoryId || null,
-          ...(type === 'income' && { incomeLineId: values.incomeLineId || null }),
+          ...(type === 'income' && {
+            incomeLineId: values.incomeLineId || null,
+            // Редагування доходу не розриває його зв'язок із надходженням.
+            occurrenceId: context.original?.occurrenceId ?? null,
+          }),
         };
 
   const parsed = transactionInputSchema.safeParse(candidate);

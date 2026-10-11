@@ -13,6 +13,7 @@ export type TransactionValues = Pick<
   | 'toAccountId'
   | 'categoryId'
   | 'incomeLineId'
+  | 'occurrenceId'
   | 'amountMinor'
   | 'currency'
   | 'description'
@@ -34,6 +35,7 @@ export async function listTransactions(db: Db, householdId: string, query: ListT
         )
       : undefined,
     query.categoryId ? eq(transactions.categoryId, query.categoryId) : undefined,
+    query.occurrenceId ? eq(transactions.occurrenceId, query.occurrenceId) : undefined,
     query.from ? gte(transactions.occurredAt, new Date(query.from)) : undefined,
     query.to ? lt(transactions.occurredAt, new Date(query.to)) : undefined,
   );

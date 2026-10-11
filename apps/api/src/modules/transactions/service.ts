@@ -4,6 +4,7 @@ import { badRequest, notFound } from '../../http/errors.ts';
 import { findAccountsByIds } from '../accounts/repo.ts';
 import { findIncomeLineWithBudget } from '../budgets/repo.ts';
 import { findCategory } from '../categories/repo.ts';
+import { findOccurrenceForLink } from '../incomes/repo.ts';
 import * as repo from './repo.ts';
 import type { ListTransactionsQuery, Transaction, TransactionInput } from './schema.ts';
 
@@ -14,6 +15,7 @@ const toDto = (row: repo.TransactionRow): Transaction => ({
   toAccountId: row.toAccountId,
   categoryId: row.categoryId,
   incomeLineId: row.incomeLineId,
+  occurrenceId: row.occurrenceId,
   amountMinor: row.amountMinor,
   currency: row.currency,
   description: row.description,
@@ -62,6 +64,7 @@ async function resolveValues(
       toAccountId: input.toAccountId,
       categoryId: null,
       incomeLineId: null,
+      occurrenceId: null,
     };
   }
 
@@ -86,12 +89,22 @@ async function resolveValues(
       );
     }
   }
+
+  const occurrenceId = input.type === 'income' ? input.occurrenceId : null;
+  if (occurrenceId) {
+    const occurrence = await findOccurrenceForLink(db, auth.householdId, occurrenceId);
+    if (!occurrence) throw badRequest('Надходження не знайдено');
+    if (occurrence.currency !== input.currency) {
+      throw badRequest('Валюта доходу має збігатися з валютою джерела доходу');
+    }
+  }
   return {
     ...base,
     type: input.type,
     toAccountId: null,
     categoryId: input.categoryId,
     incomeLineId,
+    occurrenceId,
   };
 }
 

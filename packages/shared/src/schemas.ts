@@ -74,6 +74,7 @@ export const transactionInputSchema = z.discriminatedUnion('type', [
     categoryId: idSchema.nullable().default(null),
     // Статті бюджету є лише в доходів: будь-яке значення, крім null, — помилка.
     incomeLineId: z.null().optional(),
+    occurrenceId: z.null().optional(),
   }),
   z.object({
     type: z.literal('income'),
@@ -81,6 +82,8 @@ export const transactionInputSchema = z.discriminatedUnion('type', [
     categoryId: idSchema.nullable().default(null),
     /** Стаття доходу місячного бюджету; дата доходу має бути в межах місяця цього бюджету. */
     incomeLineId: idSchema.nullable().default(null),
+    /** Надходження періодичного доходу, яке оплачує ця транзакція. */
+    occurrenceId: idSchema.nullable().default(null),
   }),
   z
     .object({
@@ -88,6 +91,7 @@ export const transactionInputSchema = z.discriminatedUnion('type', [
       ...transactionBase,
       toAccountId: idSchema,
       incomeLineId: z.null().optional(),
+      occurrenceId: z.null().optional(),
     })
     .refine((value) => value.accountId !== value.toAccountId, {
       path: ['toAccountId'],
@@ -101,6 +105,7 @@ export const listTransactionsQuerySchema = z.object({
   type: transactionTypeSchema.optional(),
   accountId: idSchema.optional(),
   categoryId: idSchema.optional(),
+  occurrenceId: idSchema.optional(),
   from: instantSchema.optional(),
   to: instantSchema.optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -115,6 +120,7 @@ export const transactionSchema = z.object({
   toAccountId: idSchema.nullable(),
   categoryId: idSchema.nullable(),
   incomeLineId: idSchema.nullable(),
+  occurrenceId: idSchema.nullable(),
   amountMinor: positiveAmountMinorSchema,
   currency: currencySchema,
   description: z.string(),

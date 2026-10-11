@@ -127,6 +127,7 @@ describe('редагування', () => {
     toAccountId: null,
     categoryId: id(7),
     incomeLineId: null,
+    occurrenceId: null,
     amountMinor: 128450,
     currency: 'UAH',
     description: 'Ринок',
@@ -258,6 +259,7 @@ describe('стаття доходу', () => {
       toAccountId: null,
       categoryId: null,
       incomeLineId: id(5),
+      occurrenceId: id(6),
       amountMinor: 4500000,
       currency: 'UAH',
       description: 'Зарплата',
@@ -270,7 +272,11 @@ describe('стаття доходу', () => {
     expect(initialValues(ctx).incomeLineId).toBe(id(5));
     expect(toTransactionInput('income', initialValues(ctx), ctx)).toMatchObject({
       ok: true,
-      input: { incomeLineId: id(5), occurredAt: '2026-03-05T08:00:00.000Z' },
+      input: {
+        incomeLineId: id(5),
+        occurrenceId: id(6),
+        occurredAt: '2026-03-05T08:00:00.000Z',
+      },
     });
   });
 

@@ -1,7 +1,16 @@
 import { Router } from 'express';
 import type { Db } from '../../db/client.ts';
 import { getAuth } from '../../http/auth.ts';
-import { idParamsSchema, incomeSourceInputSchema, updateIncomeSourceSchema } from './schema.ts';
+import * as occurrences from './occurrences.service.ts';
+import {
+  idParamsSchema,
+  incomeSourceInputSchema,
+  incomesQuerySchema,
+  oneTimeIncomeSchema,
+  receiveOccurrenceSchema,
+  updateIncomeSourceSchema,
+  updateOccurrenceSchema,
+} from './schema.ts';
 import * as sources from './sources.service.ts';
 
 export function incomeSourcesRouter(db: Db): Router {
@@ -31,6 +40,35 @@ export function incomeSourcesRouter(db: Db): Router {
     const { id } = idParamsSchema.parse(req.params);
     await sources.deleteSource(db, getAuth(res), id);
     res.status(204).end();
+  });
+
+  return router;
+}
+
+export function incomesRouter(db: Db): Router {
+  const router = Router();
+
+  router.get('/', async (req, res) => {
+    const { month } = incomesQuerySchema.parse(req.query);
+    res.json(await occurrences.getIncomes(db, getAuth(res), month));
+  });
+
+  return router;
+}
+
+export function incomeOccurrencesRouter(db: Db): Router {
+  const router = Router();
+
+  router.patch('/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const patch = updateOccurrenceSchema.parse(req.body);
+    res.json(await occurrences.updateOccurrence(db, getAuth(res), id, patch));
+  });
+
+  router.post('/:id/receive', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = receiveOccurrenceSchema.parse(req.body ?? {});
+    res.status(201).json(await occurrences.receiveOccurrence(db, getAuth(res), id, input));
   });
 
   return router;

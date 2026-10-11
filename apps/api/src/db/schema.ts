@@ -243,6 +243,9 @@ export const incomeSources = pgTable(
     intervalMonths: smallint('interval_months'),
     startDate: calendarDate('start_date').notNull(),
     endDate: calendarDate('end_date'),
+    // Дата останньої зміни правила: нові надходження генеруються лише від неї,
+    // щоб змінене правило не переписувало історію.
+    ruleFrom: calendarDate('rule_from'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: createdAt(),
     updatedAt: instant().notNull().defaultNow(),
