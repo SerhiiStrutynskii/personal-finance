@@ -2,9 +2,18 @@ import { PASSWORD_MIN_LENGTH, loginSchema, registerSchema } from '@hf/shared';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
-import { Button, ErrorText, Field } from '../../shared/ui/controls.tsx';
-import { inputClass } from '../../shared/ui/styles.ts';
+import { ErrorText, Field } from '../../shared/ui/controls.tsx';
 import { useAuth } from './authContext.ts';
+import { Button } from '../../shared/ui/button.tsx';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '../../shared/ui/card.tsx';
+import { Input } from '../../shared/ui/input.tsx';
 
 function AuthLayout({
   title,
@@ -16,13 +25,17 @@ function AuthLayout({
   footer: ReactNode;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f3f5f7] p-4">
-      <div className="w-full max-w-sm rounded-md border-2 border-black/10 bg-white p-6 shadow-sm">
-        <p className="mb-1 text-lg font-bold">Prospera</p>
-        <h1 className="mb-4 text-xl">{title}</h1>
-        {children}
-        <p className="mt-4 text-sm text-black/60">{footer}</p>
-      </div>
+    <main className="flex min-h-screen items-center justify-center bg-muted p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardDescription>Prospera</CardDescription>
+          <CardTitle className="text-xl">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>{children}</CardContent>
+        <CardFooter className="text-sm text-muted-foreground">
+          <p>{footer}</p>
+        </CardFooter>
+      </Card>
     </main>
   );
 }
@@ -70,8 +83,7 @@ export function LoginPage() {
     >
       <form className="space-y-3" onSubmit={submit} noValidate>
         <Field label="Email">
-          <input
-            className={inputClass}
+          <Input
             type="email"
             autoComplete="email"
             value={email}
@@ -79,8 +91,7 @@ export function LoginPage() {
           />
         </Field>
         <Field label="Пароль">
-          <input
-            className={inputClass}
+          <Input
             type="password"
             autoComplete="current-password"
             value={password}
@@ -134,16 +145,10 @@ export function RegisterPage() {
     >
       <form className="space-y-3" onSubmit={submit} noValidate>
         <Field label="Імʼя" error={fieldErrors.name}>
-          <input
-            className={inputClass}
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Email" error={fieldErrors.email}>
-          <input
-            className={inputClass}
+          <Input
             type="email"
             autoComplete="email"
             value={email}
@@ -151,8 +156,7 @@ export function RegisterPage() {
           />
         </Field>
         <Field label="Пароль" error={fieldErrors.password}>
-          <input
-            className={inputClass}
+          <Input
             type="password"
             autoComplete="new-password"
             value={password}

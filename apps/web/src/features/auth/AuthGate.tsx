@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { Button, ErrorText, Muted } from '../../shared/ui/controls.tsx';
+import { Button } from '../../shared/ui/button.tsx';
+import { ErrorText, Muted } from '../../shared/ui/controls.tsx';
 import { useAuth } from './authContext.ts';
 
 function FullScreen({ children }: { children: React.ReactNode }) {

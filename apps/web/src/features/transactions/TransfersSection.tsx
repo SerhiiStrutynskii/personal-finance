@@ -1,12 +1,14 @@
 import type { Account } from '@hf/shared';
 import { useState, type FormEvent } from 'react';
 import { errorMessage } from '../../shared/api/index.ts';
-import { Button, ErrorText, Field, Muted } from '../../shared/ui/controls.tsx';
-import { inputClass } from '../../shared/ui/styles.ts';
+import { ErrorText, Field, Muted } from '../../shared/ui/controls.tsx';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useSaveTransaction, useTransactions } from './api.ts';
 import { initialValues, toTransactionInput, type FormErrors } from './transactionForm.ts';
 import { TransactionTable } from './TransactionTable.tsx';
+import { Button } from '../../shared/ui/button.tsx';
+import { Input } from '../../shared/ui/input.tsx';
+import { SelectField } from '../../shared/ui/select-field.tsx';
 
 /** Форма переказу між рахунками й останні перекази. Переказ не є ні витратою, ні доходом. */
 export function TransfersSection({ accounts }: { accounts: Account[] }) {
@@ -31,15 +33,14 @@ export function TransfersSection({ accounts }: { accounts: Account[] }) {
     save.mutate({ input: result.input }, { onSuccess: () => setValues(blank()) });
   }
 
-  const accountOptions = accounts.map((account) => (
-    <option key={account.id} value={account.id}>
-      {account.name} ({account.currency})
-    </option>
-  ));
+  const accountOptions = accounts.map((account) => ({
+    value: account.id,
+    label: `${account.name} (${account.currency})`,
+  }));
 
   return (
     <section className="mt-8">
-      <h2 className="mb-3 text-lg font-bold">Перекази між рахунками</h2>
+      <h2 className="mb-3 font-heading text-lg font-semibold">Перекази між рахунками</h2>
       {accounts.length < 2 ? (
         <Muted>Для переказу потрібно щонайменше два рахунки.</Muted>
       ) : (
@@ -49,26 +50,23 @@ export function TransfersSection({ accounts }: { accounts: Account[] }) {
           noValidate
         >
           <Field label="З рахунку" error={errors.accountId}>
-            <select
-              className={inputClass}
+            <SelectField
               value={values.accountId}
-              onChange={(e) => set({ accountId: e.target.value })}
-            >
-              {accountOptions}
-            </select>
+              onChange={(accountId) => set({ accountId })}
+              invalid={Boolean(errors.accountId)}
+              options={accountOptions}
+            />
           </Field>
           <Field label="На рахунок" error={errors.toAccountId}>
-            <select
-              className={inputClass}
+            <SelectField
               value={values.toAccountId}
-              onChange={(e) => set({ toAccountId: e.target.value })}
-            >
-              {accountOptions}
-            </select>
+              onChange={(toAccountId) => set({ toAccountId })}
+              invalid={Boolean(errors.toAccountId)}
+              options={accountOptions}
+            />
           </Field>
           <Field label="Сума" error={errors.amount}>
-            <input
-              className={inputClass}
+            <Input
               inputMode="decimal"
               placeholder="0,00"
               value={values.amount}
@@ -76,8 +74,7 @@ export function TransfersSection({ accounts }: { accounts: Account[] }) {
             />
           </Field>
           <Field label="Дата" error={errors.date}>
-            <input
-              className={inputClass}
+            <Input
               type="date"
               value={values.date}
               onChange={(e) => set({ date: e.target.value })}
@@ -85,8 +82,7 @@ export function TransfersSection({ accounts }: { accounts: Account[] }) {
           </Field>
           <div className="sm:col-span-2">
             <Field label="Опис" error={errors.description}>
-              <input
-                className={inputClass}
+              <Input
                 maxLength={500}
                 value={values.description}
                 onChange={(e) => set({ description: e.target.value })}

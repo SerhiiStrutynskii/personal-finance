@@ -1,9 +1,12 @@
-import { createCategorySchema, type Category, type CategoryKind } from '@hf/shared';
+import { createCategorySchema, type CategoryKind } from '@hf/shared';
 import { useState, type FormEvent } from 'react';
 import { errorMessage } from '../../shared/api/index.ts';
-import { Button, ErrorText, Field, Muted, PageHeader } from '../../shared/ui/controls.tsx';
-import { inputClass } from '../../shared/ui/styles.ts';
+import { ErrorText, Field, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { useCategories, useCreateCategory, useDeleteCategory } from './api.ts';
+import { Button } from '../../shared/ui/button.tsx';
+import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
+import { Input } from '../../shared/ui/input.tsx';
+import { SelectField } from '../../shared/ui/select-field.tsx';
 
 const KIND_TITLES: Record<CategoryKind, string> = { expense: 'Витрати', income: 'Доходи' };
 const KINDS = Object.keys(KIND_TITLES) as CategoryKind[];
@@ -28,10 +31,6 @@ export function CategoriesPage() {
     create.mutate(parsed.data, { onSuccess: () => setName('') });
   }
 
-  function handleDelete(category: Category) {
-    if (window.confirm(`Видалити категорію «${category.name}»?`)) remove.mutate(category.id);
-  }
-
   return (
     <div>
       <PageHeader title="Категорії" />
@@ -45,19 +44,17 @@ export function CategoriesPage() {
             const items = categories.data.filter((category) => category.kind === value);
             return (
               <section key={value}>
-                <h2 className="mb-2 font-bold">{KIND_TITLES[value]}</h2>
+                <h2 className="mb-2 font-heading font-semibold">{KIND_TITLES[value]}</h2>
                 {items.length === 0 && <Muted>Категорій ще немає</Muted>}
-                <ul className="divide-y divide-black/5 text-sm">
+                <ul className="divide-y text-sm">
                   {items.map((category) => (
                     <li key={category.id} className="flex items-center justify-between gap-4 py-2">
                       {category.name}
-                      <Button
-                        variant="danger"
+                      <ConfirmButton
+                        title={`Видалити категорію «${category.name}»?`}
                         disabled={remove.isPending}
-                        onClick={() => handleDelete(category)}
-                      >
-                        Видалити
-                      </Button>
+                        onConfirm={() => remove.mutate(category.id)}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -73,22 +70,16 @@ export function CategoriesPage() {
         noValidate
       >
         <Field label="Назва нової категорії" error={nameError}>
-          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Тип">
-          <select
-            className={inputClass}
+          <SelectField
             value={kind}
-            onChange={(e) => setKind(e.target.value as CategoryKind)}
-          >
-            {KINDS.map((value) => (
-              <option key={value} value={value}>
-                {KIND_TITLES[value]}
-              </option>
-            ))}
-          </select>
+            onChange={setKind}
+            options={KINDS.map((value) => ({ value, label: KIND_TITLES[value] }))}
+          />
         </Field>
-        <Button type="submit" className="sm:mt-6" disabled={create.isPending}>
+        <Button type="submit" className="sm:mt-[26px]" disabled={create.isPending}>
           Додати
         </Button>
         <div className="sm:col-span-3">

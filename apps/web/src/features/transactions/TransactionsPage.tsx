@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
-import { Button, ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
-import { buttonClass } from '../../shared/ui/styles.ts';
+import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
 import { useTransactions } from './api.ts';
 import { ENTRY_CONFIG, type EntryType } from './config.ts';
 import { TransactionTable } from './TransactionTable.tsx';
+import { Button } from '../../shared/ui/button.tsx';
 
 const PAGE_SIZE = 50;
 
@@ -31,9 +31,9 @@ export function TransactionsPage({ type }: { type: EntryType }) {
         title={config.title}
         action={
           hasAccounts && (
-            <Link className={buttonClass()} to={`${config.path}/add`}>
-              Додати
-            </Link>
+            <Button asChild>
+              <Link to={`${config.path}/add`}>Додати</Link>
+            </Button>
           )
         }
       />
@@ -60,25 +60,25 @@ export function TransactionsPage({ type }: { type: EntryType }) {
             categories={categories.data ?? []}
             timeZone={user.timeZone}
             renderActions={(transaction) => (
-              <Link className={buttonClass('secondary')} to={`${config.path}/${transaction.id}`}>
-                Змінити
-              </Link>
+              <Button variant="outline" asChild>
+                <Link to={`${config.path}/${transaction.id}`}>Змінити</Link>
+              </Button>
             )}
           />
           {page.total > PAGE_SIZE && (
             <div className="mt-4 flex items-center gap-3 text-sm">
               <Button
-                variant="secondary"
+                variant="outline"
                 disabled={offset === 0}
                 onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
               >
                 Новіші
               </Button>
-              <span className="text-black/60">
+              <span className="text-muted-foreground">
                 {offset + 1}–{Math.min(offset + PAGE_SIZE, page.total)} із {page.total}
               </span>
               <Button
-                variant="secondary"
+                variant="outline"
                 disabled={offset + PAGE_SIZE >= page.total}
                 onClick={() => setOffset(offset + PAGE_SIZE)}
               >

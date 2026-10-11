@@ -2,14 +2,16 @@ import type { Account, Category, Transaction } from '@hf/shared';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
-import { Button, ErrorText, Field, Muted, PageHeader } from '../../shared/ui/controls.tsx';
-import { buttonClass, inputClass } from '../../shared/ui/styles.ts';
+import { ErrorText, Field, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
 import { useSaveTransaction, useTransaction } from './api.ts';
 import { ENTRY_CONFIG, type EntryType } from './config.ts';
 import { initialValues, toTransactionInput, type FormErrors } from './transactionForm.ts';
+import { Button } from '../../shared/ui/button.tsx';
+import { Input } from '../../shared/ui/input.tsx';
+import { SelectField } from '../../shared/ui/select-field.tsx';
 
 export function TransactionFormPage({ type }: { type: EntryType }) {
   const config = ENTRY_CONFIG[type];
@@ -90,10 +92,9 @@ function TransactionForm({ type, original, accounts, categories }: FormProps) {
   }
 
   return (
-    <form className="space-y-3" onSubmit={handleSubmit} noValidate>
+    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <Field label={currency ? `Сума, ${currency}` : 'Сума'} error={errors.amount}>
-        <input
-          className={inputClass}
+        <Input
           inputMode="decimal"
           placeholder="0,00"
           autoFocus
@@ -102,43 +103,31 @@ function TransactionForm({ type, original, accounts, categories }: FormProps) {
         />
       </Field>
       <Field label="Рахунок" error={errors.accountId}>
-        <select
-          className={inputClass}
+        <SelectField
           value={values.accountId}
-          onChange={(e) => set({ accountId: e.target.value })}
-        >
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name} ({account.currency})
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Категорія" error={errors.categoryId}>
-        <select
-          className={inputClass}
-          value={values.categoryId}
-          onChange={(e) => set({ categoryId: e.target.value })}
-        >
-          <option value="">Без категорії</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Дата" error={errors.date}>
-        <input
-          className={inputClass}
-          type="date"
-          value={values.date}
-          onChange={(e) => set({ date: e.target.value })}
+          onChange={(accountId) => set({ accountId })}
+          invalid={Boolean(errors.accountId)}
+          options={accounts.map((account) => ({
+            value: account.id,
+            label: `${account.name} (${account.currency})`,
+          }))}
         />
       </Field>
+      <Field label="Категорія" error={errors.categoryId}>
+        <SelectField
+          value={values.categoryId}
+          onChange={(categoryId) => set({ categoryId })}
+          options={[
+            { value: '', label: 'Без категорії' },
+            ...categories.map((category) => ({ value: category.id, label: category.name })),
+          ]}
+        />
+      </Field>
+      <Field label="Дата" error={errors.date}>
+        <Input type="date" value={values.date} onChange={(e) => set({ date: e.target.value })} />
+      </Field>
       <Field label="Опис" error={errors.description}>
-        <input
-          className={inputClass}
+        <Input
           maxLength={500}
           value={values.description}
           onChange={(e) => set({ description: e.target.value })}
@@ -149,9 +138,9 @@ function TransactionForm({ type, original, accounts, categories }: FormProps) {
         <Button type="submit" disabled={save.isPending}>
           Зберегти
         </Button>
-        <Link className={buttonClass('secondary')} to={config.path}>
-          Скасувати
-        </Link>
+        <Button variant="outline" asChild>
+          <Link to={config.path}>Скасувати</Link>
+        </Button>
       </div>
     </form>
   );

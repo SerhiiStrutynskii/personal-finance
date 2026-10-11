@@ -1,19 +1,8 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import { buttonClass, type ButtonVariant } from './styles.ts';
+import type { ReactNode } from 'react';
+import { Alert, AlertDescription } from './alert.tsx';
+import { Label } from './label.tsx';
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: ButtonVariant;
-}
-
-export function Button({
-  variant = 'primary',
-  type = 'button',
-  className = '',
-  ...props
-}: ButtonProps) {
-  return <button type={type} className={`${buttonClass(variant)} ${className}`} {...props} />;
-}
-
+/** Поле форми з підписом і повідомленням про помилку. */
 export function Field({
   label,
   error,
@@ -24,32 +13,32 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="block text-sm">
-      <span className="mb-1 block text-black/70">{label}</span>
+    <Label className="flex-col items-stretch gap-1.5 font-normal">
+      <span className="font-medium">{label}</span>
       {children}
-      {error && <span className="mt-1 block text-red-700">{error}</span>}
-    </label>
+      {error && <span className="text-destructive">{error}</span>}
+    </Label>
   );
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-      {children}
-    </p>
+    <Alert variant="destructive">
+      <AlertDescription>{children}</AlertDescription>
+    </Alert>
   );
 }
 
 export function PageHeader({ title, action }: { title: string; action?: ReactNode }) {
   return (
     <div className="mb-4 flex items-center justify-between gap-4">
-      <h1 className="text-xl font-bold">{title}</h1>
+      <h1 className="font-heading text-xl font-semibold">{title}</h1>
       {action}
     </div>
   );
 }
 
 export function Muted({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-black/60">{children}</p>;
+  return <p className="text-sm text-muted-foreground">{children}</p>;
 }
