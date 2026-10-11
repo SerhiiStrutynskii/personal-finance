@@ -46,7 +46,9 @@ export async function deleteAccount(db: Db, auth: AuthContext, id: string): Prom
     if (!(await repo.deleteAccount(db, auth.householdId, id))) throw notFound('Рахунок');
   } catch (error) {
     if (isForeignKeyViolation(error)) {
-      throw conflict('Рахунок має транзакції, тому його не можна видалити');
+      throw conflict(
+        'Рахунок використовується в транзакціях або джерелах доходу, тому його не можна видалити',
+      );
     }
     throw error;
   }
