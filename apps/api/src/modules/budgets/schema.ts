@@ -4,11 +4,9 @@ export {
   createBudgetSchema,
   createExpenseLineSchema,
   idParamsSchema,
-  updateBudgetSchema,
   updateExpenseLineSchema,
 } from '@hf/shared';
 export type {
-  BudgetStatus,
   BudgetView,
   CreateBudgetInput,
   CreateExpenseLineInput,

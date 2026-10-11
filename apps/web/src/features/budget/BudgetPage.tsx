@@ -2,7 +2,6 @@ import { localMonthKey, shiftMonth, type BudgetView } from '@hf/shared';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
-import { Badge } from '../../shared/ui/badge.tsx';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
@@ -13,18 +12,12 @@ import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
 import { TransactionDialog } from '../transactions/TransactionDialog.tsx';
 import type { TransactionFormValues } from '../transactions/transactionForm.ts';
-import { useBudget, useCreateBudget, useDeleteExpenseLine, useSetBudgetStatus } from './api.ts';
+import { useBudget, useCreateBudget, useDeleteExpenseLine } from './api.ts';
 import { BudgetSummary } from './BudgetSummary.tsx';
 import { ExpenseSection } from './ExpenseSection.tsx';
 import { IncomeSection } from './IncomeSection.tsx';
 import { ExpenseLineDialog } from './LineDialogs.tsx';
 import { defaultEntryDate } from './month.ts';
-
-const STATUS_LABELS: Record<BudgetView['status'], string> = {
-  draft: 'Чернетка',
-  active: 'Активний',
-  closed: 'Закритий',
-};
 
 export function BudgetPage() {
   const { user } = useCurrentUser();
@@ -74,7 +67,6 @@ function BudgetContent({ budget }: { budget: BudgetView }) {
   const { user } = useCurrentUser();
   const accounts = useAccounts();
   const categories = useCategories();
-  const setStatus = useSetBudgetStatus(budget.id);
   const deleteExpenseLine = useDeleteExpenseLine(budget.id);
 
   // Вміст вікон зберігається й після закриття, щоб не змінюватися під час анімації.
@@ -87,32 +79,17 @@ function BudgetContent({ budget }: { budget: BudgetView }) {
   });
   const [deletion, setDeletion] = useState<{ open: boolean; line?: ExpenseLine }>({ open: false });
 
-  const editable = budget.status !== 'closed';
+  const editable = true;
   const accountList = accounts.data ?? [];
   const expenseCategories = (categories.data ?? []).filter(
     (category) => category.kind === 'expense',
   );
   const canAddTransactions = accountList.length > 0;
 
-  const error = accounts.error ?? categories.error ?? setStatus.error ?? deleteExpenseLine.error;
+  const error = accounts.error ?? categories.error ?? deleteExpenseLine.error;
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant={editable ? 'secondary' : 'outline'} data-testid="budget-status">
-          {STATUS_LABELS[budget.status]}
-        </Badge>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={setStatus.isPending}
-          onClick={() => setStatus.mutate(editable ? 'closed' : 'active')}
-        >
-          {editable ? 'Закрити місяць' : 'Відкрити знову'}
-        </Button>
-        {!editable && <Muted>Ліміти закритого бюджету змінювати не можна.</Muted>}
-      </div>
-
       <ErrorText>{error && errorMessage(error)}</ErrorText>
       {accounts.data && !canAddTransactions && (
         <Muted>

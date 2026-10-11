@@ -1,9 +1,4 @@
-import type {
-  BudgetStatus,
-  BudgetView,
-  CreateBudgetInput,
-  CreateExpenseLineInput,
-} from '@hf/shared';
+import type { BudgetView, CreateBudgetInput, CreateExpenseLineInput } from '@hf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../shared/api/index.ts';
 
@@ -35,11 +30,6 @@ function useBudgetMutation<TInput>(request: (input: TInput) => Promise<BudgetVie
 
 export const useCreateBudget = () =>
   useBudgetMutation((input: CreateBudgetInput) => api.post<BudgetView>('/api/budgets', input));
-
-export const useSetBudgetStatus = (budgetId: string) =>
-  useBudgetMutation((status: BudgetStatus) =>
-    api.patch<BudgetView>(`/api/budgets/${budgetId}`, { status }),
-  );
 
 export const useSaveExpenseLine = (budgetId: string) =>
   useBudgetMutation(

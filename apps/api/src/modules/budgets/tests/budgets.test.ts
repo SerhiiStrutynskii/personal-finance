@@ -70,7 +70,6 @@ describe('створення й читання бюджету', () => {
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
       month: '2026-10',
-      status: 'active',
       currency: 'UAH',
       periodStart: '2026-09-30T21:00:00.000Z',
       periodEnd: '2026-10-31T22:00:00.000Z',
@@ -194,6 +193,13 @@ describe('статті', () => {
       404,
     );
     expect((await actor.patch(`${expenseLines}/${MISSING_ID}`, {})).status).toBe(400);
+  });
+
+  it('статусу бюджету й ендпоінта його зміни більше немає', async () => {
+    const actor = await createActor();
+    const { body: budget } = await createBudget(actor, FUTURE);
+    expect(budget).not.toHaveProperty('status');
+    expect((await actor.patch(`/api/budgets/${budget.id}`, { status: 'closed' })).status).toBe(404);
   });
 
   it('статей доходу в бюджеті більше немає', async () => {
@@ -512,62 +518,6 @@ describe('копіювання з попереднього місяця', () => 
   });
 });
 
-describe('статус бюджету', () => {
-  it('закритий бюджет доступний лише для читання, але транзакції перераховуються', async () => {
-    const actor = await createActor();
-    const f = await createFixtures(actor);
-    const { body: budget } = await createBudget(actor, FUTURE);
-    const { body: withLines } = await actor.post(`/api/budgets/${budget.id}/expense-lines`, {
-      categoryId: f.food.id,
-      plannedAmount: 1000,
-    });
-    const expenseLine = withLines.expenseLines[0].id;
-
-    const closed = await actor.patch(`/api/budgets/${budget.id}`, { status: 'closed' });
-    expect(closed.body.status).toBe('closed');
-
-    const base = `/api/budgets/${budget.id}`;
-    const attempts = await Promise.all([
-      actor.post(`${base}/expense-lines`, { categoryId: f.transport.id, plannedAmount: 1 }),
-      actor.patch(`${base}/expense-lines/${expenseLine}`, { plannedAmount: 1 }),
-      actor.delete(`${base}/expense-lines/${expenseLine}`),
-    ]);
-    expect(attempts.map((res) => res.status)).toEqual([409, 409, 409]);
-
-    // транзакції заднім числом дозволені, розрахунки оновлюються
-    await expense(actor, f, { categoryId: f.food.id, amountMinor: 1500 });
-    await income(actor, f, { amountMinor: 700 });
-    const { body } = await actor.get(`/api/budgets?month=${FUTURE}`);
-    expect(body.expenseLines[0]).toMatchObject({ planned: 1000, spent: 1500, status: 'over' });
-    expect(body.summary.receivedIncomeTotal).toBe(700);
-  });
-
-  it('закритий бюджет можна відкрити знову', async () => {
-    const actor = await createActor();
-    const { body: budget } = await createBudget(actor, FUTURE);
-    await actor.patch(`/api/budgets/${budget.id}`, { status: 'closed' });
-
-    expect((await actor.patch(`/api/budgets/${budget.id}`, { status: 'draft' })).body.status).toBe(
-      'draft',
-    );
-    const f = await createFixtures(actor);
-    const added = await actor.post(`/api/budgets/${budget.id}/expense-lines`, {
-      categoryId: f.food.id,
-      plannedAmount: 1,
-    });
-    expect(added.status).toBe(201);
-  });
-
-  it('відхиляє невідомий статус', async () => {
-    const actor = await createActor();
-    const { body: budget } = await createBudget(actor, FUTURE);
-    expect((await actor.patch(`/api/budgets/${budget.id}`, { status: 'archived' })).status).toBe(
-      400,
-    );
-    expect((await actor.patch(`/api/budgets/${budget.id}`, {})).status).toBe(400);
-  });
-});
-
 describe('ізоляція домогосподарств', () => {
   it('чужий бюджет недоступний ні для читання, ні для зміни', async () => {
     const owner = await createActor();
@@ -584,7 +534,6 @@ describe('ізоляція домогосподарств', () => {
 
     expect((await stranger.get(`/api/budgets?month=${FUTURE}`)).status).toBe(404);
     const attempts = await Promise.all([
-      stranger.patch(base, { status: 'closed' }),
       stranger.post(`${base}/expense-lines`, {
         categoryId: strangerData.food.id,
         plannedAmount: 1,
@@ -592,10 +541,9 @@ describe('ізоляція домогосподарств', () => {
       stranger.patch(`${base}/expense-lines/${expenseLine}`, { plannedAmount: 1 }),
       stranger.delete(`${base}/expense-lines/${expenseLine}`),
     ]);
-    expect(attempts.map((res) => res.status)).toEqual([404, 404, 404, 404]);
+    expect(attempts.map((res) => res.status)).toEqual([404, 404, 404]);
 
     const untouched = await owner.get(`/api/budgets?month=${FUTURE}`);
-    expect(untouched.body).toMatchObject({ status: 'active' });
     expect(untouched.body.expenseLines[0].planned).toBe(1000);
   });
 

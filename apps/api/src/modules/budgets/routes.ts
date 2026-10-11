@@ -7,7 +7,6 @@ import {
   createBudgetSchema,
   createExpenseLineSchema,
   idParamsSchema,
-  updateBudgetSchema,
   updateExpenseLineSchema,
 } from './schema.ts';
 import * as service from './service.ts';
@@ -24,12 +23,6 @@ export function budgetsRouter(db: Db, now: () => Date): Router {
   router.post('/', async (req, res) => {
     const input = createBudgetSchema.parse(req.body);
     res.status(201).json(await service.createBudget(db, getAuth(res), input, now()));
-  });
-
-  router.patch('/:id', async (req, res) => {
-    const { id } = idParamsSchema.parse(req.params);
-    const { status } = updateBudgetSchema.parse(req.body);
-    res.json(await service.updateBudgetStatus(db, getAuth(res), id, status, now()));
   });
 
   router.post('/:id/expense-lines', async (req, res) => {

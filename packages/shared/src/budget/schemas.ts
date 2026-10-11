@@ -3,9 +3,6 @@ import { currencySchema } from '../money.ts';
 import { idSchema } from '../schemas.ts';
 import { monthSchema } from './month.ts';
 
-export const budgetStatusSchema = z.enum(['draft', 'active', 'closed']);
-export type BudgetStatus = z.infer<typeof budgetStatusSchema>;
-
 export const categoryStatusSchema = z.enum(['over', 'surplus', 'neutral']);
 
 /** Запланована сума в мінімальних одиницях валюти; нуль дозволено. */
@@ -24,9 +21,6 @@ export const createBudgetSchema = z.object({
 });
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
 
-export const updateBudgetSchema = z.object({ status: budgetStatusSchema });
-export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
-
 export const budgetLineParamsSchema = z.object({ id: idSchema, lineId: idSchema });
 
 export const createExpenseLineSchema = z.object({
@@ -42,7 +36,6 @@ export type UpdateExpenseLineInput = z.infer<typeof updateExpenseLineSchema>;
 export const budgetViewSchema = z.object({
   id: idSchema,
   month: monthSchema,
-  status: budgetStatusSchema,
   currency: currencySchema,
   periodStart: z.iso.datetime(),
   periodEnd: z.iso.datetime(),

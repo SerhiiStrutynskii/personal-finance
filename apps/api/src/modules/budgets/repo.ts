@@ -7,7 +7,6 @@ import {
   households,
   transactions,
 } from '../../db/schema.ts';
-import type { BudgetStatus } from './schema.ts';
 
 export type BudgetRow = typeof budgets.$inferSelect;
 export type ExpenseLineRow = typeof budgetExpenseLines.$inferSelect;
@@ -42,20 +41,6 @@ export async function insertBudget(
 ) {
   const [row] = await db.insert(budgets).values(values).returning();
   return row!;
-}
-
-export async function updateBudgetStatus(
-  db: DbOrTx,
-  householdId: string,
-  id: string,
-  status: BudgetStatus,
-) {
-  const [row] = await db
-    .update(budgets)
-    .set({ status, updatedAt: new Date() })
-    .where(and(eq(budgets.householdId, householdId), eq(budgets.id, id)))
-    .returning();
-  return row;
 }
 
 // --- Статті ---

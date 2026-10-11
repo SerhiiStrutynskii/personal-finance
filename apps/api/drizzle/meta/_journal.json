@@ -43,6 +43,13 @@
       "when": 1791750946489,
       "tag": "0005_drop_budget_income_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791751692468,
+      "tag": "0006_budget_periods",
+      "breakpoints": true
     }
   ]
 }

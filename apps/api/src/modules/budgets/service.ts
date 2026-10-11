@@ -12,7 +12,6 @@ import { findCategory } from '../categories/repo.ts';
 import { getIncomes } from '../incomes/occurrences.service.ts';
 import * as repo from './repo.ts';
 import type {
-  BudgetStatus,
   BudgetView,
   CreateBudgetInput,
   CreateExpenseLineInput,
@@ -76,7 +75,6 @@ async function buildView(
   return {
     id: budget.id,
     month,
-    status: budget.status,
     currency: budget.currency,
     periodStart: budget.periodStart.toISOString(),
     periodEnd: budget.periodEnd.toISOString(),
@@ -90,13 +88,10 @@ async function viewById(db: Db, auth: AuthContext, id: string, now: Date): Promi
   return buildView(db, auth, budget, await householdTimeZone(db, auth), now);
 }
 
-/** Бюджет, у якому можна змінювати статті: він має існувати в домогосподарстві й не бути закритим. */
+/** Бюджет домогосподарства, ліміти якого збираються змінити. */
 async function editableBudget(db: Db, auth: AuthContext, id: string): Promise<repo.BudgetRow> {
   const budget = await repo.findBudgetById(db, auth.householdId, id);
   if (!budget) throw budgetNotFound();
-  if (budget.status === 'closed') {
-    throw conflict('Бюджет закрито: статті можна лише переглядати');
-  }
   return budget;
 }
 
@@ -144,18 +139,6 @@ export async function createBudget(
     if (isUniqueViolation(error)) throw conflict('Бюджет на цей місяць уже існує');
     throw error;
   }
-}
-
-export async function updateBudgetStatus(
-  db: Db,
-  auth: AuthContext,
-  id: string,
-  status: BudgetStatus,
-  now: Date = new Date(),
-): Promise<BudgetView> {
-  const budget = await repo.updateBudgetStatus(db, auth.householdId, id, status);
-  if (!budget) throw budgetNotFound();
-  return buildView(db, auth, budget, await householdTimeZone(db, auth), now);
 }
 
 // --- Статті витрат ---

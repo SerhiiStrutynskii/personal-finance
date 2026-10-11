@@ -12,7 +12,7 @@ test('витрата понад ліміт робить рядок катего�
   await page.getByRole('link', { name: 'Бюджет' }).click();
   await expect(page.getByText(/Бюджету на .+ ще немає/)).toBeVisible();
   await page.getByRole('button', { name: 'Створити' }).click();
-  await expect(page.getByTestId('budget-status')).toHaveText('Активний');
+  await expect(page.getByRole('button', { name: 'Додати ліміт' })).toBeVisible();
 
   // Ліміт 100 грн на «Продукти».
   await page.getByRole('button', { name: 'Додати ліміт' }).click();

@@ -134,7 +134,8 @@ export const transactions = pgTable(
     updatedAt: instant().notNull().defaultNow(),
   },
   (t) => [
-    index().on(t.householdId, t.occurredAt, t.type, t.categoryId),
+    // Для агрегації витрат бюджету: домогосподарство, тип, період, категорія.
+    index().on(t.householdId, t.type, t.occurredAt, t.categoryId),
     index().on(t.accountId),
     index().on(t.toAccountId),
     index().on(t.categoryId),
@@ -152,8 +153,6 @@ export const transactions = pgTable(
   ],
 );
 
-export const BUDGET_STATUSES = ['draft', 'active', 'closed'] as const;
-
 export const budgets = pgTable(
   'budgets',
   {
@@ -165,13 +164,11 @@ export const budgets = pgTable(
     periodStart: instant().notNull(),
     periodEnd: instant().notNull(),
     currency: char({ length: 3 }).notNull().default('UAH'),
-    status: text({ enum: BUDGET_STATUSES }).notNull().default('active'),
     createdAt: createdAt(),
     updatedAt: instant().notNull().defaultNow(),
   },
   (t) => [
     unique().on(t.householdId, t.periodStart),
-    check('budgets_status_valid', sql`${t.status} IN ('draft', 'active', 'closed')`),
     check('budgets_period_valid', sql`${t.periodEnd} > ${t.periodStart}`),
   ],
 );
