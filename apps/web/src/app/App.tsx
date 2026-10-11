@@ -4,6 +4,7 @@ import { AccountsPage } from '../features/accounts/AccountsPage.tsx';
 import { AnonymousOnly, RequireAuth } from '../features/auth/AuthGate.tsx';
 import { LoginPage, RegisterPage } from '../features/auth/AuthPages.tsx';
 import { AuthProvider } from '../features/auth/AuthProvider.tsx';
+import { BudgetPage } from '../features/budget/BudgetPage.tsx';
 import { CategoriesPage } from '../features/categories/CategoriesPage.tsx';
 import { ENTRY_CONFIG, type EntryType } from '../features/transactions/config.ts';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
@@ -45,7 +46,7 @@ export function App() {
                 ))}
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="categories" element={<CategoriesPage />} />
-                <Route path="budget" element={<ComingSoonPage title="Бюджет" />} />
+                <Route path="budget" element={<BudgetPage />} />
                 <Route path="debts" element={<ComingSoonPage title="Борги" />} />
                 <Route path="analytics" element={<ComingSoonPage title="Аналітика" />} />
                 <Route path="*" element={<NotFoundPage />} />

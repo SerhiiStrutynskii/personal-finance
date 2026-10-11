@@ -11,6 +11,7 @@ import {
 } from '../../shared/ui/dialog.tsx';
 import { ENTRY_CONFIG, type EntryType } from './config.ts';
 import { TransactionForm } from './TransactionForm.tsx';
+import type { TransactionFormValues } from './transactionForm.ts';
 
 interface Props {
   type: EntryType;
@@ -21,6 +22,10 @@ interface Props {
   accounts: Account[];
   /** Категорії того самого типу, що й запис. */
   categories: Category[];
+  /** Початкові значення нового запису. */
+  defaults?: Partial<TransactionFormValues> | undefined;
+  /** Статті доходу бюджету, до яких можна прив'язати дохід. */
+  incomeLines?: readonly { id: string; name: string }[] | undefined;
 }
 
 /** Модальне вікно з формою витрати або доходу: створення або редагування. Керується ззовні. */
@@ -31,6 +36,8 @@ export function TransactionDialog({
   original,
   accounts,
   categories,
+  defaults,
+  incomeLines,
 }: Props) {
   const config = ENTRY_CONFIG[type];
   return (
@@ -48,6 +55,8 @@ export function TransactionDialog({
           original={original}
           accounts={accounts}
           categories={categories}
+          defaults={defaults}
+          incomeLines={incomeLines}
           onSaved={() => onOpenChange(false)}
           renderActions={(submit) => (
             <DialogFooter>

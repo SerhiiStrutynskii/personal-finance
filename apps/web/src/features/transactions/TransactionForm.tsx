@@ -8,7 +8,12 @@ import { SelectField } from '../../shared/ui/select-field.tsx';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useSaveTransaction } from './api.ts';
 import type { EntryType } from './config.ts';
-import { initialValues, toTransactionInput, type FormErrors } from './transactionForm.ts';
+import {
+  initialValues,
+  toTransactionInput,
+  type FormErrors,
+  type TransactionFormValues,
+} from './transactionForm.ts';
 
 interface Props {
   type: EntryType;
@@ -17,6 +22,10 @@ interface Props {
   accounts: Account[];
   /** Категорії того самого типу, що й транзакція. */
   categories: Category[];
+  /** Початкові значення нового запису, наприклад категорія чи дата з екрана бюджету. */
+  defaults?: Partial<TransactionFormValues> | undefined;
+  /** Статті доходу бюджету; якщо передані, дохід можна прив'язати до статті. */
+  incomeLines?: readonly { id: string; name: string }[] | undefined;
   onSaved: () => void;
   /** Розміщує кнопку збереження поруч із власними діями (наприклад, «Скасувати»). */
   renderActions: (submit: ReactNode) => ReactNode;
@@ -28,6 +37,8 @@ export function TransactionForm({
   original,
   accounts,
   categories,
+  defaults,
+  incomeLines,
   onSaved,
   renderActions,
 }: Props) {
@@ -35,7 +46,7 @@ export function TransactionForm({
   const save = useSaveTransaction();
 
   const context = () => ({ accounts, timeZone: user.timeZone, now: new Date(), original });
-  const [values, setValues] = useState(() => initialValues(context()));
+  const [values, setValues] = useState(() => initialValues(context(), defaults));
   const [errors, setErrors] = useState<FormErrors>({});
   const set = (patch: Partial<typeof values>) => setValues({ ...values, ...patch });
 
@@ -85,6 +96,18 @@ export function TransactionForm({
           ]}
         />
       </Field>
+      {type === 'income' && incomeLines && incomeLines.length > 0 && (
+        <Field label="Стаття доходу" error={errors.incomeLineId}>
+          <SelectField
+            value={values.incomeLineId}
+            onChange={(incomeLineId) => set({ incomeLineId })}
+            options={[
+              { value: '', label: 'Без статті' },
+              ...incomeLines.map((line) => ({ value: line.id, label: line.name })),
+            ]}
+          />
+        </Field>
+      )}
       <Field label="Дата" error={errors.date}>
         <Input
           type="date"

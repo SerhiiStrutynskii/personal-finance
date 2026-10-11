@@ -2,7 +2,7 @@ import type { ListTransactionsQuery, Transaction, TransactionInput } from '@hf/s
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
 
-const LIST_KEY = ['transactions'];
+export const TRANSACTIONS_KEY = ['transactions'];
 
 export interface TransactionPage {
   items: Transaction[];
@@ -13,7 +13,7 @@ export interface TransactionPage {
 
 export function useTransactions(query: Partial<ListTransactionsQuery>) {
   return useQuery({
-    queryKey: [...LIST_KEY, query],
+    queryKey: [...TRANSACTIONS_KEY, query],
     queryFn: () => api.get<TransactionPage>('/api/transactions', query),
     placeholderData: keepPreviousData,
   });
@@ -21,7 +21,12 @@ export function useTransactions(query: Partial<ListTransactionsQuery>) {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: LIST_KEY });
+  // Транзакції змінюють і фактичні суми місячного бюджету.
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
+      queryClient.invalidateQueries({ queryKey: ['budget'] }),
+    ]);
 }
 
 /** Створює транзакцію або повністю замінює наявну, якщо передано id. */
