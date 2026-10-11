@@ -1,13 +1,16 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   char,
   check,
+  date,
   index,
   integer,
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -126,6 +129,10 @@ export const transactions = pgTable(
     incomeLineId: uuid('income_line_id').references(() => budgetIncomeLines.id, {
       onDelete: 'set null',
     }),
+    // Надходження періодичного доходу, яке ця транзакція оплачує; тільки для доходів.
+    occurrenceId: uuid('occurrence_id').references(() => incomeOccurrences.id, {
+      onDelete: 'set null',
+    }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: instant().notNull().defaultNow(),
@@ -136,6 +143,11 @@ export const transactions = pgTable(
     index().on(t.toAccountId),
     index().on(t.categoryId),
     index().on(t.incomeLineId),
+    index().on(t.occurrenceId),
+    check(
+      'transactions_occurrence_only_for_income',
+      sql`${t.occurrenceId} IS NULL OR ${t.type} = 'income'`,
+    ),
     check(
       'transactions_income_line_only_for_income',
       sql`${t.incomeLineId} IS NULL OR ${t.type} = 'income'`,
@@ -206,5 +218,84 @@ export const budgetExpenseLines = pgTable(
   (t) => [
     unique().on(t.budgetId, t.categoryId),
     check('budget_expense_lines_planned_non_negative', sql`${t.plannedAmount} >= 0`),
+  ],
+);
+
+export const INCOME_FREQUENCIES = ['monthly', 'weekly', 'biweekly', 'every_n_months'] as const;
+const calendarDate = (name: string) => date(name, { mode: 'string' });
+
+export const incomeSources = pgTable(
+  'income_sources',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    // Рахунок, на який зазвичай надходить дохід.
+    accountId: uuid('account_id').references(() => accounts.id),
+    name: text().notNull(),
+    currency: char({ length: 3 }).notNull().default('UAH'),
+    // Типова сума одного надходження.
+    plannedAmount: bigint('planned_amount', { mode: 'number' }).notNull(),
+    frequency: text({ enum: INCOME_FREQUENCIES }).notNull(),
+    dayOfMonth: smallint('day_of_month'),
+    dayOfWeek: smallint('day_of_week'),
+    intervalMonths: smallint('interval_months'),
+    startDate: calendarDate('start_date').notNull(),
+    endDate: calendarDate('end_date'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.householdId),
+    check('income_sources_planned_positive', sql`${t.plannedAmount} > 0`),
+    check(
+      'income_sources_frequency_valid',
+      sql`${t.frequency} IN ('monthly', 'weekly', 'biweekly', 'every_n_months')`,
+    ),
+    check('income_sources_day_of_month_valid', sql`${t.dayOfMonth} BETWEEN 1 AND 31`),
+    check('income_sources_day_of_week_valid', sql`${t.dayOfWeek} BETWEEN 1 AND 7`),
+    check('income_sources_interval_valid', sql`${t.intervalMonths} >= 1`),
+    check(
+      'income_sources_dates_valid',
+      sql`${t.endDate} IS NULL OR ${t.endDate} >= ${t.startDate}`,
+    ),
+    // Кожна частота вимагає свої поля правила.
+    check(
+      'income_sources_rule_complete',
+      sql`(${t.frequency} = 'monthly' AND ${t.dayOfMonth} IS NOT NULL)
+        OR (${t.frequency} = 'every_n_months' AND ${t.dayOfMonth} IS NOT NULL AND ${t.intervalMonths} IS NOT NULL)
+        OR (${t.frequency} IN ('weekly', 'biweekly') AND ${t.dayOfWeek} IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const OCCURRENCE_STATUSES = ['expected', 'skipped'] as const;
+
+export const incomeOccurrences = pgTable(
+  'income_occurrences',
+  {
+    id: id(),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => incomeSources.id, { onDelete: 'cascade' }),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    // Дата за правилом джерела. За нею генерація розпізнає вже створені надходження,
+    // тому перенесення plannedDate не породжує дубль.
+    scheduledDate: calendarDate('scheduled_date').notNull(),
+    // Очікувана дата; користувач може змінити її для одного надходження.
+    plannedDate: calendarDate('planned_date').notNull(),
+    plannedAmount: bigint('planned_amount', { mode: 'number' }).notNull(),
+    status: text({ enum: OCCURRENCE_STATUSES }).notNull().default('expected'),
+  },
+  (t) => [
+    unique().on(t.sourceId, t.scheduledDate),
+    unique().on(t.sourceId, t.plannedDate),
+    index().on(t.householdId, t.plannedDate),
+    check('income_occurrences_planned_positive', sql`${t.plannedAmount} > 0`),
+    check('income_occurrences_status_valid', sql`${t.status} IN ('expected', 'skipped')`),
   ],
 );
