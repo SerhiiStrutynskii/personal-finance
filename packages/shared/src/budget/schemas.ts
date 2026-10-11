@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { currencySchema } from '../money.ts';
+import { dateStringSchema, occurrenceStatusSchema } from '../incomes/schemas.ts';
 import { idSchema } from '../schemas.ts';
 import { monthSchema } from './month.ts';
 
@@ -29,7 +30,14 @@ export const createExpenseLineSchema = z.object({
 });
 export type CreateExpenseLineInput = z.infer<typeof createExpenseLineSchema>;
 
-export const updateExpenseLineSchema = z.object({ plannedAmount: plannedAmountSchema });
+export const updateExpenseLineSchema = z
+  .object({
+    plannedAmount: plannedAmountSchema,
+    /** Позиція рядка в списку лімітів. */
+    sortOrder: z.number().int().min(0).max(10_000),
+  })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'Потрібне хоча б одне поле');
 export type UpdateExpenseLineInput = z.infer<typeof updateExpenseLineSchema>;
 
 /** Бюджет місяця разом із розрахунками. Статуси рахує бекенд; фронтенд лише показує їх. */
@@ -37,6 +45,12 @@ export const budgetViewSchema = z.object({
   id: idSchema,
   month: monthSchema,
   currency: currencySchema,
+  /** Стан періоду відносно поточного моменту: минулий, поточний чи майбутній місяць. */
+  periodState: z.enum(['past', 'current', 'future']),
+  /** Видатки додаються лише в поточному періоді. Підказка для інтерфейсу; перевіряє API. */
+  canAddExpense: z.boolean(),
+  /** Ліміти змінюються в поточному й майбутніх періодах. */
+  canEditLimits: z.boolean(),
   periodStart: z.iso.datetime(),
   periodEnd: z.iso.datetime(),
   summary: z.object({
@@ -46,6 +60,19 @@ export const budgetViewSchema = z.object({
     spentTotal: z.number().int(),
     plannedBalance: z.number().int(),
     actualBalance: z.number().int(),
+  }),
+  /** Доходи місяця з фічі доходів — лише для перегляду. */
+  incomes: z.object({
+    occurrences: z.array(
+      z.object({
+        name: z.string(),
+        plannedDate: dateStringSchema,
+        plannedAmount: z.number().int(),
+        actualAmount: z.number().int(),
+        status: occurrenceStatusSchema,
+      }),
+    ),
+    oneTimeTotal: z.number().int(),
   }),
   expenseLines: z.array(
     z.object({

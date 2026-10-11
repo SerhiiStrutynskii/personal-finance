@@ -87,11 +87,14 @@ export async function updateExpenseLine(
   db: DbOrTx,
   budgetId: string,
   lineId: string,
-  plannedAmount: number,
+  patch: { plannedAmount?: number | undefined; sortOrder?: number | undefined },
 ) {
   const [row] = await db
     .update(budgetExpenseLines)
-    .set({ plannedAmount })
+    .set({
+      ...(patch.plannedAmount !== undefined && { plannedAmount: patch.plannedAmount }),
+      ...(patch.sortOrder !== undefined && { sortOrder: patch.sortOrder }),
+    })
     .where(and(eq(budgetExpenseLines.budgetId, budgetId), eq(budgetExpenseLines.id, lineId)))
     .returning();
   return row;

@@ -1,8 +1,15 @@
-import { UNCATEGORIZED_NAME, budgetPeriod, calculateBudget, localMonthKey } from '@hf/shared';
+import {
+  UNCATEGORIZED_NAME,
+  budgetPeriod,
+  calculateBudget,
+  getPeriodState,
+  localMonthKey,
+} from '@hf/shared';
 import type { Db, DbOrTx } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import {
   badRequest,
+  budgetPeriodClosed,
   conflict,
   isForeignKeyViolation,
   isUniqueViolation,
@@ -72,13 +79,27 @@ async function buildView(
     periodEnd: budget.periodEnd,
   });
 
+  const periodState = getPeriodState(budget.periodStart, budget.periodEnd, now);
   return {
     id: budget.id,
     month,
     currency: budget.currency,
+    periodState,
+    canAddExpense: periodState === 'current',
+    canEditLimits: periodState !== 'past',
     periodStart: budget.periodStart.toISOString(),
     periodEnd: budget.periodEnd.toISOString(),
     ...result,
+    incomes: {
+      occurrences: incomes.occurrences.map((occurrence) => ({
+        name: occurrence.name,
+        plannedDate: occurrence.plannedDate,
+        plannedAmount: occurrence.plannedAmount,
+        actualAmount: occurrence.actualAmount,
+        status: occurrence.status,
+      })),
+      oneTimeTotal: incomes.summary.oneTimeTotal,
+    },
   };
 }
 
@@ -88,10 +109,18 @@ async function viewById(db: Db, auth: AuthContext, id: string, now: Date): Promi
   return buildView(db, auth, budget, await householdTimeZone(db, auth), now);
 }
 
-/** Бюджет домогосподарства, ліміти якого збираються змінити. */
-async function editableBudget(db: Db, auth: AuthContext, id: string): Promise<repo.BudgetRow> {
+/** Бюджет, ліміти якого можна змінювати: він існує в домогосподарстві й ще не минув. */
+async function editableBudget(
+  db: Db,
+  auth: AuthContext,
+  id: string,
+  now: Date,
+): Promise<repo.BudgetRow> {
   const budget = await repo.findBudgetById(db, auth.householdId, id);
   if (!budget) throw budgetNotFound();
+  if (getPeriodState(budget.periodStart, budget.periodEnd, now) === 'past') {
+    throw conflict('Місяць минув: ліміти цього бюджету можна лише переглядати');
+  }
   return budget;
 }
 
@@ -116,6 +145,7 @@ export async function createBudget(
 ): Promise<BudgetView> {
   const timeZone = await householdTimeZone(db, auth);
   const period = budgetPeriod(input.month, timeZone);
+  if (getPeriodState(period.start, period.end, now) === 'past') throw budgetPeriodClosed();
 
   let source: repo.BudgetRow | undefined;
   if (input.copyFrom) {
@@ -150,7 +180,7 @@ export async function addExpenseLine(
   input: CreateExpenseLineInput,
   now: Date = new Date(),
 ): Promise<BudgetView> {
-  const budget = await editableBudget(db, auth, budgetId);
+  const budget = await editableBudget(db, auth, budgetId, now);
   const category = await findCategory(db, auth.householdId, input.categoryId);
   if (!category) throw badRequest('Категорію не знайдено');
   if (category.kind !== 'expense') throw badRequest('Ліміт можна задати лише для категорії витрат');
@@ -174,8 +204,8 @@ export async function updateExpenseLine(
   input: UpdateExpenseLineInput,
   now: Date = new Date(),
 ): Promise<BudgetView> {
-  const budget = await editableBudget(db, auth, budgetId);
-  if (!(await repo.updateExpenseLine(db, budget.id, lineId, input.plannedAmount))) {
+  const budget = await editableBudget(db, auth, budgetId, now);
+  if (!(await repo.updateExpenseLine(db, budget.id, lineId, input))) {
     throw notFound('Стаття витрат');
   }
   return viewById(db, auth, budget.id, now);
@@ -188,7 +218,7 @@ export async function deleteExpenseLine(
   lineId: string,
   now: Date = new Date(),
 ): Promise<BudgetView> {
-  const budget = await editableBudget(db, auth, budgetId);
+  const budget = await editableBudget(db, auth, budgetId, now);
   if (!(await repo.deleteExpenseLine(db, budget.id, lineId))) throw notFound('Стаття витрат');
   return viewById(db, auth, budget.id, now);
 }

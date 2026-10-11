@@ -19,6 +19,13 @@ export const tooManyRequests = () =>
 /** Видаток не можна створити чи змінити поза поточним періодом. */
 export const expensePeriodClosed = (message: string) =>
   new AppError(422, 'EXPENSE_PERIOD_CLOSED', message);
+/** Бюджет не можна створити для місяця, що вже минув. */
+export const budgetPeriodClosed = () =>
+  new AppError(
+    422,
+    'BUDGET_PERIOD_CLOSED',
+    'Бюджет можна створити лише для поточного або майбутнього місяця',
+  );
 export const conflict = (message: string) => new AppError(409, 'CONFLICT', message);
 
 // ON DELETE RESTRICT повідомляє 23001, звичайний зовнішній ключ — 23503
