@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { addAccount, addExpenseCategory, register } from './helpers.ts';
 
-test('витрата понад ліміт робить рядок категорії червоним і не блокує наступні', async ({
+test('видаток понад ліміт робить рядок категорії червоним; минулий місяць — лише перегляд', async ({
   page,
 }) => {
   await register(page);
@@ -12,7 +12,6 @@ test('витрата понад ліміт робить рядок катего�
   await page.getByRole('link', { name: 'Бюджет' }).click();
   await expect(page.getByText(/Бюджету на .+ ще немає/)).toBeVisible();
   await page.getByRole('button', { name: 'Створити' }).click();
-  await expect(page.getByRole('button', { name: 'Додати ліміт' })).toBeVisible();
 
   // Ліміт 100 грн на «Продукти».
   await page.getByRole('button', { name: 'Додати ліміт' }).click();
@@ -24,15 +23,34 @@ test('витрата понад ліміт робить рядок катего�
   const row = page.getByTestId('expense-line').filter({ hasText: 'Продукти' });
   await expect(row).toHaveAttribute('data-status', 'neutral');
   await expect(row).toContainText('Залишок 100,00');
+  // У рядках категорій видатки не додаються.
+  await expect(row.getByRole('button', { name: /витрата|видаток/i })).toHaveCount(0);
 
-  // Витрата 150 грн перевищує ліміт на 50 грн.
-  await row.getByRole('button', { name: 'витрата' }).click();
+  // «+ Видаток» у шапці відкриває ту саму модалку, що й на сторінці видатків.
+  const addExpense = page.getByRole('button', { name: 'Видаток', exact: true });
   const expenseDialog = page.getByRole('dialog');
-  await expect(expenseDialog.getByRole('heading', { name: 'Нова витрата' })).toBeVisible();
-  await expenseDialog.getByLabel('Сума, UAH').fill('150');
-  await expenseDialog.getByRole('button', { name: 'Зберегти' }).click();
+  async function spend(amount: string) {
+    await addExpense.click();
+    await expect(expenseDialog.getByRole('heading', { name: 'Нова витрата' })).toBeVisible();
+    await expenseDialog.getByLabel('Сума, UAH').fill(amount);
+    // другий список у формі — категорія (перший — рахунок)
+    await expenseDialog.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', { name: 'Продукти' }).click();
+    await expenseDialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(expenseDialog).toBeHidden();
+  }
+
+  // Вибір дати обмежено поточним місяцем і сьогоднішнім днем.
+  await addExpense.click();
+  const dateInput = expenseDialog.getByLabel('Дата');
+  const today = await dateInput.inputValue();
+  await expect(dateInput).toHaveAttribute('max', today);
+  await expect(dateInput).toHaveAttribute('min', `${today.slice(0, 8)}01`);
+  await page.keyboard.press('Escape');
   await expect(expenseDialog).toBeHidden();
 
+  // Видаток 150 грн перевищує ліміт на 50 грн.
+  await spend('150');
   await expect(row).toHaveAttribute('data-status', 'over');
   // Статус передано не лише кольором: є текст і іконка.
   await expect(row).toContainText('Перевищено на 50,00');
@@ -49,14 +67,25 @@ test('витрата понад ліміт робить рядок катего�
   });
   expect(colors.border).toBe(colors.expected);
 
-  await expect(page.getByText('150,00').first()).toBeVisible();
-
-  // Перевищений ліміт не блокує нові витрати в цій категорії.
-  await row.getByRole('button', { name: 'витрата' }).click();
-  await expenseDialog.getByLabel('Сума, UAH').fill('25');
-  await expenseDialog.getByRole('button', { name: 'Зберегти' }).click();
-  await expect(expenseDialog).toBeHidden();
-  await expect(row).toHaveAttribute('data-status', 'over');
-  await expect(row).toContainText('Перевищено на 75,00');
+  // Підсумок оновився.
+  const summary = page.locator('[data-slot=card]').first();
+  await expect(summary).toContainText('Витрати150,00');
   await page.screenshot({ path: 'test-results/budget-over-limit.png', fullPage: true });
+
+  // Перевищений ліміт не блокує нові видатки в цій категорії.
+  await spend('25');
+  await expect(row).toContainText('Перевищено на 75,00');
+
+  // Ліміт редагується прямо в рядку.
+  await row.getByRole('button', { name: 'Змінити ліміт «Продукти»' }).click();
+  await row.getByLabel('Ліміт «Продукти», UAH').fill('200');
+  await page.keyboard.press('Enter');
+  await expect(row).toHaveAttribute('data-status', 'neutral');
+  await expect(row).toContainText('Залишок 25,00');
+
+  // Минулий місяць: кнопки «+ Видаток» немає, створити бюджет не можна.
+  await page.getByRole('button', { name: 'Попередній місяць' }).click();
+  await expect(page.getByTestId('budget-empty')).toContainText('не було');
+  await expect(addExpense).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Створити' })).toHaveCount(0);
 });

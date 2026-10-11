@@ -7,7 +7,7 @@ test('джерело «Зарплата» дає очікуване надход
 
   // Джерело «Зарплата»: 45 000 грн щомісяця 5-го.
   await page.getByRole('link', { name: 'Доходи' }).click();
-  await page.getByRole('link', { name: 'Джерела доходу' }).click();
+  await page.getByRole('link', { name: 'Джерела доходу', exact: true }).click();
   await page.getByRole('button', { name: 'Додати джерело' }).click();
   const sourceDialog = page.getByRole('dialog');
   await sourceDialog.getByLabel('Назва').fill('Зарплата');
