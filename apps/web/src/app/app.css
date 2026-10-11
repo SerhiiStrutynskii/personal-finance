@@ -27,6 +27,7 @@
   --color-destructive: var(--destructive);
   --color-status-over: var(--status-over);
   --color-status-surplus: var(--status-surplus);
+  --color-status-partial: var(--status-partial);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -69,6 +70,8 @@
   /* Статуси категорій бюджету: перевищення ліміту й залишок після завершення місяця. */
   --status-over: oklch(0.55 0.22 27);
   --status-surplus: oklch(0.5 0.14 150);
+  /* Дохід отримано частково. */
+  --status-partial: oklch(0.55 0.13 80);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -106,6 +109,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --status-over: oklch(0.72 0.18 22);
   --status-surplus: oklch(0.76 0.16 150);
+  --status-partial: oklch(0.82 0.15 85);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

@@ -1,5 +1,4 @@
 import { localMonthKey, shiftMonth, type BudgetView, type Transaction } from '@hf/shared';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -7,6 +6,8 @@ import { Badge } from '../../shared/ui/badge.tsx';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
+import { monthLabel } from '../../shared/ui/format.ts';
+import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
 import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
@@ -26,7 +27,7 @@ import { BudgetSummary } from './BudgetSummary.tsx';
 import { ExpenseSection } from './ExpenseSection.tsx';
 import { IncomeSection } from './IncomeSection.tsx';
 import { ExpenseLineDialog, IncomeLineDialog } from './LineDialogs.tsx';
-import { defaultEntryDate, monthLabel } from './month.ts';
+import { defaultEntryDate } from './month.ts';
 
 const STATUS_LABELS: Record<BudgetView['status'], string> = {
   draft: 'Чернетка',
@@ -41,32 +42,7 @@ export function BudgetPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <PageHeader
-        title="Бюджет"
-        action={
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Попередній місяць"
-              onClick={() => setMonth(shiftMonth(month, -1))}
-            >
-              <ChevronLeft />
-            </Button>
-            <span className="min-w-36 text-center font-medium" data-testid="budget-month">
-              {monthLabel(month)}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Наступний місяць"
-              onClick={() => setMonth(shiftMonth(month, 1))}
-            >
-              <ChevronRight />
-            </Button>
-          </div>
-        }
-      />
+      <PageHeader title="Бюджет" action={<MonthSwitcher month={month} onChange={setMonth} />} />
 
       <ErrorText>{budget.isError && errorMessage(budget.error)}</ErrorText>
       {budget.isPending && <Muted>Завантаження…</Muted>}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defaultEntryDate, monthLabel } from './month.ts';
+import { formatDateString, formatDayMonth, monthLabel } from '../../shared/ui/format.ts';
+import { defaultEntryDate } from './month.ts';
 
 describe('monthLabel', () => {
   it('називає місяць з великої літери без «р.»', () => {
@@ -25,5 +26,12 @@ describe('defaultEntryDate', () => {
     const late = new Date('2026-10-31T23:30:00Z');
     expect(defaultEntryDate('2026-11', late, 'Europe/Kyiv')).toBe('2026-11-01');
     expect(defaultEntryDate('2026-10', late, 'Europe/Kyiv')).toBe('2026-10-01');
+  });
+});
+
+describe('formatDayMonth / formatDateString', () => {
+  it('форматує календарну дату без зсуву часового поясу', () => {
+    expect(formatDayMonth('2026-10-05')).toBe('05.10');
+    expect(formatDateString('2026-01-31')).toBe('31.01.2026');
   });
 });

@@ -6,7 +6,8 @@ import { LoginPage, RegisterPage } from '../features/auth/AuthPages.tsx';
 import { AuthProvider } from '../features/auth/AuthProvider.tsx';
 import { BudgetPage } from '../features/budget/BudgetPage.tsx';
 import { CategoriesPage } from '../features/categories/CategoriesPage.tsx';
-import { ENTRY_CONFIG, type EntryType } from '../features/transactions/config.ts';
+import { IncomesPage } from '../features/incomes/IncomesPage.tsx';
+import { SourcesPage } from '../features/incomes/SourcesPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
 import { ApiError } from '../shared/api/index.ts';
 import { Layout } from '../shared/layout/Layout.tsx';
@@ -22,8 +23,6 @@ const queryClient = new QueryClient({
   },
 });
 
-const ENTRY_TYPES = Object.keys(ENTRY_CONFIG) as EntryType[];
-
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -37,13 +36,9 @@ export function App() {
             <Route element={<RequireAuth />}>
               <Route element={<Layout />}>
                 <Route index element={<DashboardPage />} />
-                {ENTRY_TYPES.map((type) => (
-                  <Route
-                    key={type}
-                    path={ENTRY_CONFIG[type].path}
-                    element={<TransactionsPage key={type} type={type} />}
-                  />
-                ))}
+                <Route path="expenses" element={<TransactionsPage type="expense" />} />
+                <Route path="incomes" element={<IncomesPage />} />
+                <Route path="incomes/sources" element={<SourcesPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="categories" element={<CategoriesPage />} />
                 <Route path="budget" element={<BudgetPage />} />
