@@ -42,16 +42,20 @@
 }
 ```
 
-| Статус | `code`                   | Коли                                        |
-| ------ | ------------------------ | ------------------------------------------- |
-| 400    | `VALIDATION_ERROR`       | Дані не пройшли zod-схему (є `issues`)      |
-| 400    | `BAD_REQUEST`            | Порушено правило домену або зіпсований JSON |
-| 401    | `UNAUTHORIZED`           | Користувача не визначено                    |
-| 404    | `NOT_FOUND`              | Запису немає в домогосподарстві користувача |
-| 409    | `CONFLICT`               | Дублікат або запис використовується         |
-| 422    | `EXPENSE_DATE_IN_FUTURE` | Видаток на майбутню дату                    |
-| 422    | `BUDGET_PERIOD_CLOSED`   | Створення бюджету для місяця, що минув      |
-| 500    | `INTERNAL_ERROR`         | Непередбачена помилка                       |
+| Статус | `code`                        | Коли                                                                        |
+| ------ | ----------------------------- | --------------------------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR`            | Дані не пройшли zod-схему (є `issues`)                                      |
+| 400    | `BAD_REQUEST`                 | Порушено правило домену або зіпсований JSON                                 |
+| 401    | `UNAUTHORIZED`                | Користувача не визначено                                                    |
+| 404    | `NOT_FOUND`                   | Запису немає в домогосподарстві користувача                                 |
+| 409    | `CONFLICT`                    | Дублікат або запис використовується                                         |
+| 422    | `EXPENSE_DATE_IN_FUTURE`      | Видаток або рух по боргу на майбутню дату                                   |
+| 422    | `CURRENCY_MISMATCH`           | Рахунок не у валюті боргу                                                   |
+| 422    | `DEBT_TYPE_MISMATCH`          | Рух не того типу боргу: платіж по кредитці чи переказ на позику             |
+| 422    | `SAME_ACCOUNT`                | Погашення кредитки з неї самої                                              |
+| 422    | `EARLY_REPAYMENT_NOT_ALLOWED` | Достроковий платіж без підтвердження, коли умови боргу його не передбачають |
+| 422    | `BUDGET_PERIOD_CLOSED`        | Створення бюджету для місяця, що минув                                      |
+| 500    | `INTERNAL_ERROR`              | Непередбачена помилка                                                       |
 
 ## Службове
 
@@ -59,19 +63,30 @@
 
 ## Рахунки
 
-Об'єкт: `{ id, name, type, currency, createdAt }`, де `type` — `card` \| `cash` \| `deposit`.
+Об'єкт: `{ id, name, type, currency, balance, creditLimit, isArchived, createdAt }`.
 
-| Метод  | Шлях                | Тіло                                                            | Відповідь                       |
-| ------ | ------------------- | --------------------------------------------------------------- | ------------------------------- |
-| GET    | `/api/accounts`     | —                                                               | `200 { items: Account[] }`      |
-| POST   | `/api/accounts`     | `{ name, type, currency? }` (`currency` за замовчуванням `UAH`) | `201 Account`                   |
-| GET    | `/api/accounts/:id` | —                                                               | `200 Account`                   |
-| PATCH  | `/api/accounts/:id` | `{ name?, type? }`, хоча б одне поле                            | `200 Account`                   |
-| DELETE | `/api/accounts/:id` | —                                                               | `204`; `409`, якщо є транзакції |
+- `type` — `card` \| `cash` \| `deposit` \| `credit_card`. Рахунок `credit_card` створюється лише разом
+  із боргом (`POST /api/debts`); через `/api/accounts` його не створити, а тип — не змінити.
+- `balance` — баланс із транзакцій рахунку в мінімальних одиницях; може бути від'ємним. Для кредитної
+  картки від'ємний баланс — це борг.
+- `creditLimit` — кредитний ліміт; `null` для всіх типів, крім `credit_card`.
+- `isArchived` — архівний рахунок лишається в історії, але нових транзакцій не приймає (`400`).
+
+| Метод  | Шлях                | Тіло                                                            | Відповідь                                                |
+| ------ | ------------------- | --------------------------------------------------------------- | -------------------------------------------------------- |
+| GET    | `/api/accounts`     | —                                                               | `200 { items: Account[] }`                               |
+| POST   | `/api/accounts`     | `{ name, type, currency? }` (`currency` за замовчуванням `UAH`) | `201 Account`                                            |
+| GET    | `/api/accounts/:id` | —                                                               | `200 Account`                                            |
+| PATCH  | `/api/accounts/:id` | `{ name?, type? }`, хоча б одне поле                            | `200 Account`                                            |
+| DELETE | `/api/accounts/:id` | —                                                               | `204`; `409`, якщо є транзакції, джерела доходу або борг |
 
 ## Категорії
 
-Об'єкт: `{ id, name, kind, createdAt }`, де `kind` — `income` \| `expense`.
+Об'єкт: `{ id, name, kind, systemKey, createdAt }`, де `kind` — `income` \| `expense`.
+
+`systemKey` — `debt_repayment` («Погашення боргів») \| `interest_fees` («Відсотки та комісії») для
+системних категорій і `null` для звичайних. Системні категорії створює застосунок за першої потреби;
+перейменувати чи видалити їх не можна (`409`).
 
 | Метод  | Шлях                  | Тіло             | Відповідь                                                     |
 | ------ | --------------------- | ---------------- | ------------------------------------------------------------- |
@@ -93,6 +108,7 @@
   "toAccountId": null,
   "categoryId": "…",
   "occurrenceId": null,
+  "debtId": null,
   "amountMinor": 128450,
   "currency": "UAH",
   "description": "Супермаркет",
@@ -103,6 +119,11 @@
 ```
 
 `amountMinor` — додатне ціле число мінімальних одиниць валюти (128450 = 1284,50 грн).
+
+`type` у відповіді може бути також службовим: `debt_payment` (платіж по позиці чи розстрочці, з
+`debtId`) або `balance_adjustment` (початковий борг чи звірка кредитки; сума знакова й додається до
+балансу рахунку як є). Службові транзакції створюються, змінюються й видаляються лише через
+`/api/debts`: `POST`, `PUT` і `DELETE` у `/api/transactions` для них дають `400`.
 
 Тіло для створення й заміни:
 
@@ -126,15 +147,15 @@
 
 Параметри `GET /api/transactions`:
 
-| Параметр       | Опис                                                       |
-| -------------- | ---------------------------------------------------------- |
-| `type`         | `income` \| `expense` \| `transfer`                        |
-| `accountId`    | Транзакції рахунку; переказ знаходиться за обома рахунками |
-| `categoryId`   | Транзакції категорії                                       |
-| `occurrenceId` | Платежі одного надходження періодичного доходу             |
-| `from`, `to`   | Період за `occurredAt`: `from` включно, `to` виключно      |
-| `limit`        | 1–200, за замовчуванням 50                                 |
-| `offset`       | За замовчуванням 0                                         |
+| Параметр       | Опис                                                                          |
+| -------------- | ----------------------------------------------------------------------------- |
+| `type`         | `income` \| `expense` \| `transfer` \| `debt_payment` \| `balance_adjustment` |
+| `accountId`    | Транзакції рахунку; переказ знаходиться за обома рахунками                    |
+| `categoryId`   | Транзакції категорії                                                          |
+| `occurrenceId` | Платежі одного надходження періодичного доходу                                |
+| `from`, `to`   | Період за `occurredAt`: `from` включно, `to` виключно                         |
+| `limit`        | 1–200, за замовчуванням 50                                                    |
+| `offset`       | За замовчуванням 0                                                            |
 
 Сортування — від новіших до старіших.
 
@@ -222,6 +243,11 @@
 | PATCH  | `/api/budgets/:id/expense-lines/:lineId` | `{ plannedAmount?, sortOrder? }` | `200 Budget`                                                                                                                     |
 | DELETE | `/api/budgets/:id/expense-lines/:lineId` | —                                | `200 Budget`                                                                                                                     |
 
+У `spent` ідуть транзакції типів `expense` і `debt_payment` (платежі по позиках — у категорії
+«Погашення боргів»). Перекази, зокрема погашення кредитки, і `balance_adjustment` не враховуються.
+Новий бюджет без `copyFrom` одразу отримує ліміт «Погашення боргів» на суму щомісячних платежів
+активних позик і розстрочок, якщо вони є.
+
 `copyFrom` копіює лише ліміти, зокрема з місяця, що вже минув. Зміна лімітів минулого бюджету — `409`.
 Чужий бюджет — `404`. Видатки створюються через `POST /api/transactions` з `type = expense`;
 окремого endpoint-у для видатків із бюджету немає.
@@ -308,3 +334,134 @@
 `receive` можна викликати кілька разів — так записуються часткові виплати; пропущене надходження
 після `receive` знову стає очікуваним. Фактичні записи змінюються й видаляються через
 `/api/transactions/:id`; платежі одного надходження — `GET /api/transactions?occurrenceId=…`.
+
+## Борги
+
+Кредитні картки, розстрочки й позики. Усі суми — цілі числа в мінімальних одиницях валюти, дати —
+`YYYY-MM-DD` у часовому поясі домогосподарства. Борги підтримуються лише у валюті `UAH`. Правила — у
+`docs/domain.md`.
+
+Кредитна картка — це борг і рахунок водночас: її залишок — від'ємний баланс рахунку-картки, а рухи —
+звичайні транзакції цього рахунку. Позики й розстрочки ведуться записами боргу.
+
+Об'єкт `Debt`:
+
+```json
+{
+  "id": "…",
+  "name": "Кредитка",
+  "description": null,
+  "type": "credit_card",
+  "status": "active",
+  "accountId": "…",
+  "currency": "UAH",
+  "initialAmount": 0,
+  "startDate": "2026-09-01",
+  "maturityDate": null,
+  "interestRate": 3.1,
+  "ratePeriod": "month",
+  "monthlyPayment": 120000,
+  "paymentDay": 25,
+  "earlyRepaymentAllowed": true,
+  "defaultAccountId": null,
+  "balance": 2340000,
+  "card": {
+    "creditLimit": 5000000,
+    "available": 2660000,
+    "usage": 0.468,
+    "overLimitBy": 0,
+    "nearLimit": false
+  },
+  "month": { "dueDate": "2026-10-25", "required": 120000, "paid": 0, "status": "pending" },
+  "projection": {
+    "months": 31,
+    "payoffDate": "2029-04-25",
+    "totalInterest": 1410000,
+    "paymentCoversInterest": true,
+    "maturityWarning": null,
+    "assumesNoNewPurchases": true
+  }
+}
+```
+
+- `type` — `credit_card` \| `installment` \| `mfo_loan` \| `bank_loan`; `status` — `active` \| `closed`.
+- `ratePeriod` — `year` \| `month` \| `day`; `interestRate` — відсотки, до чотирьох знаків після коми.
+- `accountId` і `card` — лише в кредитної картки; `card.available` від'ємне, якщо ліміт перевищено,
+  `nearLimit` — використано 90% ліміту або більше.
+- `month` — платіж запитаного місяця; `status` — `none` \| `paid` \| `partial` \| `due_soon` \|
+  `pending` \| `overdue`. Рахує бекенд.
+- `projection` — прогноз від найближчого ще не внесеного платежу. `months`, `payoffDate` і
+  `totalInterest` дорівнюють `null`, якщо борг не погашається; `maturityWarning.requiredPayment` —
+  мінімальний платіж, щоб встигнути до `maturityDate`.
+
+| Метод  | Шлях                       | Тіло                  | Відповідь                                                                                   |
+| ------ | -------------------------- | --------------------- | ------------------------------------------------------------------------------------------- |
+| GET    | `/api/debts?month=YYYY-MM` | —                     | `200 { month, currency, today, summary, debts: Debt[] }`; `month` за замовчуванням поточний |
+| POST   | `/api/debts`               | див. нижче            | `201 Debt`                                                                                  |
+| GET    | `/api/debts/:id?month=…`   | —                     | `200 DebtDetails`                                                                           |
+| PATCH  | `/api/debts/:id`           | будь-які з умов боргу | `200 Debt`                                                                                  |
+| POST   | `/api/debts/:id/close`     | —                     | `200 Debt`; `409`, якщо залишок не нульовий                                                 |
+| DELETE | `/api/debts/:id`           | —                     | `204`; `409`, якщо в боргу є рухи                                                           |
+
+`summary` — `{ totalBalance, totalMonthlyPayments, weightedAnnualRate, dueThisMonth, debtFreeDate,
+totalCreditAvailable }` за активними боргами. Список відсортовано за датою платежу, закриті борги — в
+кінці.
+
+Тіло `POST /api/debts`:
+`{ name, type, description?, initialAmount, startDate, maturityDate?, interestRate, ratePeriod,
+monthlyPayment, paymentDay, earlyRepaymentAllowed?, defaultAccountId?, creditLimit?, existingAccountId? }`.
+
+- `maturityDate` обов'язкова для всіх типів, крім `credit_card`, і має бути пізніше за `startDate`.
+- `creditLimit` обов'язковий тоді й лише тоді, коли тип `credit_card`.
+- `startDate` може бути в минулому, але не в майбутньому (`400`).
+- Кредитна картка атомарно створює рахунок-картку з назвою боргу й, якщо `initialAmount > 0`,
+  транзакцію `balance_adjustment` на `-initialAmount` з датою `startDate`.
+- `existingAccountId` перетворює наявний рахунок на рахунок-картку: борг дорівнює його поточному
+  від'ємному балансу, тому `initialAmount` має бути 0. Рахунок, уже прив'язаний до боргу, — `409`.
+- Порушення цих правил схеми — `400 VALIDATION_ERROR`, як і в решті API.
+
+`PATCH` змінює умови (`name`, `description`, `maturityDate`, `interestRate`, `ratePeriod`,
+`monthlyPayment`, `paymentDay`, `earlyRepaymentAllowed`, `defaultAccountId`, для кредитки —
+`creditLimit`) і не змінює історію; тип, `initialAmount` і `startDate` не змінюються. Закриття
+кредитки архівує рахунок-картку. Позика закривається сама, коли залишок стає нульовим, і відкривається
+знову з новим нарахуванням; кредитка з нульовим боргом лишається активною.
+
+`DebtDetails` — це `Debt` плюс `viewedMonth`, `today`, `entries` (записи позики:
+`{ id, kind, amount, principalPart, interestPart, accountId, date, note }`, `kind` — `payment` \|
+`charge` \| `adjustment`) і `transactions` (останні 200 транзакцій рахунку-картки). У позики порожній
+`transactions`, у кредитки — `entries`.
+
+### Рухи
+
+| Метод  | Шлях                                      | Тіло                                                                        | Відповідь            |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------- |
+| POST   | `/api/debts/:id/payments`                 | `{ accountId, amount, date, principalPart?, interestPart?, confirmEarly? }` | `201 DebtDetails`    |
+| POST   | `/api/debts/:id/charges`                  | `{ amount, date, note? }`                                                   | `201 DebtDetails`    |
+| DELETE | `/api/debts/:id/entries/:entryId`         | —                                                                           | `204`                |
+| GET    | `/api/debts/:id/payment-preview?amount=…` | —                                                                           | `200 PaymentPreview` |
+| POST   | `/api/debts/:id/card-payments`            | `{ fromAccountId, amount, date }`                                           | `201 DebtDetails`    |
+| POST   | `/api/debts/:id/card-fees`                | `{ amount, date, note? }`                                                   | `201 DebtDetails`    |
+| POST   | `/api/debts/:id/adjustments`              | `{ actualBalance, note? }`                                                  | `201 DebtDetails`    |
+
+- `payments`, `charges`, `entries` і `payment-preview` — лише для позик і розстрочок; `card-payments` і
+  `card-fees` — лише для кредиток. Інакше — `422 DEBT_TYPE_MISMATCH`.
+- Платіж створює транзакцію `debt_payment` рахунку (категорія «Погашення боргів») і запис боргу в одній
+  транзакції БД; видалення запису видаляє й транзакцію. Без `principalPart` та `interestPart` розбивка
+  пропонується за ставкою; якщо вони задані, їхня сума має дорівнювати `amount`. Тіло платежу не може
+  перевищувати залишок (`400`), погашений борг платежів не приймає (`409`).
+- Платіж достроковий, якщо разом із ним за місяць сплачено більше за `month.required`. Коли
+  `earlyRepaymentAllowed = false`, такий платіж потребує `confirmEarly: true`, інакше —
+  `422 EARLY_REPAYMENT_NOT_ALLOWED`.
+- Нестача коштів на рахунку платіж не блокує: застосунок фіксує факт, а не проводить оплату.
+- `card-payments` створює переказ на рахунок-картку, `card-fees` — видаток з картки в категорії
+  «Відсотки та комісії». Покупки з кредитки — звичайні видатки (`POST /api/transactions`) з рахунком
+  картки; перевищення ліміту їх не блокує.
+- `adjustments` — звірка поточною датою: для позики зберігає запис із різницею, для кредитки —
+  транзакцію `balance_adjustment`. Якщо залишок збігається, нічого не записується.
+- Рух можна внести на будь-яку дату до сьогодні включно, але не раніше за `startDate` позики; майбутня
+  дата — `422 EXPENSE_DATE_IN_FUTURE`.
+- Рахунок не в `UAH` — `422 CURRENCY_MISMATCH`; чужий або невідомий рахунок чи борг — `404`; погашення
+  кредитки з неї самої — `422 SAME_ACCOUNT`.
+
+`PaymentPreview`: `{ amount, principalPart, interestPart, isEarly, requiresConfirmation, balanceAfter,
+projection, interestSaved }` — розбивка платежу на сьогодні й прогноз після нього.
