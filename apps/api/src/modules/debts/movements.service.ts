@@ -4,8 +4,10 @@ import type { AuthContext } from '../../http/auth.ts';
 import { badRequest, conflict, notFound, unprocessable } from '../../http/errors.ts';
 import { ensureSystemCategory } from '../categories/repo.ts';
 import { deleteTransaction, insertTransaction } from '../transactions/repo.ts';
+import { createTransaction } from '../transactions/service.ts';
 import * as repo from './repo.ts';
 import type {
+  CardPaymentInput,
   DebtAdjustmentInput,
   DebtChargeInput,
   DebtDetails,
@@ -274,4 +276,80 @@ export async function previewPayment(
         ? before.totalInterest - after.totalInterest - split.interestPart
         : null,
   };
+}
+
+// --- Кредитки ---
+
+/** Погашення переказом і відсотки з картки є лише в кредитної картки. */
+function assertCard(row: repo.DebtRow): string {
+  if (!row.accountId) throw typeMismatch('Ця дія доступна лише для кредитної картки');
+  return row.accountId;
+}
+
+/**
+ * Погашення кредитки — переказ з іншого рахунку на рахунок-картку. Тонка обгортка над
+ * створенням переказу, щоб екран боргів не знав про внутрішню модель рахунків.
+ */
+export async function addCardPayment(
+  db: Db,
+  auth: AuthContext,
+  id: string,
+  input: CardPaymentInput,
+  now: Date,
+): Promise<DebtDetails> {
+  const row = await requireDebt(db, auth, id);
+  const cardAccountId = assertCard(row);
+  if (input.fromAccountId === cardAccountId) {
+    throw unprocessable('SAME_ACCOUNT', 'Кредитку не можна гасити з неї самої');
+  }
+  await requirePaymentAccount(db, auth, input.fromAccountId);
+  const context = await loadDebtContext(db, auth, [row], undefined, now);
+  const occurredAt = movementInstant(input.date, context, now);
+
+  await createTransaction(
+    db,
+    auth,
+    {
+      type: 'transfer',
+      accountId: input.fromAccountId,
+      toAccountId: cardAccountId,
+      amountMinor: input.amount,
+      currency: row.currency,
+      description: `Погашення: ${row.name}`,
+      occurredAt: occurredAt.toISOString(),
+    },
+    now,
+  );
+  return getDebt(db, auth, id, undefined, now);
+}
+
+/** Відсотки й комісії банку по кредитці — видаток з картки в системній категорії. */
+export async function addCardFee(
+  db: Db,
+  auth: AuthContext,
+  id: string,
+  input: DebtChargeInput,
+  now: Date,
+): Promise<DebtDetails> {
+  const row = await requireDebt(db, auth, id);
+  const cardAccountId = assertCard(row);
+  const context = await loadDebtContext(db, auth, [row], undefined, now);
+  const occurredAt = movementInstant(input.date, context, now);
+  const category = await ensureSystemCategory(db, auth.householdId, 'interest_fees');
+
+  await createTransaction(
+    db,
+    auth,
+    {
+      type: 'expense',
+      accountId: cardAccountId,
+      categoryId: category.id,
+      amountMinor: input.amount,
+      currency: row.currency,
+      description: input.note || category.name,
+      occurredAt: occurredAt.toISOString(),
+    },
+    now,
+  );
+  return getDebt(db, auth, id, undefined, now);
 }

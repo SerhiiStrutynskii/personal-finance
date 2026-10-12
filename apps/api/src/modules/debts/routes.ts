@@ -3,6 +3,7 @@ import type { Db } from '../../db/client.ts';
 import { getAuth } from '../../http/auth.ts';
 import * as movements from './movements.service.ts';
 import {
+  cardPaymentSchema,
   createDebtSchema,
   debtAdjustmentSchema,
   debtChargeSchema,
@@ -75,6 +76,20 @@ export function debtsRouter(db: Db, now: () => Date): Router {
     const { id } = idParamsSchema.parse(req.params);
     const { amount } = paymentPreviewQuerySchema.parse(req.query);
     res.json(await movements.previewPayment(db, getAuth(res), id, amount, now()));
+  });
+
+  // --- Рухи кредиток ---
+
+  router.post('/:id/card-payments', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = cardPaymentSchema.parse(req.body);
+    res.status(201).json(await movements.addCardPayment(db, getAuth(res), id, input, now()));
+  });
+
+  router.post('/:id/card-fees', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = debtChargeSchema.parse(req.body);
+    res.status(201).json(await movements.addCardFee(db, getAuth(res), id, input, now()));
   });
 
   // --- Обидва типи ---
