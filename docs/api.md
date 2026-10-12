@@ -62,6 +62,69 @@
 
 `GET /health` → `{ "status": "ok" }` (без авторизації).
 
+## Головна
+
+`GET /api/dashboard` → `200 Dashboard` — зведення поточного місяця (у часовому поясі домогосподарства)
+для головної сторінки. Лише читання: числа й статуси беруться з рахунків, аналітики, доходів, боргів і
+цілей. Правила — у `docs/domain.md`.
+
+```json
+{
+  "month": "2026-10",
+  "today": "2026-10-12",
+  "currency": "UAH",
+  "setup": { "hasAccounts": true, "hasTransactions": true, "hasBudget": true },
+  "money": {
+    "netWorth": 12400000,
+    "accountsTotal": 13400000,
+    "debtTotal": 3340000,
+    "accounts": [
+      { "id": "…", "name": "Картка", "type": "card", "currency": "UAH", "balance": 4200000 }
+    ]
+  },
+  "monthSummary": {
+    "income": 6000000,
+    "expenses": 3180000,
+    "net": 2820000,
+    "plannedExpenseTotal": 5200000,
+    "projected": 8215000,
+    "daysElapsed": 12,
+    "daysInMonth": 31
+  },
+  "attention": [
+    { "kind": "debt_overdue", "id": "…", "name": "Позика", "amount": 100000, "date": "2026-10-10" }
+  ],
+  "upcoming": [
+    { "kind": "income", "id": "…", "name": "Аванс", "amount": 1500000, "date": "2026-10-15" }
+  ],
+  "goals": [],
+  "recent": [
+    {
+      "id": "…",
+      "type": "expense",
+      "description": "Супермаркет",
+      "categoryName": "Продукти",
+      "accountName": "Картка",
+      "amountMinor": 128450,
+      "currency": "UAH",
+      "occurredAt": "2026-10-11T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+- `money.accountsTotal` — сума балансів рахунків у гривні; `netWorth` — вона ж мінус залишки активних
+  позик і розстрочок; `debtTotal` — усі борги разом із кредитками. `accounts` — неархівні рахунки.
+- `monthSummary.plannedExpenseTotal` — сума лімітів бюджету; `null`, якщо бюджету на місяць немає.
+- `attention[].kind` — `debt_overdue` \| `income_overdue` \| `budget_over` \| `goal_overdue` \|
+  `debt_due_soon` \| `goal_behind`, у цьому порядку. `id` — борг, надходження чи ціль; для
+  `budget_over` — категорія або `null`. `amount` і `date` можуть бути `null`.
+- `upcoming` — платежі по боргах (`debt_payment`) і надходження (`income`) від сьогодні до кінця місяця,
+  за датою; прострочене сюди не входить.
+- `goals` — не більше трьох активних цілей, як у `GET /api/goals`.
+- `recent` — не більше п'яти останніх витрат, доходів і платежів по боргах; перекази й службові зміни
+  балансу не показуються.
+
 ## Рахунки
 
 Об'єкт: `{ id, name, type, currency, balance, creditLimit, isArchived, createdAt }`.
