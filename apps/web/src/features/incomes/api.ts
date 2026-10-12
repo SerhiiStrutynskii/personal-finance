@@ -35,9 +35,15 @@ function useIncomeMutation<TInput, TResult>(request: (input: TInput) => Promise<
     mutationFn: request,
     onSuccess: () =>
       Promise.all(
-        [INCOMES_KEY, SOURCES_KEY, ['budget'], ['accounts'], ['debts'], TRANSACTIONS_KEY].map(
-          (queryKey) => queryClient.invalidateQueries({ queryKey }),
-        ),
+        [
+          INCOMES_KEY,
+          SOURCES_KEY,
+          ['budget'],
+          ['accounts'],
+          ['debts'],
+          ['analytics'],
+          TRANSACTIONS_KEY,
+        ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
       ),
   });
 }

@@ -8,13 +8,14 @@ import { BudgetPage } from '../features/budget/BudgetPage.tsx';
 import { CategoriesPage } from '../features/categories/CategoriesPage.tsx';
 import { IncomesPage } from '../features/incomes/IncomesPage.tsx';
 import { SourcesPage } from '../features/incomes/SourcesPage.tsx';
+import { AnalyticsPage } from '../features/analytics/AnalyticsPage.tsx';
 import { DebtPage } from '../features/debts/DebtPage.tsx';
 import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
 import { ApiError } from '../shared/api/index.ts';
 import { Layout } from '../shared/layout/Layout.tsx';
 import './app.css';
-import { ComingSoonPage, DashboardPage, NotFoundPage } from './pages.tsx';
+import { DashboardPage, NotFoundPage } from './pages.tsx';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,7 +47,7 @@ export function App() {
                 <Route path="budget" element={<BudgetPage />} />
                 <Route path="debts" element={<DebtsPage />} />
                 <Route path="debts/:id" element={<DebtPage />} />
-                <Route path="analytics" element={<ComingSoonPage title="Аналітика" />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Route>

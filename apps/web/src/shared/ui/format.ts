@@ -34,3 +34,17 @@ export function formatDayMonth(date: string): string {
 export function formatDateString(date: string): string {
   return `${formatDayMonth(date)}.${date.slice(0, 4)}`;
 }
+
+const shortMonthFormatter = new Intl.DateTimeFormat('uk-UA', { month: 'short', timeZone: 'UTC' });
+
+/** «2026-10» -> «жовт. 26» — підпис місяця на осі графіка. */
+export function shortMonthLabel(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number) as [number, number];
+  const name = shortMonthFormatter.format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+  return `${name} ${String(year).slice(2)}`;
+}
+
+/** Частка у відсотках з одним знаком: 0,4245 -> «42,5%». */
+export function percentText(ratio: number): string {
+  return `${(Math.round(ratio * 1000) / 10).toFixed(1).replace('.', ',')}%`;
+}

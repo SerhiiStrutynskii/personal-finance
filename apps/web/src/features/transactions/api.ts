@@ -29,6 +29,7 @@ function useInvalidate() {
       queryClient.invalidateQueries({ queryKey: ['incomes'] }),
       queryClient.invalidateQueries({ queryKey: ['accounts'] }),
       queryClient.invalidateQueries({ queryKey: ['debts'] }),
+      queryClient.invalidateQueries({ queryKey: ['analytics'] }),
     ]);
 }
 

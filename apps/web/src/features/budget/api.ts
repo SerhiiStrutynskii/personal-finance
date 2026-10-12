@@ -24,7 +24,11 @@ function useBudgetMutation<TInput>(request: (input: TInput) => Promise<BudgetVie
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: request,
-    onSuccess: (budget) => queryClient.setQueryData(budgetKey(budget.month), budget),
+    onSuccess: (budget) => {
+      queryClient.setQueryData(budgetKey(budget.month), budget);
+      // Перевитрати й прогноз в аналітиці залежать від лімітів.
+      return queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    },
   });
 }
 
