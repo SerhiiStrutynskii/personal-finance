@@ -1,6 +1,7 @@
 import {
   MoneyParseError,
   MoneyRangeError,
+  getCardLimitState,
   localDateKey,
   parseMoney,
   startOfLocalDay,
@@ -175,4 +176,28 @@ export function toTransactionInput(
     return { ok: false, errors };
   }
   return { ok: true, input: parsed.data };
+}
+
+/** Скільки ще можна витратити з кредитної картки; null для інших рахунків. */
+export function cardAvailable(account: Account | undefined): number | null {
+  if (!account || account.type !== 'credit_card' || account.creditLimit === null) return null;
+  return getCardLimitState(account.creditLimit, account.balance).available;
+}
+
+/**
+ * На скільки видаток перевищить кредитний ліміт картки; 0, якщо не перевищить або рахунок
+ * не кредитка. Видаток, який редагують, уже врахований у балансі, тому його сума повертається.
+ */
+export function creditLimitExcess(
+  account: Account | undefined,
+  amountText: string,
+  original?: Transaction,
+): number {
+  const available = cardAvailable(account);
+  if (!account || available === null) return 0;
+  const amount = parseAmount(amountText, account.currency);
+  if (typeof amount !== 'number') return 0;
+  const alreadySpent =
+    original?.type === 'expense' && original.accountId === account.id ? original.amountMinor : 0;
+  return Math.max(0, amount - available - alreadySpent);
 }

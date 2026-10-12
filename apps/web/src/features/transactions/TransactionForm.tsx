@@ -1,4 +1,5 @@
-import type { Account, Category, Transaction } from '@hf/shared';
+import { formatMoney, type Account, type Category, type Transaction } from '@hf/shared';
+import { TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -9,6 +10,8 @@ import { useCurrentUser } from '../auth/authContext.ts';
 import { useSaveTransaction } from './api.ts';
 import type { EntryType } from './config.ts';
 import {
+  cardAvailable,
+  creditLimitExcess,
   initialValues,
   toTransactionInput,
   type FormErrors,
@@ -30,6 +33,14 @@ interface Props {
   onSaved: () => void;
   /** Розміщує кнопку збереження поруч із власними діями (наприклад, «Скасувати»). */
   renderActions: (submit: ReactNode) => ReactNode;
+}
+
+/** Кредитна картка у списку рахунків показується з доступним лімітом. */
+function accountLabel(account: Account): string {
+  const available = cardAvailable(account);
+  if (available === null) return `${account.name} (${account.currency})`;
+  const money = formatMoney({ amountMinor: available, currency: account.currency });
+  return `${account.name} (кредитка, доступно ${money})`;
 }
 
 /** Поля витрати або доходу для створення чи редагування запису. */
@@ -59,7 +70,10 @@ export function TransactionForm({
   const [errors, setErrors] = useState<FormErrors>({});
   const set = (patch: Partial<typeof values>) => setValues({ ...values, ...patch });
 
-  const currency = accounts.find((account) => account.id === values.accountId)?.currency;
+  const account = accounts.find((item) => item.id === values.accountId);
+  const currency = account?.currency;
+  // Перевищення кредитного ліміту лише показується: видаток з картки не блокується.
+  const overLimit = type === 'expense' ? creditLimitExcess(account, values.amount, original) : 0;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -89,12 +103,17 @@ export function TransactionForm({
           value={values.accountId}
           onChange={(accountId) => set({ accountId })}
           invalid={Boolean(errors.accountId)}
-          options={accounts.map((account) => ({
-            value: account.id,
-            label: `${account.name} (${account.currency})`,
-          }))}
+          options={accounts.map((item) => ({ value: item.id, label: accountLabel(item) }))}
         />
       </Field>
+      {overLimit > 0 && currency && (
+        <p className="flex items-start gap-1.5 text-sm text-status-over" role="status">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            Перевищення кредитного ліміту на {formatMoney({ amountMinor: overLimit, currency })}
+          </span>
+        </p>
+      )}
       <Field label="Категорія" error={errors.categoryId}>
         <SelectField
           value={values.categoryId}

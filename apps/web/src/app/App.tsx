@@ -8,6 +8,8 @@ import { BudgetPage } from '../features/budget/BudgetPage.tsx';
 import { CategoriesPage } from '../features/categories/CategoriesPage.tsx';
 import { IncomesPage } from '../features/incomes/IncomesPage.tsx';
 import { SourcesPage } from '../features/incomes/SourcesPage.tsx';
+import { DebtPage } from '../features/debts/DebtPage.tsx';
+import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
 import { ApiError } from '../shared/api/index.ts';
 import { Layout } from '../shared/layout/Layout.tsx';
@@ -42,7 +44,8 @@ export function App() {
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="categories" element={<CategoriesPage />} />
                 <Route path="budget" element={<BudgetPage />} />
-                <Route path="debts" element={<ComingSoonPage title="Борги" />} />
+                <Route path="debts" element={<DebtsPage />} />
+                <Route path="debts/:id" element={<DebtPage />} />
                 <Route path="analytics" element={<ComingSoonPage title="Аналітика" />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

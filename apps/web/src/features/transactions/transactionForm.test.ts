@@ -1,6 +1,8 @@
 import type { Account, Transaction } from '@hf/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  cardAvailable,
+  creditLimitExcess,
   initialValues,
   toTransactionInput,
   type FormContext,
@@ -315,5 +317,48 @@ describe('межі дат (minDate / maxDate)', () => {
   it('сьогоднішня дата отримує поточний час, тож не виходить у майбутнє', () => {
     const result = toTransactionInput('expense', values({ date: '2026-03-15' }), limited);
     expect(result.ok && result.input.occurredAt).toBe(now.toISOString());
+  });
+});
+
+describe('кредитний ліміт у формі видатку', () => {
+  // ліміт 1 000 грн, борг 700 грн — доступно 300 грн
+  const creditCard: Account = {
+    ...account(5),
+    type: 'credit_card',
+    creditLimit: 100_000,
+    balance: -70_000,
+  };
+
+  it('доступна сума є лише в кредитної картки', () => {
+    expect(cardAvailable(creditCard)).toBe(30_000);
+    expect(cardAvailable({ ...creditCard, balance: 5_000 })).toBe(105_000);
+    expect(cardAvailable(account(1))).toBeNull();
+    expect(cardAvailable(undefined)).toBeNull();
+  });
+
+  it('перевищення рахується від доступної суми', () => {
+    expect(creditLimitExcess(creditCard, '300')).toBe(0);
+    expect(creditLimitExcess(creditCard, '300,01')).toBe(1);
+    expect(creditLimitExcess(creditCard, '1 000')).toBe(70_000);
+  });
+
+  it('звичайний рахунок, порожня або некоректна сума — без попередження', () => {
+    expect(creditLimitExcess(account(1), '999999')).toBe(0);
+    expect(creditLimitExcess(undefined, '100')).toBe(0);
+    expect(creditLimitExcess(creditCard, '')).toBe(0);
+    expect(creditLimitExcess(creditCard, 'abc')).toBe(0);
+  });
+
+  it('видаток, який редагують, уже врахований у балансі картки', () => {
+    const original = {
+      type: 'expense',
+      accountId: creditCard.id,
+      amountMinor: 20_000,
+    } as Transaction;
+    // без цього видатку доступно 500 грн
+    expect(creditLimitExcess(creditCard, '500', original)).toBe(0);
+    expect(creditLimitExcess(creditCard, '501', original)).toBe(100);
+    // видаток з іншого рахунку не повертається
+    expect(creditLimitExcess(creditCard, '500', { ...original, accountId: id(1) })).toBe(20_000);
   });
 });

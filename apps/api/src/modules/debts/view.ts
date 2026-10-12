@@ -42,11 +42,10 @@ export interface DebtContext {
 
 async function loadMonth(db: DbOrTx, householdId: string, month: string, timeZone: string) {
   const period = budgetPeriod(month, timeZone);
-  const [loans, cards, balancesBefore] = await Promise.all([
-    repo.loanAggregates(db, householdId, period),
-    repo.cardAggregates(db, householdId, period),
-    accountBalances(db, householdId, { before: period.start }),
-  ]);
+  // Запити йдуть по черзі: усередині транзакції БД з'єднання одне й паралельних не допускає.
+  const loans = await repo.loanAggregates(db, householdId, period);
+  const cards = await repo.cardAggregates(db, householdId, period);
+  const balancesBefore = await accountBalances(db, householdId, { before: period.start });
   return { month, loans, cards, balancesBefore };
 }
 
@@ -70,13 +69,10 @@ export async function loadDebtContext(
   const viewedMonth = month ?? currentMonth;
   const cardAccountIds = rows.flatMap((row) => (row.accountId ? [row.accountId] : []));
 
-  const [balances, accountRows, current] = await Promise.all([
-    accountBalances(db, auth.householdId),
-    cardAccountIds.length > 0
-      ? findAccountsByIds(db, auth.householdId, cardAccountIds)
-      : Promise.resolve([]),
-    loadMonth(db, auth.householdId, currentMonth, timeZone),
-  ]);
+  const balances = await accountBalances(db, auth.householdId);
+  const accountRows =
+    cardAccountIds.length > 0 ? await findAccountsByIds(db, auth.householdId, cardAccountIds) : [];
+  const current = await loadMonth(db, auth.householdId, currentMonth, timeZone);
   const viewed =
     viewedMonth === currentMonth
       ? current
