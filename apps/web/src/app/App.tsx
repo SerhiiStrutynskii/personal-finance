@@ -9,6 +9,7 @@ import { CategoriesPage } from '../features/categories/CategoriesPage.tsx';
 import { IncomesPage } from '../features/incomes/IncomesPage.tsx';
 import { SourcesPage } from '../features/incomes/SourcesPage.tsx';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage.tsx';
+import { DashboardPage } from '../features/dashboard/DashboardPage.tsx';
 import { DebtPage } from '../features/debts/DebtPage.tsx';
 import { GoalsPage } from '../features/goals/GoalsPage.tsx';
 import { PayoffPlanPage } from '../features/goals/PayoffPlanPage.tsx';
@@ -17,7 +18,7 @@ import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx'
 import { ApiError } from '../shared/api/index.ts';
 import { Layout } from '../shared/layout/Layout.tsx';
 import './app.css';
-import { DashboardPage, NotFoundPage } from './pages.tsx';
+import { NotFoundPage } from './pages.tsx';
 
 const queryClient = new QueryClient({
   defaultOptions: {
