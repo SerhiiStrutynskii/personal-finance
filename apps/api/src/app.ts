@@ -4,6 +4,7 @@ import type { Db } from './db/client.ts';
 import { requireAuth } from './http/auth.ts';
 import { errorHandler, notFoundHandler } from './http/error-handler.ts';
 import { accountsRouter } from './modules/accounts/routes.ts';
+import { analyticsRouter } from './modules/analytics/routes.ts';
 import { createLoginLimiter, type RateLimiter } from './modules/auth/rate-limiter.ts';
 import { authRouter } from './modules/auth/routes.ts';
 import { createTokenService } from './modules/auth/tokens.ts';
@@ -52,6 +53,7 @@ export function createApp({
   const api = Router();
   api.use(requireAuth(db, tokens));
   api.use('/accounts', accountsRouter(db));
+  api.use('/analytics', analyticsRouter(db, now));
   api.use('/budgets', budgetsRouter(db, now));
   api.use('/categories', categoriesRouter(db));
   api.use('/debts', debtsRouter(db, now));
