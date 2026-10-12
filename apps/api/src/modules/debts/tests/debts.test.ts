@@ -438,17 +438,38 @@ describe('деталі, зміна, закриття й видалення', () 
     expect(await count('transactions')).toBe(0);
   });
 
-  it('кредитку з рухами видалити не можна', async () => {
+  it('видалення кредитки з рухами лишає рахунок звичайною карткою з усіма транзакціями', async () => {
     const actor = await createActor();
-    const { body: card } = await actor.post('/api/debts', cardInput());
+    const debit = await createAccount(actor);
+    const { body: card } = await actor.post('/api/debts', cardInput({ initialAmount: 50_000 }));
     await actor.post('/api/transactions', {
       type: 'expense',
       accountId: card.accountId,
       amountMinor: 100,
       occurredAt: '2026-10-05T10:00:00Z',
     });
-    expect((await actor.delete(`/api/debts/${card.id}`)).status).toBe(409);
-    expect(await count('debts')).toBe(1);
+    await actor.post(`/api/debts/${card.id}/card-payments`, {
+      fromAccountId: debit.id,
+      amount: 20_000,
+      date: TODAY,
+    });
+
+    expect((await actor.delete(`/api/debts/${card.id}`)).status).toBe(204);
+    expect(await count('debts')).toBe(0);
+    // рахунок, покупка, переказ і початковий баланс на місці
+    expect(await count('transactions')).toBe(3);
+    expect((await actor.get(`/api/accounts/${card.accountId}`)).body).toMatchObject({
+      name: 'Кредитка',
+      type: 'card',
+      creditLimit: null,
+      balance: -30_100,
+      isArchived: false,
+    });
+
+    // тепер це звичайний рахунок: його можна знову прив'язати до нового боргу
+    const again = await actor.post('/api/debts', cardInput({ existingAccountId: card.accountId }));
+    expect(again.status).toBe(201);
+    expect(again.body.balance).toBe(30_100);
   });
 
   it('рахунок-картку не можна видалити окремо від боргу', async () => {

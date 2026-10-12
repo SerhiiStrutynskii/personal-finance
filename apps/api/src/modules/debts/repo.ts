@@ -55,6 +55,13 @@ export async function updateDebt(
   return row;
 }
 
+/** Транзакції платежів по боргу; їхні записи боргу видаляються каскадом. */
+export async function deletePaymentTransactions(db: DbOrTx, householdId: string, debtId: string) {
+  await db
+    .delete(transactions)
+    .where(and(eq(transactions.householdId, householdId), eq(transactions.debtId, debtId)));
+}
+
 export async function deleteDebt(db: DbOrTx, householdId: string, id: string) {
   await db.delete(debts).where(owned(householdId, id));
 }

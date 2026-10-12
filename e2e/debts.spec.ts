@@ -133,4 +133,29 @@ test('позика банку: місячний платіж дає статус
   await expect(line).toHaveAttribute('data-status', 'neutral');
   await expect(line).toContainText('Залишок 0,00');
   await expect(page.locator('[data-slot=card]').first()).toContainText('Витрати100,00');
+
+  // Умови змінюються з меню рядка у списку боргів.
+  await page.getByRole('link', { name: 'Борги' }).click();
+  const loanRow = page.getByTestId('debt-row').filter({ hasText: 'Позика на ремонт' });
+  await loanRow.getByRole('button', { name: 'Дії з боргом «Позика на ремонт»' }).click();
+  await page.getByRole('menuitem', { name: 'Змінити умови' }).click();
+  const editDialog = page.getByRole('dialog');
+  await expect(editDialog.getByRole('heading', { name: 'Умови боргу' })).toBeVisible();
+  await editDialog.getByLabel('Щомісячний платіж, UAH').fill('200');
+  await expect(editDialog.getByTestId('debt-projection')).toContainText('Погашення за 4 місяці');
+  await editDialog.getByRole('button', { name: 'Зберегти' }).click();
+  await expect(editDialog).toBeHidden();
+  await expect(loanRow).toContainText('Платіж 200,00');
+
+  // Видалення боргу з рухами прибирає платіж: баланс рахунку й бюджет повертаються.
+  await loanRow.getByRole('button', { name: 'Дії з боргом «Позика на ремонт»' }).click();
+  await page.getByRole('menuitem', { name: 'Видалити' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Видалити' }).click();
+  await expect(page.getByText('Боргів ще немає')).toBeVisible();
+
+  await page.getByRole('link', { name: 'Рахунки' }).click();
+  await expect(page.getByTestId('account-balance').first()).toContainText('0,00');
+  await expect(page.getByTestId('account-balance').first()).not.toContainText('-100,00');
+  await page.getByRole('link', { name: 'Бюджет' }).click();
+  await expect(line).toContainText('Залишок 100,00');
 });

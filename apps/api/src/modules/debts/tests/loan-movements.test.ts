@@ -429,10 +429,37 @@ describe('записи боргу лише для позик і лише сво�
     expect(responses.map((res) => res.status)).toEqual([404, 404, 404, 404, 404]);
   });
 
-  it('борг із рухами видалити не можна', async () => {
-    const { actor, loan } = await setup();
+  it('видалення позики з рухами прибирає записи й платежі та відновлює баланс рахунку', async () => {
+    const { actor, account, loan, pay } = await setup();
+    await pay({ amount: 100_000 });
+    await pay({ amount: 50_000, date: '2026-09-18' });
     await actor.post(`/api/debts/${loan.id}/charges`, { amount: 100, date: TODAY });
-    expect((await actor.delete(`/api/debts/${loan.id}`)).status).toBe(409);
+    await actor.post(`/api/debts/${loan.id}/adjustments`, { actualBalance: 500_000 });
+    expect(await balanceOfAccount(actor, account.id)).toBe(1_850_000);
+
+    expect((await actor.delete(`/api/debts/${loan.id}`)).status).toBe(204);
+    expect((await actor.get(`/api/debts/${loan.id}`)).status).toBe(404);
+    expect((await actor.get('/api/transactions?type=debt_payment')).body.total).toBe(0);
+    expect(await balanceOfAccount(actor, account.id)).toBe(2_000_000);
+    const stored = await db.execute(sql`SELECT 1 FROM debt_entries`);
+    expect(stored.rows).toEqual([]);
+    // дохід, яким поповнювали рахунок, лишився
+    expect((await actor.get('/api/transactions')).body.total).toBe(1);
+  });
+
+  it('видалення однієї позики не чіпає платежі іншої', async () => {
+    const { actor, account, loan, pay } = await setup();
+    await pay({ amount: 100_000 });
+    const { body: other } = await actor.post('/api/debts', loanInput({ name: 'Друга' }));
+    await actor.post(`/api/debts/${other.id}/payments`, {
+      accountId: account.id,
+      amount: 70_000,
+      date: TODAY,
+    });
+
+    await actor.delete(`/api/debts/${loan.id}`);
+    expect((await details(actor, other.id)).entries).toHaveLength(1);
+    expect(await balanceOfAccount(actor, account.id)).toBe(1_930_000);
   });
 
   it('платіж по боргу не змінюється й не видаляється через /api/transactions', async () => {

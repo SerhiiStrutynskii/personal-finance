@@ -401,7 +401,7 @@
 | GET    | `/api/debts/:id?month=…`   | —                     | `200 DebtDetails`                                                                           |
 | PATCH  | `/api/debts/:id`           | будь-які з умов боргу | `200 Debt`                                                                                  |
 | POST   | `/api/debts/:id/close`     | —                     | `200 Debt`; `409`, якщо залишок не нульовий                                                 |
-| DELETE | `/api/debts/:id`           | —                     | `204`; `409`, якщо в боргу є рухи                                                           |
+| DELETE | `/api/debts/:id`           | —                     | `204`; борг видаляється разом із рухами                                                     |
 
 `summary` — `{ totalBalance, totalMonthlyPayments, weightedAnnualRate, dueThisMonth, debtFreeDate,
 totalCreditAvailable }` за активними боргами. Список відсортовано за датою платежу, закриті борги — в
@@ -425,6 +425,14 @@ monthlyPayment, paymentDay, earlyRepaymentAllowed?, defaultAccountId?, creditLim
 `creditLimit`) і не змінює історію; тип, `initialAmount` і `startDate` не змінюються. Закриття
 кредитки архівує рахунок-картку. Позика закривається сама, коли залишок стає нульовим, і відкривається
 знову з новим нарахуванням; кредитка з нульовим боргом лишається активною.
+
+`DELETE` видаляє борг разом з його рухами:
+
+- позика чи розстрочка — зникають записи боргу й транзакції платежів, тож баланси рахунків, з яких
+  платили, відновлюються;
+- кредитка без рухів — зникають також рахунок-картка й початковий баланс;
+- кредитка з рухами — видаляється лише борг: рахунок стає звичайним (`type = card`, без ліміту), а
+  його покупки, перекази й баланс лишаються, щоб витрати й бюджети минулих місяців не змінилися.
 
 `DebtDetails` — це `Debt` плюс `viewedMonth`, `today`, `entries` (записи позики:
 `{ id, kind, amount, principalPart, interestPart, accountId, date, note }`, `kind` — `payment` \|

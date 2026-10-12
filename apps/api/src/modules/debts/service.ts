@@ -318,17 +318,23 @@ export async function closeDebt(db: Db, auth: AuthContext, id: string, now: Date
   return buildDebt(db, auth, row!, now);
 }
 
-const hasMovements = () =>
-  conflict('У боргу є рухи, тому його не можна видалити — закрийте його після погашення');
-
-/** Видаляє борг без рухів; кредитку — разом із рахунком-карткою та початковим балансом. */
+/**
+ * Видаляє борг разом з його рухами.
+ * Позика: зникають записи боргу й транзакції платежів, тож баланси рахунків відновлюються.
+ * Кредитка без рухів: зникає й рахунок-картка з початковим балансом.
+ * Кредитка з рухами: видаляється лише борг — рахунок стає звичайною карткою, а його покупки,
+ * перекази й баланс лишаються, щоб витрати й бюджети минулих місяців не змінилися.
+ */
 export async function deleteDebt(db: Db, auth: AuthContext, id: string): Promise<void> {
   const existing = await requireDebt(db, auth, id);
   const { accountId } = existing;
 
   if (!accountId) {
-    if ((await repo.listEntries(db, auth.householdId, id)).length > 0) throw hasMovements();
-    await repo.deleteDebt(db, auth.householdId, id);
+    await db.transaction(async (tx) => {
+      // Записи платежів видаляються каскадом разом із транзакціями, решта — разом із боргом.
+      await repo.deletePaymentTransactions(tx, auth.householdId, id);
+      await repo.deleteDebt(tx, auth.householdId, id);
+    });
     return;
   }
 
@@ -338,7 +344,17 @@ export async function deleteDebt(db: Db, auth: AuthContext, id: string): Promise
     history.length === 1 &&
     history[0]!.type === 'balance_adjustment' &&
     history[0]!.amountMinor === -existing.initialAmount;
-  if (history.length > 0 && !onlyInitial) throw hasMovements();
+
+  if (history.length > 0 && !onlyInitial) {
+    await db.transaction(async (tx) => {
+      await repo.deleteDebt(tx, auth.householdId, id);
+      await tx
+        .update(accounts)
+        .set({ type: 'card', creditLimit: null })
+        .where(eq(accounts.id, accountId));
+    });
+    return;
+  }
 
   try {
     await db.transaction(async (tx) => {

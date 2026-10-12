@@ -20,7 +20,7 @@ import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCloseDebt, useDebt, useDeleteDebt, useDeleteDebtEntry } from './api.ts';
 import { DebtDialog } from './DebtDialog.tsx';
-import { DEBT_TYPE_ICONS, DEBT_TYPE_LABELS, rateText } from './labels.ts';
+import { DEBT_TYPE_ICONS, DEBT_TYPE_LABELS, deleteDebtDescription, rateText } from './labels.ts';
 import {
   AdjustDialog,
   CardPaymentDialog,
@@ -252,7 +252,7 @@ function DebtContent({ debt }: { debt: DebtDetails }) {
             ? isCard
               ? 'Рахунок-картка перейде в архів і більше не прийматиме транзакцій.'
               : 'Борг перейде в закриті.'
-            : 'Видалити можна лише борг без рухів. Цю дію не можна скасувати.'
+            : deleteDebtDescription(debt)
         }
         label={confirm.kind === 'close' ? 'Закрити' : 'Видалити'}
         onConfirm={() =>

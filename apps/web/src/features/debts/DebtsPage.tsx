@@ -1,21 +1,37 @@
 import { formatMoney, type Debt } from '@hf/shared';
-import { Plus } from 'lucide-react';
+import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
+import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../shared/ui/dropdown-menu.tsx';
 import { formatDayMonth } from '../../shared/ui/format.ts';
 import { Progress } from '../../shared/ui/progress.tsx';
-import { useDebts } from './api.ts';
+import { useDebts, useDeleteDebt } from './api.ts';
 import { DebtDialog } from './DebtDialog.tsx';
 import { DebtsSummary } from './DebtsSummary.tsx';
-import { DEBT_TYPE_ICONS, DEBT_TYPE_LABELS, PAYMENT_ROW_CLASS, rateText } from './labels.ts';
+import {
+  DEBT_TYPE_ICONS,
+  DEBT_TYPE_LABELS,
+  PAYMENT_ROW_CLASS,
+  deleteDebtDescription,
+  rateText,
+} from './labels.ts';
 import { PaymentStatusLabel } from './PaymentStatusLabel.tsx';
 
 export function DebtsPage() {
   const debts = useDebts();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const remove = useDeleteDebt();
+  // Борг зберігається й після закриття, щоб вміст вікна не змінювався під час анімації.
+  const [dialog, setDialog] = useState<{ open: boolean; original?: Debt }>({ open: false });
+  const [deletion, setDeletion] = useState<{ open: boolean; debt?: Debt }>({ open: false });
   const overview = debts.data;
 
   return (
@@ -23,13 +39,14 @@ export function DebtsPage() {
       <PageHeader
         title="Борги"
         action={
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => setDialog({ open: true })}>
             <Plus />
             Борг
           </Button>
         }
       />
       <ErrorText>{debts.isError && errorMessage(debts.error)}</ErrorText>
+      <ErrorText>{remove.isError && errorMessage(remove.error)}</ErrorText>
       {debts.isPending && <Muted>Завантаження…</Muted>}
 
       {overview && overview.debts.length === 0 && (
@@ -40,20 +57,48 @@ export function DebtsPage() {
           <DebtsSummary overview={overview} />
           <ul className="space-y-2">
             {overview.debts.map((debt) => (
-              <DebtRow key={debt.id} debt={debt} today={overview.today} />
+              <DebtRow
+                key={debt.id}
+                debt={debt}
+                today={overview.today}
+                onEdit={() => setDialog({ open: true, original: debt })}
+                onDelete={() => setDeletion({ open: true, debt })}
+              />
             ))}
           </ul>
         </>
       )}
 
       {overview && (
-        <DebtDialog open={dialogOpen} onOpenChange={setDialogOpen} today={overview.today} />
+        <DebtDialog
+          open={dialog.open}
+          onOpenChange={(open) => setDialog({ ...dialog, open })}
+          today={overview.today}
+          original={dialog.original}
+        />
       )}
+      <ConfirmDialog
+        open={deletion.open}
+        onOpenChange={(open) => setDeletion({ ...deletion, open })}
+        title={`Видалити борг «${deletion.debt?.name ?? ''}»?`}
+        description={deletion.debt && deleteDebtDescription(deletion.debt)}
+        onConfirm={() => deletion.debt && remove.mutate(deletion.debt.id)}
+      />
     </div>
   );
 }
 
-function DebtRow({ debt, today }: { debt: Debt; today: string }) {
+function DebtRow({
+  debt,
+  today,
+  onEdit,
+  onDelete,
+}: {
+  debt: Debt;
+  today: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const Icon = DEBT_TYPE_ICONS[debt.type];
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency: debt.currency });
   const closed = debt.status === 'closed';
@@ -80,11 +125,30 @@ function DebtRow({ debt, today }: { debt: Debt; today: string }) {
             {closed && ' · закрито'}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-base font-semibold tabular-nums">{money(debt.balance)}</div>
-          <div className="text-muted-foreground">
-            Платіж {money(debt.monthlyPayment)} до {formatDayMonth(debt.month.dueDate)}
+        <div className="flex items-start gap-2">
+          <div className="text-right">
+            <div className="text-base font-semibold tabular-nums">{money(debt.balance)}</div>
+            <div className="text-muted-foreground">
+              Платіж {money(debt.monthlyPayment)} до {formatDayMonth(debt.month.dueDate)}
+            </div>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label={`Дії з боргом «${debt.name}»`}>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onEdit}>
+                <Pencil />
+                Змінити умови
+              </DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                <Trash2 />
+                Видалити
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
