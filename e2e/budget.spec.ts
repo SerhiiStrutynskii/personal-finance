@@ -88,4 +88,17 @@ test('видаток понад ліміт робить рядок катего�
   await expect(page.getByTestId('budget-empty')).toContainText('не було');
   await expect(addExpense).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Створити' })).toHaveCount(0);
+
+  // Сторінка витрат показує поточний місяць; у майбутнє гортати не можна.
+  await page.getByRole('link', { name: 'Витрати' }).click();
+  await expect(page.getByRole('row').filter({ hasText: 'Продукти' })).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Наступний місяць' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Додати', exact: true })).toBeVisible();
+
+  // У попередньому місяці видатків немає, і додати їх туди не можна.
+  await page.getByRole('button', { name: 'Попередній місяць' }).click();
+  await expect(page.getByText('За цей місяць витрат немає')).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Продукти' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Додати', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Наступний місяць' })).toBeEnabled();
 });

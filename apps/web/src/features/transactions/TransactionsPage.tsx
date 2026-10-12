@@ -1,8 +1,14 @@
-import { getAllowedExpenseDateRange, type Transaction } from '@hf/shared';
+import {
+  budgetPeriod,
+  getAllowedExpenseDateRange,
+  localMonthKey,
+  type Transaction,
+} from '@hf/shared';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
+import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
 import { useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
@@ -17,13 +23,23 @@ const PAGE_SIZE = 50;
 export function TransactionsPage({ type }: { type: EntryType }) {
   const config = ENTRY_CONFIG[type];
   const { user } = useCurrentUser();
+  // Список показує один місяць: спершу поточний, назад можна гортати, у майбутнє — ні.
+  const currentMonth = localMonthKey(new Date(), user.timeZone);
+  const [month, setMonth] = useState(currentMonth);
   const [offset, setOffset] = useState(0);
   // Запис зберігається й після закриття, щоб заголовок вікна не змінювався під час анімації.
   const [dialog, setDialog] = useState<{ open: boolean; original?: Transaction }>({ open: false });
 
   const accounts = useAccounts();
   const categories = useCategories();
-  const transactions = useTransactions({ type, limit: PAGE_SIZE, offset });
+  const period = budgetPeriod(month, user.timeZone);
+  const transactions = useTransactions({
+    type,
+    from: period.start.toISOString(),
+    to: period.end.toISOString(),
+    limit: PAGE_SIZE,
+    offset,
+  });
 
   const error = transactions.error ?? accounts.error ?? categories.error;
   const page = transactions.data;
@@ -37,7 +53,21 @@ export function TransactionsPage({ type }: { type: EntryType }) {
     <div>
       <PageHeader
         title={config.title}
-        action={hasAccounts && <Button onClick={() => setDialog({ open: true })}>Додати</Button>}
+        action={
+          <div className="flex items-center gap-3">
+            <MonthSwitcher
+              month={month}
+              max={currentMonth}
+              onChange={(next) => {
+                setMonth(next);
+                setOffset(0);
+              }}
+            />
+            {hasAccounts && month === currentMonth && (
+              <Button onClick={() => setDialog({ open: true })}>Додати</Button>
+            )}
+          </div>
+        }
       />
       <ErrorText>{error && errorMessage(error)}</ErrorText>
 
@@ -55,8 +85,9 @@ export function TransactionsPage({ type }: { type: EntryType }) {
       {page && page.total === 0 && hasAccounts && <Muted>{config.empty}</Muted>}
       {type === 'expense' && (
         <Muted>
-          Видаток можна додати лише в поточному місяці й не на майбутню дату. Видатки минулих
-          місяців доступні тільки для перегляду.
+          {month === currentMonth
+            ? 'Видаток можна додати лише в поточному місяці й не на майбутню дату.'
+            : 'Видатки минулих місяців доступні тільки для перегляду.'}
         </Muted>
       )}
 

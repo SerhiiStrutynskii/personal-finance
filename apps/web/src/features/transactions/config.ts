@@ -19,7 +19,7 @@ export const ENTRY_CONFIG: Record<
     addDescription: 'Сума спишеться з обраного рахунку.',
     editTitle: 'Редагування витрати',
     editDescription: 'Зміни замінять поточний запис про витрату.',
-    empty: 'Витрат ще немає',
+    empty: 'За цей місяць витрат немає',
   },
   income: {
     path: '/incomes',
@@ -28,6 +28,6 @@ export const ENTRY_CONFIG: Record<
     addDescription: 'Сума зарахується на обраний рахунок.',
     editTitle: 'Редагування доходу',
     editDescription: 'Зміни замінять поточний запис про дохід.',
-    empty: 'Доходів ще немає',
+    empty: 'За цей місяць доходів немає',
   },
 };
