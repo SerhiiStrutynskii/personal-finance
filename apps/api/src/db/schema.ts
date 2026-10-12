@@ -15,6 +15,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -424,4 +425,77 @@ export const debtEntries = pgTable(
         AND ${t.principalPart} + ${t.interestPart} = ${t.amount})`,
     ),
   ],
+);
+
+export const GOAL_KINDS = ['savings', 'debt_payoff'] as const;
+export const GOAL_STATUSES = ['active', 'archived'] as const;
+export const PAYOFF_STRATEGIES = ['avalanche', 'snowball'] as const;
+
+export const goals = pgTable(
+  'goals',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    kind: text({ enum: GOAL_KINDS }).notNull(),
+    name: text().notNull(),
+    description: text(),
+    currency: char({ length: 3 }).notNull().default('UAH'),
+    // Необов'язкова для накопичення, обов'язкова для виходу з боргів.
+    targetDate: calendarDate('target_date'),
+    status: text({ enum: GOAL_STATUSES }).notNull().default('active'),
+    // Накопичення: рахунок, баланс якого є прогресом цілі.
+    accountId: uuid('account_id').references(() => accounts.id),
+    targetAmount: bigint('target_amount', { mode: 'number' }),
+    monthlyContribution: bigint('monthly_contribution', { mode: 'number' }),
+    // Вихід із боргів: сумарний залишок боргів цілі на момент створення.
+    startBalance: bigint('start_balance', { mode: 'number' }),
+    // Скільки понад мінімальні платежі користувач готовий платити щомісяця.
+    extraPayment: bigint('extra_payment', { mode: 'number' }),
+    strategy: text({ enum: PAYOFF_STRATEGIES }),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.householdId),
+    // Один рахунок — одна активна ціль накопичення.
+    uniqueIndex('goals_active_account_unique')
+      .on(t.accountId)
+      .where(sql`${t.status} = 'active'`),
+    check('goals_kind_valid', sql`${t.kind} IN ('savings', 'debt_payoff')`),
+    check('goals_status_valid', sql`${t.status} IN ('active', 'archived')`),
+    check('goals_strategy_valid', sql`${t.strategy} IN ('avalanche', 'snowball')`),
+    check('goals_target_amount_positive', sql`${t.targetAmount} > 0`),
+    check('goals_monthly_contribution_positive', sql`${t.monthlyContribution} > 0`),
+    check('goals_start_balance_non_negative', sql`${t.startBalance} >= 0`),
+    check('goals_extra_payment_non_negative', sql`${t.extraPayment} >= 0`),
+    check(
+      'goals_savings_shape',
+      sql`(${t.kind} = 'savings') = (${t.accountId} IS NOT NULL AND ${t.targetAmount} IS NOT NULL)`,
+    ),
+    check(
+      'goals_savings_only_fields',
+      sql`${t.kind} <> 'savings' OR (${t.startBalance} IS NULL AND ${t.extraPayment} IS NULL AND ${t.strategy} IS NULL)`,
+    ),
+    check(
+      'goals_debt_payoff_shape',
+      sql`${t.kind} <> 'debt_payoff' OR (${t.targetDate} IS NOT NULL AND ${t.startBalance} IS NOT NULL
+        AND ${t.extraPayment} IS NOT NULL AND ${t.strategy} IS NOT NULL AND ${t.monthlyContribution} IS NULL)`,
+    ),
+  ],
+);
+
+// Борги, які охоплює ціль виходу з боргів; видалений борг зникає з цілі.
+export const goalDebts = pgTable(
+  'goal_debts',
+  {
+    goalId: uuid('goal_id')
+      .notNull()
+      .references(() => goals.id, { onDelete: 'cascade' }),
+    debtId: uuid('debt_id')
+      .notNull()
+      .references(() => debts.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.goalId, t.debtId] }), index().on(t.debtId)],
 );

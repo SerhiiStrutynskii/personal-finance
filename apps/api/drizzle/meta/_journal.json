@@ -64,6 +64,13 @@
       "when": 1791796767645,
       "tag": "0008_debts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791821709338,
+      "tag": "0009_goals",
+      "breakpoints": true
     }
   ]
 }
