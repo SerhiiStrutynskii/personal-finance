@@ -1,7 +1,18 @@
 import { Router } from 'express';
 import type { Db } from '../../db/client.ts';
 import { getAuth } from '../../http/auth.ts';
-import { createDebtSchema, debtsQuerySchema, idParamsSchema, updateDebtSchema } from './schema.ts';
+import * as movements from './movements.service.ts';
+import {
+  createDebtSchema,
+  debtAdjustmentSchema,
+  debtChargeSchema,
+  debtEntryParamsSchema,
+  debtPaymentSchema,
+  debtsQuerySchema,
+  idParamsSchema,
+  paymentPreviewQuerySchema,
+  updateDebtSchema,
+} from './schema.ts';
 import * as service from './service.ts';
 
 export function debtsRouter(db: Db, now: () => Date): Router {
@@ -38,6 +49,40 @@ export function debtsRouter(db: Db, now: () => Date): Router {
     const { id } = idParamsSchema.parse(req.params);
     await service.deleteDebt(db, getAuth(res), id);
     res.status(204).end();
+  });
+
+  // --- Рухи позик і розстрочок ---
+
+  router.post('/:id/payments', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = debtPaymentSchema.parse(req.body);
+    res.status(201).json(await movements.addPayment(db, getAuth(res), id, input, now()));
+  });
+
+  router.post('/:id/charges', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = debtChargeSchema.parse(req.body);
+    res.status(201).json(await movements.addCharge(db, getAuth(res), id, input, now()));
+  });
+
+  router.delete('/:id/entries/:entryId', async (req, res) => {
+    const { id, entryId } = debtEntryParamsSchema.parse(req.params);
+    await movements.deleteEntry(db, getAuth(res), id, entryId, now());
+    res.status(204).end();
+  });
+
+  router.get('/:id/payment-preview', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const { amount } = paymentPreviewQuerySchema.parse(req.query);
+    res.json(await movements.previewPayment(db, getAuth(res), id, amount, now()));
+  });
+
+  // --- Обидва типи ---
+
+  router.post('/:id/adjustments', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = debtAdjustmentSchema.parse(req.body);
+    res.status(201).json(await movements.addAdjustment(db, getAuth(res), id, input, now()));
   });
 
   return router;
