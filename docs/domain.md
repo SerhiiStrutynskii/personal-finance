@@ -1,23 +1,24 @@
 # Доменна модель
 
-Описано лише те, що вже реалізовано. Goal з'явиться окремим зрізом.
+Описано лише те, що вже реалізовано.
 
 ## Сутності
 
-| Сутність          | Призначення                                                | Ключові поля                                                                                                                                                                                                                          |
-| ----------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| User              | Людина, що користується застосунком                        | `email` (унікальний), `name`, `timeZone` (за замовчуванням `Europe/Kyiv`)                                                                                                                                                             |
-| Household         | Домогосподарство; усі фінансові дані належать йому         | `name`, `timeZone` (за замовчуванням `Europe/Kyiv`; у ньому рахуються межі місяця бюджету)                                                                                                                                            |
-| HouseholdMember   | Членство користувача в домогосподарстві                    | `role`: `owner` \| `member`                                                                                                                                                                                                           |
-| Account           | Рахунок                                                    | `name`, `type`: `card` \| `cash` \| `deposit` \| `credit_card`, `currency`, `creditLimit` (лише кредитна картка), `isArchived`; баланс рахується з транзакцій                                                                         |
-| Category          | Категорія доходів або витрат                               | `name`, `kind`: `income` \| `expense`, `systemKey` (системні категорії); назва унікальна в межах домогосподарства й типу                                                                                                              |
-| Transaction       | Рух грошей                                                 | `type`: `income` \| `expense` \| `transfer` \| `debt_payment` \| `balance_adjustment`, `accountId`, `toAccountId`, `categoryId`, `occurrenceId`, `debtId`, `amountMinor`, `currency`, `description`, `occurredAt`                     |
-| Budget            | План лімітів витрат домогосподарства на календарний місяць | `periodStart`, `periodEnd`, `currency`; один на місяць                                                                                                                                                                                |
-| IncomeSource      | Джерело періодичного доходу з правилом повторення          | `name`, `accountId`, `currency`, `plannedAmount`, `frequency`, `dayOfMonth`, `dayOfWeek`, `intervalMonths`, `startDate`, `endDate`, `isActive`                                                                                        |
-| IncomeOccurrence  | Одне очікуване надходження періодичного доходу             | `sourceId`, `plannedDate`, `plannedAmount`, `status`: `expected` \| `skipped`                                                                                                                                                         |
-| BudgetExpenseLine | Запланований ліміт на категорію витрат                     | `categoryId`, `plannedAmount`, `sortOrder`; одна на категорію в бюджеті                                                                                                                                                               |
-| Debt              | Борг: кредитна картка, розстрочка, позика МФО чи банку     | `name`, `type`, `accountId` (рахунок-картка), `initialAmount`, `startDate`, `maturityDate`, `interestRate`, `ratePeriod`, `monthlyPayment`, `paymentDay`, `earlyRepaymentAllowed`, `defaultAccountId`, `status`: `active` \| `closed` |
-| DebtEntry         | Рух позики чи розстрочки                                   | `kind`: `payment` \| `charge` \| `adjustment`, `amount`, `principalPart`, `interestPart`, `transactionId`, `occurredAt`, `note`                                                                                                       |
+| Сутність          | Призначення                                                | Ключові поля                                                                                                                                                                                                                           |
+| ----------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User              | Людина, що користується застосунком                        | `email` (унікальний), `name`, `timeZone` (за замовчуванням `Europe/Kyiv`)                                                                                                                                                              |
+| Household         | Домогосподарство; усі фінансові дані належать йому         | `name`, `timeZone` (за замовчуванням `Europe/Kyiv`; у ньому рахуються межі місяця бюджету)                                                                                                                                             |
+| HouseholdMember   | Членство користувача в домогосподарстві                    | `role`: `owner` \| `member`                                                                                                                                                                                                            |
+| Account           | Рахунок                                                    | `name`, `type`: `card` \| `cash` \| `deposit` \| `credit_card`, `currency`, `creditLimit` (лише кредитна картка), `isArchived`; баланс рахується з транзакцій                                                                          |
+| Category          | Категорія доходів або витрат                               | `name`, `kind`: `income` \| `expense`, `systemKey` (системні категорії); назва унікальна в межах домогосподарства й типу                                                                                                               |
+| Transaction       | Рух грошей                                                 | `type`: `income` \| `expense` \| `transfer` \| `debt_payment` \| `balance_adjustment`, `accountId`, `toAccountId`, `categoryId`, `occurrenceId`, `debtId`, `amountMinor`, `currency`, `description`, `occurredAt`                      |
+| Budget            | План лімітів витрат домогосподарства на календарний місяць | `periodStart`, `periodEnd`, `currency`; один на місяць                                                                                                                                                                                 |
+| IncomeSource      | Джерело періодичного доходу з правилом повторення          | `name`, `accountId`, `currency`, `plannedAmount`, `frequency`, `dayOfMonth`, `dayOfWeek`, `intervalMonths`, `startDate`, `endDate`, `isActive`                                                                                         |
+| IncomeOccurrence  | Одне очікуване надходження періодичного доходу             | `sourceId`, `plannedDate`, `plannedAmount`, `status`: `expected` \| `skipped`                                                                                                                                                          |
+| BudgetExpenseLine | Запланований ліміт на категорію витрат                     | `categoryId`, `plannedAmount`, `sortOrder`; одна на категорію в бюджеті                                                                                                                                                                |
+| Debt              | Борг: кредитна картка, розстрочка, позика МФО чи банку     | `name`, `type`, `accountId` (рахунок-картка), `initialAmount`, `startDate`, `maturityDate`, `interestRate`, `ratePeriod`, `monthlyPayment`, `paymentDay`, `earlyRepaymentAllowed`, `defaultAccountId`, `status`: `active` \| `closed`  |
+| DebtEntry         | Рух позики чи розстрочки                                   | `kind`: `payment` \| `charge` \| `adjustment`, `amount`, `principalPart`, `interestPart`, `transactionId`, `occurredAt`, `note`                                                                                                        |
+| Goal              | Ціль накопичення або виходу з боргів                       | `kind`: `savings` \| `debt_payoff`, `name`, `targetDate`, `status`: `active` \| `archived`; накопичення — `accountId`, `targetAmount`, `monthlyContribution`; вихід із боргів — борги цілі, `startBalance`, `extraPayment`, `strategy` |
 
 ## Гроші
 
@@ -152,6 +153,27 @@
 - Жодних подвійних витрат у бюджеті: покупка з кредитки — витрата своєї категорії, погашення
   кредитки — ні; платіж по позиці — витрата «Погашення боргів»; нарахування по позиці й звірки —
   ні.
+
+## Цілі
+
+- Два види: накопичення на рахунку й вихід із боргів. Лише `UAH`. Досягнення цілі не зберігається,
+  а обчислюється; архівна ціль лишається в списку окремо.
+- Накопичення рахується за балансом прив'язаного рахунку, тому поповнення — звичайний переказ на
+  нього, а будь-який рух по рахунку змінює прогрес. Один рахунок — одна активна ціль; кредитна картка
+  для цілі не підходить.
+- Потрібний внесок — залишок, поділений на кількість місяців до місяця цілі (не менше одного), з
+  округленням угору. Темп — плановий внесок, а без нього середній приріст балансу за три попередні
+  повні місяці. Ціль «встигає», якщо темп не менший за потрібний внесок.
+- Вихід із боргів охоплює вибрані під час створення борги й запам'ятовує їхній сумарний залишок;
+  прогрес — погашене від цього залишку. Нові покупки з кредитки рухають прогрес назад.
+- План погашення — помісячна симуляція: відсотки, мінімальні платежі, потім додаткові гроші за
+  порядком стратегії. «Лавина» спрямовує їх на борг із найвищою ставкою, «сніжна куля» — на
+  найменший. Мінімальний платіж погашеного боргу переходить на наступний. Борг без дострокового
+  погашення додаткових грошей не отримує. Для кредитки вважається, що нових покупок не буде.
+- План порівнюється з базовим сценарієм — лише мінімальні платежі без перенесення звільнених.
+- Потрібний платіж до дати — мінімальні платежі плюс найменший додатковий платіж, з яким план
+  закінчується не пізніше місяця цілі.
+- Стратегію обирає користувач; застосунок показує наслідки, а не радить.
 
 ## Аналітика
 

@@ -42,20 +42,21 @@
 }
 ```
 
-| Статус | `code`                        | Коли                                                                        |
-| ------ | ----------------------------- | --------------------------------------------------------------------------- |
-| 400    | `VALIDATION_ERROR`            | Дані не пройшли zod-схему (є `issues`)                                      |
-| 400    | `BAD_REQUEST`                 | Порушено правило домену або зіпсований JSON                                 |
-| 401    | `UNAUTHORIZED`                | Користувача не визначено                                                    |
-| 404    | `NOT_FOUND`                   | Запису немає в домогосподарстві користувача                                 |
-| 409    | `CONFLICT`                    | Дублікат або запис використовується                                         |
-| 422    | `EXPENSE_DATE_IN_FUTURE`      | Видаток або рух по боргу на майбутню дату                                   |
-| 422    | `CURRENCY_MISMATCH`           | Рахунок не у валюті боргу                                                   |
-| 422    | `DEBT_TYPE_MISMATCH`          | Рух не того типу боргу: платіж по кредитці чи переказ на позику             |
-| 422    | `SAME_ACCOUNT`                | Погашення кредитки з неї самої                                              |
-| 422    | `EARLY_REPAYMENT_NOT_ALLOWED` | Достроковий платіж без підтвердження, коли умови боргу його не передбачають |
-| 422    | `BUDGET_PERIOD_CLOSED`        | Створення бюджету для місяця, що минув                                      |
-| 500    | `INTERNAL_ERROR`              | Непередбачена помилка                                                       |
+| Статус | `code`                        | Коли                                                                                          |
+| ------ | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR`            | Дані не пройшли zod-схему (є `issues`)                                                        |
+| 400    | `BAD_REQUEST`                 | Порушено правило домену або зіпсований JSON                                                   |
+| 401    | `UNAUTHORIZED`                | Користувача не визначено                                                                      |
+| 404    | `NOT_FOUND`                   | Запису немає в домогосподарстві користувача                                                   |
+| 409    | `CONFLICT`                    | Дублікат або запис використовується                                                           |
+| 422    | `EXPENSE_DATE_IN_FUTURE`      | Видаток, рух по боргу або поповнення цілі на майбутню дату                                    |
+| 422    | `CURRENCY_MISMATCH`           | Рахунок не у валюті боргу чи цілі                                                             |
+| 422    | `DEBT_TYPE_MISMATCH`          | Рух не того типу боргу: платіж по кредитці чи переказ на позику                               |
+| 422    | `SAME_ACCOUNT`                | Погашення кредитки чи поповнення цілі з того самого рахунку                                   |
+| 422    | `EARLY_REPAYMENT_NOT_ALLOWED` | Достроковий платіж без підтвердження, коли умови боргу його не передбачають                   |
+| 422    | `GOAL_KIND_MISMATCH`          | Дія не для цього виду цілі: поповнення цілі виходу з боргів чи план погашення для накопичення |
+| 422    | `BUDGET_PERIOD_CLOSED`        | Створення бюджету для місяця, що минув                                                        |
+| 500    | `INTERNAL_ERROR`              | Непередбачена помилка                                                                         |
 
 ## Службове
 
@@ -473,6 +474,135 @@ monthlyPayment, paymentDay, earlyRepaymentAllowed?, defaultAccountId?, creditLim
 
 `PaymentPreview`: `{ amount, principalPart, interestPart, isEarly, requiresConfirmation, balanceAfter,
 projection, interestSaved }` — розбивка платежу на сьогодні й прогноз після нього.
+
+## Цілі
+
+Ціль накопичення (`savings`) рахується за балансом прив'язаного рахунку, ціль виходу з боргів
+(`debt_payoff`) — за залишками вибраних боргів. Цілі нічого не дублюють: гроші й борги беруться з
+рахунків і боргів. Усі суми — цілі числа в мінімальних одиницях валюти, лише `UAH`; частки —
+відношення (0,2 = 20%). Правила — у `docs/domain.md`.
+
+Ціль накопичення:
+
+```json
+{
+  "id": "…",
+  "kind": "savings",
+  "name": "Подушка",
+  "description": null,
+  "status": "active",
+  "currency": "UAH",
+  "targetDate": "2027-06-30",
+  "accountId": "…",
+  "accountName": "Депозит",
+  "targetAmount": 10000000,
+  "monthlyContribution": 500000,
+  "saved": 2000000,
+  "remaining": 8000000,
+  "progress": 0.2,
+  "requiredMonthly": 1000000,
+  "pace": 500000,
+  "projectedMonth": "2028-02",
+  "state": "behind"
+}
+```
+
+- `saved` — баланс рахунку цілі (від'ємний рахується як 0); баланс на момент створення цілі зараховано.
+- `requiredMonthly` — скільки відкладати щомісяця, щоб встигнути до `targetDate`; `null` без дати,
+  після дати або коли ціль досягнуто.
+- `pace` — `monthlyContribution`, а без нього — середній приріст балансу за три попередні повні місяці;
+  `null`, якщо приросту не було. `projectedMonth` — місяць досягнення цілі за цього темпу.
+- `state` — `achieved` \| `no_deadline` \| `overdue` \| `on_track` \| `behind`.
+
+Ціль виходу з боргів:
+
+```json
+{
+  "id": "…",
+  "kind": "debt_payoff",
+  "name": "Без боргів",
+  "description": null,
+  "status": "active",
+  "currency": "UAH",
+  "targetDate": "2028-03-31",
+  "debts": [{ "id": "…", "name": "Кредитка", "balance": 2340000 }],
+  "startBalance": 3000000,
+  "currentBalance": 2340000,
+  "paid": 660000,
+  "progress": 0.22,
+  "extraPayment": 200000,
+  "strategy": "avalanche",
+  "minimumPayments": 120000,
+  "requiredMonthly": 150000,
+  "debtFreeMonth": "2027-11",
+  "state": "on_track"
+}
+```
+
+- `startBalance` — сумарний залишок боргів цілі на момент створення; `paid` і `progress` рахуються від
+  нього. Нові покупки з кредитки зменшують прогрес.
+- `strategy` — `avalanche` (спершу найвища ставка) \| `snowball` (спершу найменший борг);
+  `extraPayment` — сума понад мінімальні платежі на місяць.
+- `requiredMonthly` — мінімальні платежі плюс найменший додатковий платіж, щоб погасити все до
+  `targetDate`; `null`, якщо цього не досягти жодним платежем, якщо дата минула або боргів не лишилося.
+- `debtFreeMonth` — місяць виходу з боргів за `extraPayment` і `strategy` цілі.
+- `state` — `achieved` \| `overdue` \| `on_track` \| `behind`.
+
+| Метод  | Шлях                                            | Тіло                              | Відповідь                                               |
+| ------ | ----------------------------------------------- | --------------------------------- | ------------------------------------------------------- |
+| GET    | `/api/goals`                                    | —                                 | `200 { today, goals: Goal[] }`, активні перед архівними |
+| POST   | `/api/goals`                                    | див. нижче                        | `201 Goal`                                              |
+| GET    | `/api/goals/:id`                                | —                                 | `200 Goal`                                              |
+| PATCH  | `/api/goals/:id`                                | поля свого виду цілі              | `200 Goal`                                              |
+| DELETE | `/api/goals/:id`                                | —                                 | `204`; рахунки, перекази й борги не змінюються          |
+| POST   | `/api/goals/:id/archive`                        | —                                 | `200 Goal` зі `status = archived`                       |
+| POST   | `/api/goals/:id/contributions`                  | `{ fromAccountId, amount, date }` | `201 Goal`                                              |
+| GET    | `/api/goals/:id/payoff-plan?extra=…&strategy=…` | —                                 | `200 PayoffPlan`                                        |
+
+Тіло `POST /api/goals`:
+
+- накопичення: `{ kind: "savings", name, description?, accountId, targetAmount, targetDate?, monthlyContribution? }`;
+- вихід із боргів: `{ kind: "debt_payoff", name, description?, debtIds, targetDate, extraPayment?, strategy? }`
+  (`extraPayment` за замовчуванням 0, `strategy` — `avalanche`).
+
+Правила:
+
+- Рахунок цілі накопичення: чужий або невідомий — `404`; не в `UAH` — `422 CURRENCY_MISMATCH`;
+  кредитна картка або архівний — `400`; уже має активну ціль — `409`. Рахунок із ціллю не видаляється
+  (`409`).
+- Борги цілі задаються під час створення й далі не змінюються; чужий або невідомий борг — `404`.
+  Видалений борг зникає з цілі.
+- `PATCH` не змінює вид цілі; поле іншого виду — `400`. Для накопичення можна змінити рахунок.
+- Поповнення — переказ на рахунок цілі, лише для активної цілі накопичення: архівна — `409`, ціль
+  виходу з боргів — `422 GOAL_KIND_MISMATCH`, рахунок цілі як джерело — `422 SAME_ACCOUNT`, майбутня
+  дата — `422 EXPENSE_DATE_IN_FUTURE`.
+
+`PayoffPlan` (лише для цілі виходу з боргів, інакше `422 GOAL_KIND_MISMATCH`):
+
+```json
+{
+  "extra": 200000,
+  "strategy": "avalanche",
+  "plan": {
+    "months": 14,
+    "debtFreeMonth": "2027-11",
+    "totalInterest": 310000,
+    "payoffOrder": [{ "debtId": "…", "name": "Кредитка", "month": "2027-11" }],
+    "timeline": [{ "month": "2026-10", "balance": 2190000 }]
+  },
+  "baseline": { "months": 31, "debtFreeMonth": "2029-04", "totalInterest": 1410000 },
+  "interestSaved": 1100000,
+  "monthsSaved": 17,
+  "withoutExtra": [{ "debtId": "…", "name": "Розстрочка" }]
+}
+```
+
+- Без параметрів план рахується за `extraPayment` і `strategy` цілі; параметри запиту їх перекривають і
+  нічого не зберігають.
+- `baseline` — лише мінімальні платежі. `months`, `debtFreeMonth` і `totalInterest` дорівнюють `null`,
+  якщо борги не погашаються; тоді `interestSaved` і `monthsSaved` теж `null`.
+- `withoutExtra` — борги, що не отримують додаткових грошей, бо умови не передбачають дострокового
+  погашення.
 
 ## Аналітика
 
