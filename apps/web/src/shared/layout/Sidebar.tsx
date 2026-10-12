@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   Tags,
+  Target,
   TrendingUp,
   Wallet,
   X,
@@ -25,6 +26,7 @@ const navItems: ISidebarItem[] = [
   { title: 'Категорії', icon: Tags, route: '/categories', hasDropdown: false },
   { title: 'Бюджет', icon: Calculator, route: '/budget', hasDropdown: false },
   { title: 'Борги', icon: Wallet, route: '/debts', hasDropdown: false },
+  { title: 'Цілі', icon: Target, route: '/goals', hasDropdown: false },
   { title: 'Аналітика', icon: ChartArea, route: '/analytics', hasDropdown: false },
 ];
 

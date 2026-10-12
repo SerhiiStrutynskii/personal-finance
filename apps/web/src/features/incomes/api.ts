@@ -42,6 +42,7 @@ function useIncomeMutation<TInput, TResult>(request: (input: TInput) => Promise<
           ['accounts'],
           ['debts'],
           ['analytics'],
+          ['goals'],
           TRANSACTIONS_KEY,
         ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
       ),

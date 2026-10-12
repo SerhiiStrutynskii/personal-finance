@@ -10,6 +10,8 @@ import { IncomesPage } from '../features/incomes/IncomesPage.tsx';
 import { SourcesPage } from '../features/incomes/SourcesPage.tsx';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage.tsx';
 import { DebtPage } from '../features/debts/DebtPage.tsx';
+import { GoalsPage } from '../features/goals/GoalsPage.tsx';
+import { PayoffPlanPage } from '../features/goals/PayoffPlanPage.tsx';
 import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
 import { ApiError } from '../shared/api/index.ts';
@@ -47,6 +49,8 @@ export function App() {
                 <Route path="budget" element={<BudgetPage />} />
                 <Route path="debts" element={<DebtsPage />} />
                 <Route path="debts/:id" element={<DebtPage />} />
+                <Route path="goals" element={<GoalsPage />} />
+                <Route path="goals/:id" element={<PayoffPlanPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

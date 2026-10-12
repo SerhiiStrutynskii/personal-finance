@@ -55,9 +55,15 @@ function useDebtMutation<TInput, TResult>(request: (input: TInput) => Promise<TR
     mutationFn: request,
     onSuccess: () =>
       Promise.all(
-        [DEBTS_KEY, ['accounts'], ['budget'], ['categories'], ['analytics'], TRANSACTIONS_KEY].map(
-          (queryKey) => queryClient.invalidateQueries({ queryKey }),
-        ),
+        [
+          DEBTS_KEY,
+          ['accounts'],
+          ['budget'],
+          ['categories'],
+          ['analytics'],
+          ['goals'],
+          TRANSACTIONS_KEY,
+        ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
       ),
   });
 }
