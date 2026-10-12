@@ -36,6 +36,7 @@ docs/domain.md та скіл `debts` (залишки, ставки й плате
 
 Лише для `debt_payoff`:
 - борги цілі — таблиця `goal_debts` (`goalId`, `debtId`); щонайменше один борг.
+  Після створення цілі набір боргів не змінюється: від нього залежить `startBalance`.
 - `startBalance` (копійки) — сумарний залишок боргів цілі на момент створення.
 - `extraPayment` (копійки, >= 0) — скільки понад мінімальні платежі користувач готовий платити щомісяця.
 - `strategy`: `avalanche | snowball`.
@@ -123,7 +124,7 @@ POST   /goals                         savings:     { kind, name, description?, a
                                       debt_payoff: { kind, name, description?, debtIds, targetDate,
                                                      extraPayment?, strategy? }
 GET    /goals/:id
-PATCH  /goals/:id                     (вид цілі не змінюється; для savings можна змінити рахунок)
+PATCH  /goals/:id                     (вид цілі й борги цілі не змінюються; для savings можна змінити рахунок)
 DELETE /goals/:id                     (рахунки, перекази й борги не чіпає)
 POST   /goals/:id/archive
 POST   /goals/:id/contributions       { fromAccountId, amount, date } → переказ на рахунок цілі (лише savings)

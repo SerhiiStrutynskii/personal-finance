@@ -64,7 +64,7 @@ export async function deleteAccount(db: Db, auth: AuthContext, id: string): Prom
   } catch (error) {
     if (isForeignKeyViolation(error)) {
       throw conflict(
-        'Рахунок використовується в транзакціях, джерелах доходу або боргах, тому його не можна видалити',
+        'Рахунок використовується в транзакціях, джерелах доходу, боргах або цілях, тому його не можна видалити',
       );
     }
     throw error;

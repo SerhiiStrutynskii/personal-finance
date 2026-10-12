@@ -10,6 +10,7 @@ import { authRouter } from './modules/auth/routes.ts';
 import { createTokenService } from './modules/auth/tokens.ts';
 import { budgetsRouter } from './modules/budgets/routes.ts';
 import { debtsRouter } from './modules/debts/routes.ts';
+import { goalsRouter } from './modules/goals/routes.ts';
 import {
   incomeOccurrencesRouter,
   incomeSourcesRouter,
@@ -57,6 +58,7 @@ export function createApp({
   api.use('/budgets', budgetsRouter(db, now));
   api.use('/categories', categoriesRouter(db));
   api.use('/debts', debtsRouter(db, now));
+  api.use('/goals', goalsRouter(db, now));
   api.use('/income-occurrences', incomeOccurrencesRouter(db, now));
   api.use('/income-sources', incomeSourcesRouter(db, now));
   api.use('/incomes', incomesRouter(db, now));
