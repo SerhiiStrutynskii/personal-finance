@@ -7,6 +7,7 @@ import {
   nextDueDate,
   projectPayoff,
   requiredPaymentForMaturity,
+  shiftMonth,
   toMonthlyRate,
   updateDebtSchema,
   type Debt,
@@ -20,6 +21,25 @@ import type { DebtType, RatePeriod } from './labels.ts';
 /** Значення «створити новий рахунок-картку» у виборі рахунку кредитки. */
 export const NEW_CARD_ACCOUNT = '';
 
+/** Значення «перший платіж — найближчий за графіком» у виборі місяця першого платежу. */
+export const FIRST_PAYMENT_BY_SCHEDULE = '';
+
+/** Скільки місяців наперед можна вибрати для першого платежу. */
+const FIRST_PAYMENT_MONTHS_AHEAD = 12;
+
+/**
+ * Місяці для вибору першого платежу: від поточного на рік уперед. Уже збережений місяць
+ * лишається у списку, навіть якщо він минув.
+ */
+export function firstPaymentMonths(today: string, selected: string): string[] {
+  const current = today.slice(0, 7);
+  const months = Array.from({ length: FIRST_PAYMENT_MONTHS_AHEAD + 1 }, (_, index) =>
+    shiftMonth(current, index),
+  );
+  if (selected !== FIRST_PAYMENT_BY_SCHEDULE && !months.includes(selected)) months.push(selected);
+  return months.sort();
+}
+
 export interface DebtFormValues {
   name: string;
   description: string;
@@ -31,6 +51,8 @@ export interface DebtFormValues {
   ratePeriod: RatePeriod;
   monthlyPayment: string;
   paymentDay: string;
+  /** Місяць першого платежу (YYYY-MM) або FIRST_PAYMENT_BY_SCHEDULE. */
+  firstPaymentMonth: string;
   earlyRepaymentAllowed: boolean;
   defaultAccountId: string;
   creditLimit: string;
@@ -64,6 +86,7 @@ export function initialDebtValues(today: string, original?: Debt): DebtFormValue
       ratePeriod: original.ratePeriod,
       monthlyPayment: plannedAmountText(original.monthlyPayment, CURRENCY),
       paymentDay: String(original.paymentDay),
+      firstPaymentMonth: original.firstPaymentMonth ?? FIRST_PAYMENT_BY_SCHEDULE,
       earlyRepaymentAllowed: original.earlyRepaymentAllowed,
       defaultAccountId: original.defaultAccountId ?? '',
       creditLimit: original.card ? plannedAmountText(original.card.creditLimit, CURRENCY) : '',
@@ -79,6 +102,7 @@ export function initialDebtValues(today: string, original?: Debt): DebtFormValue
     maturityDate: '',
     monthlyPayment: '',
     paymentDay: today.slice(8, 10).replace(/^0/, ''),
+    firstPaymentMonth: FIRST_PAYMENT_BY_SCHEDULE,
     earlyRepaymentAllowed: true,
     defaultAccountId: '',
     creditLimit: '',
@@ -156,6 +180,9 @@ function validateShared(values: DebtFormValues, startDate: string, errors: DebtF
   } else if (values.maturityDate <= startDate) {
     errors.maturityDate = 'Строк має бути пізніше за дату початку';
   }
+  if (values.firstPaymentMonth && values.firstPaymentMonth < startDate.slice(0, 7)) {
+    errors.firstPaymentMonth = 'Перший платіж не може бути раніше за місяць початку';
+  }
 }
 
 type Result<T> = { ok: true; input: T } | { ok: false; errors: DebtFormErrors };
@@ -190,6 +217,7 @@ export function toCreateInput(values: DebtFormValues, today: string): Result<Cre
     ratePeriod: values.ratePeriod,
     monthlyPayment: conditions.monthlyPayment,
     paymentDay: conditions.paymentDay,
+    firstPaymentMonth: values.firstPaymentMonth || null,
     earlyRepaymentAllowed: isCard ? true : values.earlyRepaymentAllowed,
     defaultAccountId: values.defaultAccountId || null,
     creditLimit: conditions.creditLimit,
@@ -217,6 +245,7 @@ export function toUpdateInput(values: DebtFormValues, original: Debt): Result<Up
     ratePeriod: values.ratePeriod,
     monthlyPayment: conditions.monthlyPayment,
     paymentDay: conditions.paymentDay,
+    firstPaymentMonth: values.firstPaymentMonth || null,
     defaultAccountId: values.defaultAccountId || null,
     ...(isCard
       ? { creditLimit: conditions.creditLimit }
@@ -258,6 +287,7 @@ export function previewProjection(
     month,
     paymentDay: conditions.paymentDay,
     startDate,
+    firstPaymentMonth: values.firstPaymentMonth || null,
     monthlyPayment: conditions.monthlyPayment,
     balanceAtMonthStart: balance,
     chargesInMonth: 0,
@@ -267,7 +297,12 @@ export function previewProjection(
   const schedule = {
     balance,
     rate: toMonthlyRate(conditions.interestRate, values.ratePeriod),
-    firstDueDate: nextDueDate(month, conditions.paymentDay, payment),
+    firstDueDate: nextDueDate(
+      month,
+      conditions.paymentDay,
+      payment,
+      values.firstPaymentMonth || null,
+    ),
     paymentDay: conditions.paymentDay,
   };
   const projection = projectPayoff({ ...schedule, monthlyPayment: conditions.monthlyPayment });

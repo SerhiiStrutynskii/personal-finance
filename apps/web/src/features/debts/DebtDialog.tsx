@@ -12,12 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../shared/ui/dialog.tsx';
+import { monthLabel } from '../../shared/ui/format.ts';
 import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
 import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { useSaveDebt, type CreateDebtBody } from './api.ts';
 import {
+  FIRST_PAYMENT_BY_SCHEDULE,
   NEW_CARD_ACCOUNT,
+  firstPaymentMonths,
   initialDebtValues,
   previewProjection,
   toCreateInput,
@@ -223,6 +226,19 @@ function DebtForm({
             onChange={(e) => set({ paymentDay: e.target.value })}
           />
         </Field>
+        <Field label="Перший платіж" error={errors.firstPaymentMonth}>
+          <SelectField
+            value={values.firstPaymentMonth}
+            onChange={(firstPaymentMonth) => set({ firstPaymentMonth })}
+            options={[
+              { value: FIRST_PAYMENT_BY_SCHEDULE, label: 'Найближчий за графіком' },
+              ...firstPaymentMonths(today, values.firstPaymentMonth).map((month) => ({
+                value: month,
+                label: monthLabel(month),
+              })),
+            ]}
+          />
+        </Field>
         <Field label={isCard ? 'Діє до (необов’язково)' : 'Виданий до'} error={errors.maturityDate}>
           <Input
             type="date"
@@ -245,6 +261,10 @@ function DebtForm({
           />
         </Field>
       </div>
+      <Muted>
+        Якщо платіж цього місяця вже зроблено або ще не настав, виберіть місяць першого платежу: до
+        нього борг не потрапляє в платежі місяця.
+      </Muted>
 
       {!isCard && (
         <label className="flex items-center gap-2 text-sm">

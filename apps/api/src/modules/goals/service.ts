@@ -104,6 +104,7 @@ const toPayoffDebt = (debt: Debt): PayoffDebt => ({
   annualRatePercent: toAnnualRatePercent(debt.interestRate, debt.ratePeriod),
   monthlyPayment: debt.monthlyPayment,
   earlyRepaymentAllowed: debt.earlyRepaymentAllowed,
+  firstPaymentMonth: debt.firstPaymentMonth,
 });
 
 /** Борги цілі, що ще існують: видалений борг із цілі зникає. */

@@ -153,6 +153,29 @@ describe('simulatePayoff', () => {
     expect(plan.timeline).toHaveLength(10);
   });
 
+  it('борг не гаситься й не росте до місяця свого першого платежу', () => {
+    const plan = simulate([debt('later', { ...withRate(36), firstPaymentMonth: '2026-12' })]);
+    expect(plan.timeline.slice(0, 2)).toEqual([
+      { month: '2026-10', balance: 100_000 },
+      { month: '2026-11', balance: 100_000 },
+    ]);
+    // грудень: +3 000 відсотків −10 000 платежу
+    expect(plan.timeline[2]).toEqual({ month: '2026-12', balance: 93_000 });
+  });
+
+  it('додаткові гроші йдуть на інші борги, поки перший платіж не настав', () => {
+    const plan = simulate(
+      [
+        debt('later', { ...withRate(36), firstPaymentMonth: '2026-12' }),
+        debt('now', { balance: 30_000 }),
+      ],
+      5_000,
+    );
+    // «later» дорожчий, але до грудня доплата дістається «now»: 30 000 − 15 000 − 15 000
+    expect(plan.payoffOrder[0]).toEqual({ debtId: 'now', month: '2026-11' });
+    expect(plan.timeline[1]).toEqual({ month: '2026-11', balance: 100_000 });
+  });
+
   it('додатковий платіж скорочує строк', () => {
     expect(simulate([debt('a')], 15_000)).toMatchObject({ months: 4, debtFreeMonth: '2027-01' });
   });

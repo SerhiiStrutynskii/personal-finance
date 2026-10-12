@@ -194,6 +194,53 @@ describe('створення боргу', () => {
     expect(future.status).toBe(400);
   });
 
+  it('перший платіж наступного місяця: цього місяця платити нічого, борг рахується одразу', async () => {
+    const actor = await createActor();
+    const { body: usual } = await actor.post('/api/debts', loanInput());
+    const res = await actor.post(
+      '/api/debts',
+      loanInput({ name: 'Відкладена', firstPaymentMonth: '2026-11' }),
+    );
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      firstPaymentMonth: '2026-11',
+      balance: 1_000_000,
+      month: { dueDate: '2026-10-20', required: 0, paid: 0, status: 'none' },
+    });
+    expect(usual).toMatchObject({ firstPaymentMonth: null, month: { required: 100_000 } });
+    // прогноз починається з першого платежу, тож закінчується на місяць пізніше
+    expect(usual.projection.payoffDate).toBe('2027-09-20');
+    expect(res.body.projection).toMatchObject({
+      months: usual.projection.months,
+      payoffDate: '2027-10-20',
+    });
+
+    const { body: overview } = await actor.get('/api/debts');
+    expect(overview.summary).toMatchObject({ totalBalance: 2_000_000, dueThisMonth: 100_000 });
+
+    const { body: november } = await actor.get('/api/debts?month=2026-11');
+    expect(
+      november.debts.find((debt: { name: string }) => debt.name === 'Відкладена').month,
+    ).toMatchObject({ dueDate: '2026-11-20', required: 100_000 });
+  });
+
+  it('перший платіж не може бути раніше за місяць початку', async () => {
+    const actor = await createActor();
+    for (const firstPaymentMonth of ['2025-12', '2026-13', '2026-11-01']) {
+      const res = await actor.post('/api/debts', loanInput({ firstPaymentMonth }));
+      expect(res.status, firstPaymentMonth).toBe(400);
+    }
+    // місяць початку — дозволено; для кредитки поле теж працює
+    expect(
+      (await actor.post('/api/debts', loanInput({ firstPaymentMonth: '2026-01' }))).status,
+    ).toBe(201);
+    const card = await actor.post(
+      '/api/debts',
+      cardInput({ initialAmount: 300_000, firstPaymentMonth: '2026-11' }),
+    );
+    expect(card.body).toMatchObject({ balance: 300_000, month: { required: 0, status: 'none' } });
+  });
+
   it('рахунок для погашення має бути своїм і в гривні', async () => {
     const actor = await createActor();
     const stranger = await createActor();
@@ -380,6 +427,27 @@ describe('деталі, зміна, закриття й видалення', () 
       // 5 жовтня вже минуло
       month: { dueDate: '2026-10-05', status: 'overdue' },
     });
+  });
+
+  it('місяць першого платежу можна задати, змінити й прибрати в наявного боргу', async () => {
+    const actor = await createActor();
+    const { body: loan } = await actor.post('/api/debts', loanInput());
+    const patch = (firstPaymentMonth: string | null) =>
+      actor.patch(`/api/debts/${loan.id}`, { firstPaymentMonth });
+
+    expect((await patch('2026-11')).body).toMatchObject({
+      firstPaymentMonth: '2026-11',
+      month: { required: 0, status: 'none' },
+    });
+    expect((await patch(null)).body).toMatchObject({
+      firstPaymentMonth: null,
+      month: { required: 100_000, status: 'pending' },
+    });
+    expect((await patch('2025-12')).status).toBe(400);
+    // інші зміни місяць першого платежу не скидають
+    await patch('2026-12');
+    const renamed = await actor.patch(`/api/debts/${loan.id}`, { name: 'Інша назва' });
+    expect(renamed.body.firstPaymentMonth).toBe('2026-12');
   });
 
   it('перевіряє узгодженість зміни з типом боргу', async () => {

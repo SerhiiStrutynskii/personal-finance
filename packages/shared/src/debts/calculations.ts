@@ -173,12 +173,14 @@ export interface MonthPayment {
 
 /**
  * Платіж боргу за місяць. Якщо борг почався після дати платежу цього місяця (або пізніше),
- * перший платіж — наступного місяця, тож у цьому платити нічого.
+ * перший платіж — наступного місяця, тож у цьому платити нічого. Так само нічого платити
+ * до `firstPaymentMonth`, якщо його задано.
  */
 export function getMonthPayment(input: {
   month: string;
   paymentDay: number;
   startDate: DateString;
+  firstPaymentMonth?: string | null;
   monthlyPayment: number;
   balanceAtMonthStart: number;
   chargesInMonth: number;
@@ -186,10 +188,12 @@ export function getMonthPayment(input: {
   today: DateString;
 }): MonthPayment {
   const dueDate = paymentDueDate(input.month, input.paymentDay);
-  const required =
-    input.startDate > dueDate
-      ? 0
-      : getRequiredPayment(input.monthlyPayment, input.balanceAtMonthStart, input.chargesInMonth);
+  const beforeFirstPayment =
+    input.startDate > dueDate ||
+    (input.firstPaymentMonth != null && input.month < input.firstPaymentMonth);
+  const required = beforeFirstPayment
+    ? 0
+    : getRequiredPayment(input.monthlyPayment, input.balanceAtMonthStart, input.chargesInMonth);
   return {
     dueDate,
     required,
@@ -300,10 +304,21 @@ export function requiredPaymentForMaturity(input: {
   return low;
 }
 
-/** Найближча ще не внесена дата платежу: цього місяця, якщо він не сплачений, інакше наступного. */
-export function nextDueDate(month: string, paymentDay: number, payment: MonthPayment): DateString {
+/**
+ * Найближча ще не внесена дата платежу: цього місяця, якщо він не сплачений, інакше наступного,
+ * але не раніше за місяць першого платежу.
+ */
+export function nextDueDate(
+  month: string,
+  paymentDay: number,
+  payment: MonthPayment,
+  firstPaymentMonth?: string | null,
+): DateString {
   const unpaid = payment.required > 0 && payment.paid < payment.required;
-  return unpaid ? payment.dueDate : paymentDueDate(shiftMonth(month, 1), paymentDay);
+  const next = unpaid ? payment.dueDate : paymentDueDate(shiftMonth(month, 1), paymentDay);
+  if (firstPaymentMonth == null) return next;
+  const first = paymentDueDate(firstPaymentMonth, paymentDay);
+  return first > next ? first : next;
 }
 
 /** Чи буде борг погашено до кінцевого строку за прогнозом. */

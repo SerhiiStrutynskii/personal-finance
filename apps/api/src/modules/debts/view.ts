@@ -139,6 +139,7 @@ export function monthPaymentOf(
     month: data.month,
     paymentDay: row.paymentDay,
     startDate: row.startDate,
+    firstPaymentMonth: row.firstPaymentMonth,
     monthlyPayment: row.monthlyPayment,
     balanceAtMonthStart,
     chargesInMonth: increase,
@@ -159,7 +160,12 @@ export function projectionOf(
   const schedule = {
     balance,
     rate,
-    firstDueDate: nextDueDate(context.currentMonth, row.paymentDay, currentPayment),
+    firstDueDate: nextDueDate(
+      context.currentMonth,
+      row.paymentDay,
+      currentPayment,
+      row.firstPaymentMonth,
+    ),
     paymentDay: row.paymentDay,
   };
   const projection = projectPayoff({ ...schedule, monthlyPayment });
@@ -199,6 +205,7 @@ export function toDebtDto(row: repo.DebtRow, context: DebtContext): Debt {
     ratePeriod: row.ratePeriod,
     monthlyPayment: row.monthlyPayment,
     paymentDay: row.paymentDay,
+    firstPaymentMonth: row.firstPaymentMonth,
     earlyRepaymentAllowed: row.earlyRepaymentAllowed,
     defaultAccountId: row.defaultAccountId,
     balance,

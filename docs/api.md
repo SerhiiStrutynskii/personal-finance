@@ -312,7 +312,8 @@
 У `spent` ідуть транзакції типів `expense` і `debt_payment` (платежі по позиках — у категорії
 «Погашення боргів»). Перекази, зокрема погашення кредитки, і `balance_adjustment` не враховуються.
 Новий бюджет без `copyFrom` одразу отримує ліміт «Погашення боргів» на суму щомісячних платежів
-активних позик і розстрочок, якщо вони є.
+активних позик і розстрочок, якщо вони є. Позика, у якої `firstPaymentMonth` пізніше за місяць
+бюджету, у цю суму не входить.
 
 `copyFrom` копіює лише ліміти, зокрема з місяця, що вже минув. Зміна лімітів минулого бюджету — `409`.
 Чужий бюджет — `404`. Видатки створюються через `POST /api/transactions` з `type = expense`;
@@ -428,6 +429,7 @@
   "ratePeriod": "month",
   "monthlyPayment": 120000,
   "paymentDay": 25,
+  "firstPaymentMonth": null,
   "earlyRepaymentAllowed": true,
   "defaultAccountId": null,
   "balance": 2340000,
@@ -475,11 +477,15 @@ totalCreditAvailable }` за активними боргами. Список в�
 
 Тіло `POST /api/debts`:
 `{ name, type, description?, initialAmount, startDate, maturityDate?, interestRate, ratePeriod,
-monthlyPayment, paymentDay, earlyRepaymentAllowed?, defaultAccountId?, creditLimit?, existingAccountId? }`.
+monthlyPayment, paymentDay, firstPaymentMonth?, earlyRepaymentAllowed?, defaultAccountId?, creditLimit?,
+existingAccountId? }`.
 
 - `maturityDate` обов'язкова для всіх типів, крім `credit_card`, і має бути пізніше за `startDate`.
 - `creditLimit` обов'язковий тоді й лише тоді, коли тип `credit_card`.
 - `startDate` може бути в минулому, але не в майбутньому (`400`).
+- `firstPaymentMonth` (`YYYY-MM` або `null`) — місяць першого платежу, не раніший за місяць `startDate`.
+  До нього `month.required = 0` і статус `none`, а прогноз починається з платежу цього місяця; залишок
+  боргу рахується одразу. Без нього перший платіж — найближчий за графіком після `startDate`.
 - Кредитна картка атомарно створює рахунок-картку з назвою боргу й, якщо `initialAmount > 0`,
   транзакцію `balance_adjustment` на `-initialAmount` з датою `startDate`.
 - `existingAccountId` перетворює наявний рахунок на рахунок-картку: борг дорівнює його поточному
@@ -487,7 +493,7 @@ monthlyPayment, paymentDay, earlyRepaymentAllowed?, defaultAccountId?, creditLim
 - Порушення цих правил схеми — `400 VALIDATION_ERROR`, як і в решті API.
 
 `PATCH` змінює умови (`name`, `description`, `maturityDate`, `interestRate`, `ratePeriod`,
-`monthlyPayment`, `paymentDay`, `earlyRepaymentAllowed`, `defaultAccountId`, для кредитки —
+`monthlyPayment`, `paymentDay`, `firstPaymentMonth`, `earlyRepaymentAllowed`, `defaultAccountId`, для кредитки —
 `creditLimit`) і не змінює історію; тип, `initialAmount` і `startDate` не змінюються. Закриття
 кредитки архівує рахунок-картку. Позика закривається сама, коли залишок стає нульовим, і відкривається
 знову з новим нарахуванням; кредитка з нульовим боргом лишається активною.

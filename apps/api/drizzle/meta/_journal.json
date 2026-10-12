@@ -71,6 +71,13 @@
       "when": 1791821709338,
       "tag": "0009_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791838841981,
+      "tag": "0010_debt_first_payment_month",
+      "breakpoints": true
     }
   ]
 }

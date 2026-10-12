@@ -14,7 +14,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../shared/ui/dropdown-menu.tsx';
-import { formatDate, formatDateString, formatDayMonth } from '../../shared/ui/format.ts';
+import {
+  formatDate,
+  formatDateString,
+  formatDayMonth,
+  monthLabel,
+} from '../../shared/ui/format.ts';
 import { Progress } from '../../shared/ui/progress.tsx';
 import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
@@ -181,6 +186,9 @@ function DebtContent({ debt }: { debt: DebtDetails }) {
           )}
           <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
             <Term title="Початок">{formatDateString(debt.startDate)}</Term>
+            {debt.firstPaymentMonth && debt.firstPaymentMonth > debt.today.slice(0, 7) && (
+              <Term title="Перший платіж">{monthLabel(debt.firstPaymentMonth)}</Term>
+            )}
             <Term title={isCard ? 'Діє до' : 'Виданий до'}>
               {debt.maturityDate ? formatDateString(debt.maturityDate) : '—'}
             </Term>

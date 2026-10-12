@@ -41,6 +41,8 @@ const conditionFields = {
   /** Запланований щомісячний платіж; для кредитки — мінімальний. */
   monthlyPayment: positiveAmountMinorSchema,
   paymentDay: z.number().int().min(1).max(31),
+  /** Місяць першого платежу; до нього платити нічого. Без нього — найближчий після startDate. */
+  firstPaymentMonth: monthSchema.nullish(),
   earlyRepaymentAllowed: z.boolean(),
   /** Рахунок, з якого зазвичай гаситься борг. */
   defaultAccountId: idSchema.nullish(),
@@ -70,6 +72,9 @@ export const createDebtSchema = z
     if (value.maturityDate && value.maturityDate <= value.startDate) {
       issue('maturityDate', 'Строк має бути пізніше за дату початку');
     }
+    if (value.firstPaymentMonth && value.firstPaymentMonth < value.startDate.slice(0, 7)) {
+      issue('firstPaymentMonth', 'Перший платіж не може бути раніше за місяць початку');
+    }
     if (isCard && value.creditLimit == null) issue('creditLimit', 'Вкажіть кредитний ліміт');
     if (!isCard && value.creditLimit != null) {
       issue('creditLimit', 'Кредитний ліміт є лише в кредитної картки');
@@ -86,6 +91,7 @@ export const createDebtSchema = z
     ...value,
     description: value.description || null,
     maturityDate: value.maturityDate ?? null,
+    firstPaymentMonth: value.firstPaymentMonth ?? null,
     defaultAccountId: value.defaultAccountId ?? null,
     creditLimit: value.creditLimit ?? null,
     existingAccountId: value.existingAccountId ?? null,
@@ -213,6 +219,7 @@ export const debtSchema = z.object({
   ratePeriod: ratePeriodSchema,
   monthlyPayment: positiveAmountMinorSchema,
   paymentDay: z.number().int(),
+  firstPaymentMonth: monthSchema.nullable(),
   earlyRepaymentAllowed: z.boolean(),
   defaultAccountId: idSchema.nullable(),
   /** Поточний залишок боргу. */

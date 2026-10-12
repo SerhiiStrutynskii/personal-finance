@@ -221,6 +221,7 @@ export async function createDebt(
       ratePeriod: input.ratePeriod,
       monthlyPayment: input.monthlyPayment,
       paymentDay: input.paymentDay,
+      firstPaymentMonth: input.firstPaymentMonth,
       earlyRepaymentAllowed: input.earlyRepaymentAllowed,
       defaultAccountId: input.defaultAccountId,
     });
@@ -260,6 +261,9 @@ export async function updateDebt(
   if (maturityDate && maturityDate <= existing.startDate) {
     throw badRequest('Строк має бути пізніше за дату початку');
   }
+  if (input.firstPaymentMonth && input.firstPaymentMonth < existing.startDate.slice(0, 7)) {
+    throw badRequest('Перший платіж не може бути раніше за місяць початку');
+  }
   if (input.creditLimit !== undefined && (isCard ? input.creditLimit === null : true)) {
     throw badRequest(
       isCard ? 'Кредитний ліміт обов’язковий' : 'Кредитний ліміт є лише в кредитної картки',
@@ -287,6 +291,9 @@ export async function updateDebt(
       ...(input.ratePeriod !== undefined && { ratePeriod: input.ratePeriod }),
       ...(input.monthlyPayment !== undefined && { monthlyPayment: input.monthlyPayment }),
       ...(input.paymentDay !== undefined && { paymentDay: input.paymentDay }),
+      ...(input.firstPaymentMonth !== undefined && {
+        firstPaymentMonth: input.firstPaymentMonth ?? null,
+      }),
       ...(input.earlyRepaymentAllowed !== undefined && {
         earlyRepaymentAllowed: input.earlyRepaymentAllowed,
       }),

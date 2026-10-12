@@ -250,6 +250,34 @@ describe('getMonthPayment', () => {
     expect(getMonthPayment({ ...base, startDate: '2026-10-10' }).required).toBe(10_000);
   });
 
+  it('до місяця першого платежу платити нічого, з нього — звичайний платіж', () => {
+    expect(getMonthPayment({ ...base, firstPaymentMonth: '2026-11' })).toEqual({
+      dueDate: '2026-10-10',
+      required: 0,
+      paid: 0,
+      status: 'none',
+    });
+    // платіж уже прострочений би був, але він ще не почався
+    expect(
+      getMonthPayment({ ...base, firstPaymentMonth: '2026-11', today: '2026-10-25' }).status,
+    ).toBe('none');
+    expect(getMonthPayment({ ...base, firstPaymentMonth: '2026-10' }).required).toBe(10_000);
+    expect(
+      getMonthPayment({ ...base, month: '2026-11', firstPaymentMonth: '2026-11' }).required,
+    ).toBe(10_000);
+  });
+
+  it('перший платіж у минулому або не заданий нічого не змінює', () => {
+    expect(getMonthPayment({ ...base, firstPaymentMonth: '2026-03' }).required).toBe(10_000);
+    expect(getMonthPayment({ ...base, firstPaymentMonth: null }).required).toBe(10_000);
+  });
+
+  it('місяць першого платежу не скасовує правило дати початку', () => {
+    expect(
+      getMonthPayment({ ...base, startDate: '2026-10-11', firstPaymentMonth: '2026-10' }).required,
+    ).toBe(0);
+  });
+
   it('день платежу 31 у лютому — останній день місяця', () => {
     expect(getMonthPayment({ ...base, month: '2026-02', paymentDay: 31 }).dueDate).toBe(
       '2026-02-28',
@@ -402,6 +430,16 @@ describe('nextDueDate', () => {
   it('сплачений або непотрібний — наступного місяця', () => {
     expect(nextDueDate('2026-10', 10, { ...payment, paid: 10_000 })).toBe('2026-11-10');
     expect(nextDueDate('2026-12', 31, { ...payment, required: 0 })).toBe('2027-01-31');
+  });
+
+  it('не раніше за місяць першого платежу', () => {
+    const none = { ...payment, required: 0, status: 'none' as const };
+    expect(nextDueDate('2026-10', 10, none, '2027-02')).toBe('2027-02-10');
+    expect(nextDueDate('2026-10', 31, none, '2027-02')).toBe('2027-02-28');
+    // перший платіж уже настав або минув — діє звичайне правило
+    expect(nextDueDate('2026-10', 10, none, '2026-11')).toBe('2026-11-10');
+    expect(nextDueDate('2026-10', 10, payment, '2026-03')).toBe('2026-10-10');
+    expect(nextDueDate('2026-10', 10, payment, null)).toBe('2026-10-10');
   });
 });
 

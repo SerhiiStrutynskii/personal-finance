@@ -137,6 +137,24 @@ describe('типовий ліміт «Погашення боргів»', () => 
     expect(body.summary.plannedExpenseTotal).toBe(127_000);
   });
 
+  it('позика входить у ліміт лише з місяця свого першого платежу', async () => {
+    const { actor } = await setup();
+    await actor.post('/api/debts', loanInput({ monthlyPayment: 100_000 }));
+    await actor.post(
+      '/api/debts',
+      loanInput({ name: 'Відкладена', monthlyPayment: 40_000, firstPaymentMonth: '2026-11' }),
+    );
+
+    const october = await actor.post('/api/budgets', { month: MONTH });
+    expect(october.body.expenseLines).toEqual([
+      expect.objectContaining({ categoryName: 'Погашення боргів', planned: 100_000 }),
+    ]);
+    const november = await actor.post('/api/budgets', { month: '2026-11' });
+    expect(november.body.expenseLines).toEqual([
+      expect.objectContaining({ categoryName: 'Погашення боргів', planned: 140_000 }),
+    ]);
+  });
+
   it('без позик ліміту немає; закриті позики не враховуються', async () => {
     const { actor } = await setup();
     await actor.post('/api/debts', cardInput());

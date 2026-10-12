@@ -1,0 +1,2 @@
+ALTER TABLE "debts" ADD COLUMN "first_payment_month" char(7);--> statement-breakpoint
+ALTER TABLE "debts" ADD CONSTRAINT "debts_first_payment_month_valid" CHECK ("debts"."first_payment_month" IS NULL OR "debts"."first_payment_month" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$');

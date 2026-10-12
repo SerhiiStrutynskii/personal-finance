@@ -1,6 +1,7 @@
 import type { Debt } from '@hf/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  firstPaymentMonths,
   initialDebtValues,
   previewProjection,
   toCreateInput,
@@ -48,6 +49,7 @@ const existing: Debt = {
   ratePeriod: 'year',
   monthlyPayment: 100_000,
   paymentDay: 20,
+  firstPaymentMonth: null,
   earlyRepaymentAllowed: true,
   defaultAccountId: null,
   balance: 600_000,
@@ -111,6 +113,7 @@ describe('toCreateInput', () => {
         ratePeriod: 'year',
         monthlyPayment: 100_050,
         paymentDay: 20,
+        firstPaymentMonth: null,
         earlyRepaymentAllowed: true,
         defaultAccountId: null,
         creditLimit: null,
@@ -193,6 +196,7 @@ describe('toUpdateInput', () => {
         ratePeriod: 'year',
         monthlyPayment: 150_000,
         paymentDay: 5,
+        firstPaymentMonth: null,
         defaultAccountId: null,
         earlyRepaymentAllowed: true,
       },
@@ -268,6 +272,19 @@ describe('previewProjection', () => {
     });
   });
 
+  it('перший платіж пізніше відсуває прогноз', () => {
+    const values = {
+      ...initialDebtValues(TODAY, existing),
+      interestRate: '0',
+      firstPaymentMonth: '2027-01',
+    };
+    // 6 платежів, перший — 20 січня
+    expect(previewProjection(values, TODAY, existing)).toMatchObject({
+      months: 6,
+      payoffDate: '2027-06-20',
+    });
+  });
+
   it('кредитка: прогноз припускає, що нових покупок не буде', () => {
     expect(previewProjection(card(), TODAY)?.assumesNoNewPurchases).toBe(true);
   });
@@ -293,5 +310,42 @@ describe('monthsText', () => {
       '31 місяць',
       '111 місяців',
     ]);
+  });
+});
+
+describe('місяць першого платежу', () => {
+  it('у списку — поточний місяць і рік уперед', () => {
+    const months = firstPaymentMonths(TODAY, '');
+    expect(months).toHaveLength(13);
+    expect(months[0]).toBe('2026-10');
+    expect(months.at(-1)).toBe('2027-10');
+  });
+
+  it('збережений минулий місяць лишається у списку', () => {
+    expect(firstPaymentMonths(TODAY, '2026-03')[0]).toBe('2026-03');
+    expect(firstPaymentMonths(TODAY, '2026-11')).toHaveLength(13);
+  });
+
+  it('потрапляє в запит на створення й зміну; без вибору — null', () => {
+    expect(toCreateInput(loan({ firstPaymentMonth: '2026-11' }), TODAY)).toMatchObject({
+      ok: true,
+      input: { firstPaymentMonth: '2026-11' },
+    });
+    expect(toCreateInput(loan(), TODAY)).toMatchObject({
+      ok: true,
+      input: { firstPaymentMonth: null },
+    });
+    const values = { ...initialDebtValues(TODAY, existing), firstPaymentMonth: '2026-12' };
+    expect(toUpdateInput(values, existing)).toMatchObject({
+      ok: true,
+      input: { firstPaymentMonth: '2026-12' },
+    });
+  });
+
+  it('не може бути раніше за місяць початку боргу', () => {
+    expect(toCreateInput(loan({ firstPaymentMonth: '2025-12' }), TODAY)).toMatchObject({
+      ok: false,
+      errors: { firstPaymentMonth: 'Перший платіж не може бути раніше за місяць початку' },
+    });
   });
 });

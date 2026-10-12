@@ -142,8 +142,13 @@ export async function getBudgetByMonth(
  * Новий бюджет одразу має ліміт «Погашення боргів» на суму щомісячних платежів активних
  * позик і розстрочок. Кредитки сюди не входять: їхні покупки вже є витратами своїх категорій.
  */
-async function addDebtRepaymentLimit(tx: DbOrTx, auth: AuthContext, budgetId: string) {
-  const plannedAmount = await sumActiveLoanPayments(tx, auth.householdId);
+async function addDebtRepaymentLimit(
+  tx: DbOrTx,
+  auth: AuthContext,
+  budgetId: string,
+  month: string,
+) {
+  const plannedAmount = await sumActiveLoanPayments(tx, auth.householdId, month);
   if (plannedAmount === 0) return;
   const category = await ensureSystemCategory(tx, auth.householdId, 'debt_repayment');
   await repo.insertExpenseLine(tx, budgetId, { categoryId: category.id, plannedAmount });
@@ -176,7 +181,7 @@ export async function createBudget(
       if (source) {
         await repo.copyLines(tx, source.id, created.id);
       } else {
-        await addDebtRepaymentLimit(tx, auth, created.id);
+        await addDebtRepaymentLimit(tx, auth, created.id, input.month);
       }
       return created;
     });

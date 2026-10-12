@@ -159,3 +159,35 @@ test('позика банку: місячний платіж дає статус
   await page.getByRole('link', { name: 'Бюджет' }).click();
   await expect(line).toContainText('Залишок 100,00');
 });
+
+test('перший платіж наступного місяця: цього місяця платити нічого й ліміту в бюджеті немає', async ({
+  page,
+}) => {
+  await register(page);
+
+  const dialog = await openDebtDialog(page, 'Позика банку');
+  await dialog.getByLabel('Назва').fill('Відкладена позика');
+  await dialog.getByLabel('Сума боргу, UAH').fill('900');
+  await dialog.getByLabel('Ставка, %').fill('0');
+  await dialog.getByLabel('Щомісячний платіж, UAH').fill('100');
+  await dialog.getByLabel('Виданий до').fill('2035-01-01');
+  // у списку: «Найближчий за графіком», поточний місяць, наступний місяць…
+  await dialog.getByRole('combobox').filter({ hasText: 'Найближчий за графіком' }).click();
+  await page.getByRole('option').nth(2).click();
+  await dialog.getByRole('button', { name: 'Зберегти' }).click();
+  await expect(dialog).toBeHidden();
+
+  // Борг рахується одразу, але платежу цього місяця немає.
+  await expect(page.getByTestId('debts-summary')).toContainText('900,00');
+  await page.getByRole('link', { name: 'Відкладена позика' }).click();
+  await expect(page.getByTestId('debt-month-status')).toHaveAttribute('data-status', 'none');
+  await expect(page.getByText('Перший платіж', { exact: true })).toBeVisible();
+
+  // Бюджет поточного місяця створюється без ліміту «Погашення боргів».
+  await page.getByRole('link', { name: 'Бюджет', exact: true }).click();
+  await page.getByRole('button', { name: 'Створити' }).click();
+  await expect(page.getByRole('button', { name: 'Додати ліміт' })).toBeVisible();
+  await expect(
+    page.getByTestId('expense-line').filter({ hasText: 'Погашення боргів' }),
+  ).toHaveCount(0);
+});

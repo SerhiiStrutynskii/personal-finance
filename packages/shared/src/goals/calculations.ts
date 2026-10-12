@@ -81,6 +81,8 @@ export interface PayoffDebt {
   monthlyPayment: number;
   /** false — борг не отримує додаткових грошей понад мінімальний платіж. */
   earlyRepaymentAllowed: boolean;
+  /** До цього місяця борг у плані не гаситься й не росте: платежі по ньому ще не почалися. */
+  firstPaymentMonth?: string | null;
 }
 
 export const MAX_PAYOFF_MONTHS = 600;
@@ -132,7 +134,10 @@ export function simulatePayoff(input: {
 
   for (let step = 0; step < MAX_PAYOFF_MONTHS; step += 1) {
     const month = shiftMonth(input.firstMonth, step);
-    const open = debts.filter((debt) => debt.balance > 0);
+    const open = debts.filter(
+      (debt) =>
+        debt.balance > 0 && !(debt.firstPaymentMonth != null && month < debt.firstPaymentMonth),
+    );
     let pool = rollover ? input.extra + freed : 0;
 
     for (const debt of open) {

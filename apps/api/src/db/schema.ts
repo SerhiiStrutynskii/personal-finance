@@ -344,6 +344,8 @@ export const debts = pgTable(
     ratePeriod: text('rate_period', { enum: RATE_PERIODS }).notNull(),
     monthlyPayment: bigint('monthly_payment', { mode: 'number' }).notNull(),
     paymentDay: smallint('payment_day').notNull(),
+    // Місяць першого платежу (YYYY-MM); до нього платити нічого.
+    firstPaymentMonth: char('first_payment_month', { length: 7 }),
     earlyRepaymentAllowed: boolean('early_repayment_allowed').notNull().default(true),
     // Рахунок, з якого зазвичай гаситься борг.
     defaultAccountId: uuid('default_account_id').references(() => accounts.id, {
@@ -365,6 +367,10 @@ export const debts = pgTable(
     check('debts_interest_rate_non_negative', sql`${t.interestRate} >= 0`),
     check('debts_monthly_payment_positive', sql`${t.monthlyPayment} > 0`),
     check('debts_payment_day_valid', sql`${t.paymentDay} BETWEEN 1 AND 31`),
+    check(
+      'debts_first_payment_month_valid',
+      sql`${t.firstPaymentMonth} IS NULL OR ${t.firstPaymentMonth} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`,
+    ),
     check(
       'debts_card_has_account',
       sql`(${t.type} = 'credit_card') = (${t.accountId} IS NOT NULL)`,

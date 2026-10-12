@@ -64,6 +64,9 @@ description: Специфікація і порядок реалізації ф�
   для розрахунків нормалізується в місячну функцією `toMonthlyRate(rate, period)`.
 - `monthlyPayment` (копійки, > 0) — запланований щомісячний платіж (для кредитки — мінімальний).
 - `paymentDay` (1–31); якщо в місяці менше днів — останній день місяця.
+- `firstPaymentMonth` (`YYYY-MM`, необовʼязково) — місяць першого платежу, не раніший за місяць `startDate`.
+  Потрібен, коли борг вносять у застосунок посеред місяця, а платіж цього місяця вже зроблено
+  або ще не настав. Можна змінити пізніше.
 - `earlyRepaymentAllowed` (boolean). Для `credit_card` завжди `true`.
 - `defaultAccountId` — рахунок, з якого зазвичай гаситься борг (необовʼязково; не може дорівнювати `accountId`).
 - `status`: `active | closed`.
@@ -165,6 +168,8 @@ else                                   → "pending"   (нейтральний �
 ```
 `today` — дата в таймзоні household. У день `dueDate` платіж ще не прострочений.
 Якщо `startDate` пізніше за `dueDate` поточного місяця, перший платіж — наступного місяця.
+Якщо задано `firstPaymentMonth`, у місяцях до нього `required = 0` і статус `none`; прогноз погашення
+починається з платежу цього місяця. Залишок боргу рахується в підсумках одразу.
 
 ### Прогноз погашення
 `projectPayoff(balance, monthlyRate, monthlyPayment, fromDate)` — помісячна симуляція:
@@ -235,7 +240,8 @@ totalCreditAvailable  = Σ available по кредитках
 
 - «Погашення боргів» і «Відсотки та комісії» — системні категорії, їх не можна видалити.
 - При створенні бюджету ліміт «Погашення боргів» за замовчуванням = сума `monthlyPayment`
-  активних позик і розстрочок (без кредиток).
+  активних позик і розстрочок (без кредиток і без боргів, у яких `firstPaymentMonth` пізніше
+  за місяць бюджету).
 - Видатки з кредитки підпадають під ті самі правила бюджету, що й з будь-якого іншого рахунку.
 
 Це потребує змін у скілі `monthly-budget`: агрегація `spent` враховує `debt_payment` і не враховує
@@ -247,7 +253,8 @@ totalCreditAvailable  = Σ available по кредитках
 GET    /debts?month=2026-10                 → огляд: підсумки + список боргів зі статусом платежу за місяць
 POST   /debts                               { name, type, description?, currency, initialAmount, startDate,
                                               maturityDate?, interestRate, ratePeriod, monthlyPayment,
-                                              paymentDay, earlyRepaymentAllowed, defaultAccountId?,
+                                              paymentDay, firstPaymentMonth?, earlyRepaymentAllowed,
+                                              defaultAccountId?,
                                               creditLimit?,              // обовʼязково для credit_card
                                               existingAccountId? }       // привʼязати наявний рахунок-картку
                                             → для credit_card атомарно створює рахунок (або привʼязує наявний)
