@@ -89,6 +89,21 @@ describe('summarizeTransactions', () => {
     expect(facts.receivedIncome).toBe(5000);
   });
 
+  it('платіж по позиці — витрата своєї категорії; службова зміна балансу не враховується', () => {
+    const facts = summarizeTransactions(
+      [
+        tx({ type: 'debt_payment', amountMinor: 700, categoryId: 'debts', categoryName: 'Борги' }),
+        tx({ type: 'balance_adjustment', amountMinor: -5000, categoryId: null }),
+        tx({ type: 'balance_adjustment', amountMinor: 5000, categoryId: null }),
+      ],
+      october,
+      'UAH',
+    );
+
+    expect(facts.spending).toEqual([{ categoryId: 'debts', categoryName: 'Борги', spent: 700 }]);
+    expect(facts.receivedIncome).toBe(0);
+  });
+
   it('період — півінтервал у часовому поясі домогосподарства', () => {
     const facts = summarizeTransactions(
       [

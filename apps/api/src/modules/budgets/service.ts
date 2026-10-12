@@ -15,7 +15,8 @@ import {
   isUniqueViolation,
   notFound,
 } from '../../http/errors.ts';
-import { findCategory } from '../categories/repo.ts';
+import { ensureSystemCategory, findCategory } from '../categories/repo.ts';
+import { sumActiveLoanPayments } from '../debts/repo.ts';
 import { getIncomes } from '../incomes/occurrences.service.ts';
 import * as repo from './repo.ts';
 import type {
@@ -137,6 +138,17 @@ export async function getBudgetByMonth(
   return buildView(db, auth, budget, timeZone, now);
 }
 
+/**
+ * Новий бюджет одразу має ліміт «Погашення боргів» на суму щомісячних платежів активних
+ * позик і розстрочок. Кредитки сюди не входять: їхні покупки вже є витратами своїх категорій.
+ */
+async function addDebtRepaymentLimit(tx: DbOrTx, auth: AuthContext, budgetId: string) {
+  const plannedAmount = await sumActiveLoanPayments(tx, auth.householdId);
+  if (plannedAmount === 0) return;
+  const category = await ensureSystemCategory(tx, auth.householdId, 'debt_repayment');
+  await repo.insertExpenseLine(tx, budgetId, { categoryId: category.id, plannedAmount });
+}
+
 export async function createBudget(
   db: Db,
   auth: AuthContext,
@@ -161,7 +173,11 @@ export async function createBudget(
         periodStart: period.start,
         periodEnd: period.end,
       });
-      if (source) await repo.copyLines(tx, source.id, created.id);
+      if (source) {
+        await repo.copyLines(tx, source.id, created.id);
+      } else {
+        await addDebtRepaymentLimit(tx, auth, created.id);
+      }
       return created;
     });
     return await buildView(db, auth, budget, timeZone, now);

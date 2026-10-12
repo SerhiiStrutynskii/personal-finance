@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ne, or, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import { debtEntries, debts, transactions } from '../../db/schema.ts';
 
@@ -224,4 +224,19 @@ export async function deleteAccountTransactions(
   accountId: string,
 ) {
   await db.delete(transactions).where(ofAccount(householdId, accountId));
+}
+
+/** Сума щомісячних платежів активних позик і розстрочок — без кредиток. */
+export async function sumActiveLoanPayments(db: DbOrTx, householdId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<string | null>`sum(${debts.monthlyPayment})` })
+    .from(debts)
+    .where(
+      and(
+        eq(debts.householdId, householdId),
+        eq(debts.status, 'active'),
+        ne(debts.type, 'credit_card'),
+      ),
+    );
+  return num(row?.total);
 }

@@ -137,7 +137,7 @@ export function calculateBudget({
 
 /** Мінімум полів транзакції, потрібний для бюджету. */
 export interface BudgetTransaction {
-  type: 'income' | 'expense' | 'transfer';
+  type: 'income' | 'expense' | 'transfer' | 'debt_payment' | 'balance_adjustment';
   amountMinor: number;
   currency: string;
   occurredAt: Date;
@@ -163,7 +163,9 @@ export function summarizeTransactions(
   for (const transaction of transactions) {
     if (transaction.currency !== currency || !isInPeriod(transaction.occurredAt, period)) continue;
 
-    if (transaction.type === 'expense') {
+    // Платіж по позиці — теж витрата (категорія «Погашення боргів»); переказ і службова зміна
+    // балансу — ні, тому погашення кредитки переказом не подвоює вже враховані покупки.
+    if (transaction.type === 'expense' || transaction.type === 'debt_payment') {
       const entry = spending.get(transaction.categoryId) ?? {
         categoryId: transaction.categoryId,
         categoryName: transaction.categoryName ?? UNCATEGORIZED_NAME,

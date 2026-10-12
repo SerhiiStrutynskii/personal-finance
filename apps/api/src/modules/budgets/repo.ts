@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import {
   budgetExpenseLines,
@@ -147,7 +147,8 @@ export function aggregateSpending(
         gte(transactions.occurredAt, period.start),
         lt(transactions.occurredAt, period.end),
         eq(transactions.currency, currency),
-        eq(transactions.type, 'expense'),
+        // Платіж по позиці — витрата; переказ (зокрема погашення кредитки) і звірка — ні.
+        inArray(transactions.type, ['expense', 'debt_payment']),
       ),
     )
     .groupBy(transactions.categoryId, categories.name);
