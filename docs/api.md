@@ -5,8 +5,8 @@
 
 ## Авторизація
 
-Усі маршрути `/api/*`, крім `/api/auth/register`, `/api/auth/login`, `/api/auth/refresh` і
-`/api/auth/logout`, потребують заголовка `Authorization: Bearer <accessToken>`.
+Усі маршрути `/api/*`, крім `/api/auth/config`, `/api/auth/register`, `/api/auth/login`,
+`/api/auth/refresh` і `/api/auth/logout`, потребують заголовка `Authorization: Bearer <accessToken>`.
 
 - Access-токен — JWT (HS256), діє 15 хвилин.
 - Refresh-токен — випадковий рядок, діє 30 днів і одноразовий: кожне оновлення видає нову пару.
@@ -18,13 +18,14 @@
 - `AuthTokens`: `{ accessToken, refreshToken, expiresIn }` (`expiresIn` — секунди життя access-токена)
 - `AuthSession`: `CurrentUser` разом з `AuthTokens`
 
-| Метод | Шлях                 | Тіло                                        | Відповідь                                                                              |
-| ----- | -------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
-| POST  | `/api/auth/register` | `{ email, password, name, householdName? }` | `201 AuthSession`; `409`, якщо email зайнятий                                          |
-| POST  | `/api/auth/login`    | `{ email, password }`                       | `200 AuthSession`; `401` для невірних даних; `429` після 5 невдалих спроб за 15 хвилин |
-| POST  | `/api/auth/refresh`  | `{ refreshToken }`                          | `200 AuthTokens`; `401` для невідомого, використаного чи простроченого токена          |
-| POST  | `/api/auth/logout`   | `{ refreshToken }`                          | `204` завжди                                                                           |
-| GET   | `/api/auth/me`       | —                                           | `200 CurrentUser`                                                                      |
+| Метод | Шлях                 | Тіло                                        | Відповідь                                                                                         |
+| ----- | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| GET   | `/api/auth/config`   | —                                           | `200 { registrationEnabled }` — чи відкрита реєстрація на цьому сервері                           |
+| POST  | `/api/auth/register` | `{ email, password, name, householdName? }` | `201 AuthSession`; `409`, якщо email зайнятий; `403 REGISTRATION_CLOSED`, якщо реєстрацію закрито |
+| POST  | `/api/auth/login`    | `{ email, password }`                       | `200 AuthSession`; `401` для невірних даних; `429` після 5 невдалих спроб за 15 хвилин            |
+| POST  | `/api/auth/refresh`  | `{ refreshToken }`                          | `200 AuthTokens`; `401` для невідомого, використаного чи простроченого токена                     |
+| POST  | `/api/auth/logout`   | `{ refreshToken }`                          | `204` завжди                                                                                      |
+| GET   | `/api/auth/me`       | —                                           | `200 CurrentUser`                                                                                 |
 
 Пароль — від 10 до 128 символів. Email зводиться до нижнього регістру. Реєстрація створює
 користувача й окреме домогосподарство, у якому він `owner`; `householdName` за замовчуванням —
@@ -47,6 +48,7 @@
 | 400    | `VALIDATION_ERROR`            | Дані не пройшли zod-схему (є `issues`)                                                        |
 | 400    | `BAD_REQUEST`                 | Порушено правило домену або зіпсований JSON                                                   |
 | 401    | `UNAUTHORIZED`                | Користувача не визначено                                                                      |
+| 403    | `REGISTRATION_CLOSED`         | Реєстрацію нових користувачів закрито налаштуванням сервера                                   |
 | 404    | `NOT_FOUND`                   | Запису немає в домогосподарстві користувача                                                   |
 | 409    | `CONFLICT`                    | Дублікат або запис використовується                                                           |
 | 422    | `EXPENSE_DATE_IN_FUTURE`      | Видаток, рух по боргу або поповнення цілі на майбутню дату                                    |

@@ -31,6 +31,8 @@ docs/           — domain.md, api.md, decisions/ (ADR)
 
 ```
 npm run dev          # запуск усього локально
+npm run build        # зібрати фронтенд (apps/web/dist)
+npm run start        # продакшн: міграції + API; розгортання — docs/deploy.md
 npm run test         # усі тести
 npm run test:e2e     # Playwright; сам піднімає API і фронтенд на тестовій базі (порти 3100 і 5174)
 npm run lint         # eslint + prettier
