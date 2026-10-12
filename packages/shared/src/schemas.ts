@@ -64,10 +64,21 @@ export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export const updateCategorySchema = z.object({ name: nameSchema });
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 
+/** Системні категорії витрат: їх створює застосунок, змінити чи видалити їх не можна. */
+export const systemCategoryKeySchema = z.enum(['debt_repayment', 'interest_fees']);
+export type SystemCategoryKey = z.infer<typeof systemCategoryKeySchema>;
+
+export const SYSTEM_CATEGORY_NAMES: Record<SystemCategoryKey, string> = {
+  debt_repayment: 'Погашення боргів',
+  interest_fees: 'Відсотки та комісії',
+};
+
 export const categorySchema = z.object({
   id: idSchema,
   name: z.string(),
   kind: categoryKindSchema,
+  /** Ключ системної категорії; null для звичайних. */
+  systemKey: systemCategoryKeySchema.nullable(),
   createdAt: instantSchema,
 });
 export type Category = z.infer<typeof categorySchema>;
@@ -141,6 +152,8 @@ export const transactionSchema = z.object({
   toAccountId: idSchema.nullable(),
   categoryId: idSchema.nullable(),
   occurrenceId: idSchema.nullable(),
+  /** Борг, який гасить транзакція; лише для debt_payment. */
+  debtId: idSchema.nullable(),
   /** Додатна; знакова лише для balance_adjustment. */
   amountMinor: amountMinorSchema,
   currency: currencySchema,

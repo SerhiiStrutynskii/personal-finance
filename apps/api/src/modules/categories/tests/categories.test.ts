@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { ensureSystemCategory } from '../repo.ts';
 import { setupTestApp } from '../../../test/harness.ts';
 
-const { createActor, setNow } = setupTestApp();
+const { db, createActor, setNow } = setupTestApp();
 
 describe('categories', () => {
   it('створює, перейменовує і видаляє категорію', async () => {
@@ -80,5 +81,51 @@ describe('categories', () => {
     });
 
     expect((await actor.delete(`/api/categories/${category.id}`)).status).toBe(409);
+  });
+
+  it('звичайна категорія не має системного ключа', async () => {
+    const actor = await createActor();
+    const { body } = await actor.post('/api/categories', { name: 'Продукти', kind: 'expense' });
+    expect(body.systemKey).toBeNull();
+  });
+
+  it('системна категорія створюється один раз і не змінюється й не видаляється', async () => {
+    const actor = await createActor();
+    const first = await ensureSystemCategory(db, actor.householdId, 'debt_repayment');
+    const second = await ensureSystemCategory(db, actor.householdId, 'debt_repayment');
+    expect(second.id).toBe(first.id);
+
+    const { body } = await actor.get('/api/categories');
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        name: 'Погашення боргів',
+        kind: 'expense',
+        systemKey: 'debt_repayment',
+      }),
+    ]);
+
+    const renamed = await actor.patch(`/api/categories/${first.id}`, { name: 'Інше' });
+    expect(renamed.status).toBe(409);
+    expect((await actor.delete(`/api/categories/${first.id}`)).status).toBe(409);
+  });
+
+  it('наявна категорія з назвою системної стає системною, а не дублюється', async () => {
+    const actor = await createActor();
+    const { body: own } = await actor.post('/api/categories', {
+      name: 'Відсотки та комісії',
+      kind: 'expense',
+    });
+    const system = await ensureSystemCategory(db, actor.householdId, 'interest_fees');
+    expect(system.id).toBe(own.id);
+    expect((await actor.get('/api/categories')).body.items).toHaveLength(1);
+  });
+
+  it('системні категорії різних домогосподарств окремі', async () => {
+    const actor = await createActor();
+    const stranger = await createActor();
+    const mine = await ensureSystemCategory(db, actor.householdId, 'interest_fees');
+    const theirs = await ensureSystemCategory(db, stranger.householdId, 'interest_fees');
+    expect(theirs.id).not.toBe(mine.id);
+    expect((await stranger.patch(`/api/categories/${mine.id}`, { name: 'x' })).status).toBe(404);
   });
 });

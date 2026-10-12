@@ -8,6 +8,7 @@ const toDto = (row: repo.CategoryRow): Category => ({
   id: row.id,
   name: row.name,
   kind: row.kind,
+  systemKey: row.systemKey,
   createdAt: row.createdAt.toISOString(),
 });
 
@@ -36,12 +37,19 @@ export async function createCategory(
   }
 }
 
+/** Системні категорії (погашення боргів, відсотки й комісії) не перейменовуються й не видаляються. */
+async function assertNotSystem(db: Db, auth: AuthContext, id: string) {
+  const row = await repo.findCategory(db, auth.householdId, id);
+  if (row?.systemKey) throw conflict('Системну категорію не можна змінити чи видалити');
+}
+
 export async function updateCategory(
   db: Db,
   auth: AuthContext,
   id: string,
   input: UpdateCategoryInput,
 ): Promise<Category> {
+  await assertNotSystem(db, auth, id);
   try {
     const row = await repo.updateCategory(db, auth.householdId, id, input);
     if (!row) throw notFound('Категорія');
@@ -53,6 +61,7 @@ export async function updateCategory(
 }
 
 export async function deleteCategory(db: Db, auth: AuthContext, id: string): Promise<void> {
+  await assertNotSystem(db, auth, id);
   try {
     if (!(await repo.deleteCategory(db, auth.householdId, id))) throw notFound('Категорія');
   } catch (error) {

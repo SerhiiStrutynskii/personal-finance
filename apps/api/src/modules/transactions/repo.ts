@@ -1,5 +1,5 @@
 import { and, count, desc, eq, gte, lt, or } from 'drizzle-orm';
-import type { Db } from '../../db/client.ts';
+import type { DbOrTx } from '../../db/client.ts';
 import { transactions } from '../../db/schema.ts';
 import type { ListTransactionsQuery } from './schema.ts';
 
@@ -17,12 +17,16 @@ export type TransactionValues = Pick<
   | 'currency'
   | 'description'
   | 'occurredAt'
->;
+> & { debtId?: string | null };
 
 const owned = (householdId: string, id: string) =>
   and(eq(transactions.householdId, householdId), eq(transactions.id, id));
 
-export async function listTransactions(db: Db, householdId: string, query: ListTransactionsQuery) {
+export async function listTransactions(
+  db: DbOrTx,
+  householdId: string,
+  query: ListTransactionsQuery,
+) {
   const where = and(
     eq(transactions.householdId, householdId),
     query.type ? eq(transactions.type, query.type) : undefined,
@@ -52,13 +56,13 @@ export async function listTransactions(db: Db, householdId: string, query: ListT
   return { items, total: totals?.total ?? 0 };
 }
 
-export async function findTransaction(db: Db, householdId: string, id: string) {
+export async function findTransaction(db: DbOrTx, householdId: string, id: string) {
   const [row] = await db.select().from(transactions).where(owned(householdId, id));
   return row;
 }
 
 export async function insertTransaction(
-  db: Db,
+  db: DbOrTx,
   householdId: string,
   createdBy: string,
   values: TransactionValues,
@@ -71,7 +75,7 @@ export async function insertTransaction(
 }
 
 export async function replaceTransaction(
-  db: Db,
+  db: DbOrTx,
   householdId: string,
   id: string,
   values: TransactionValues,
@@ -84,7 +88,11 @@ export async function replaceTransaction(
   return row;
 }
 
-export async function deleteTransaction(db: Db, householdId: string, id: string): Promise<boolean> {
+export async function deleteTransaction(
+  db: DbOrTx,
+  householdId: string,
+  id: string,
+): Promise<boolean> {
   const rows = await db
     .delete(transactions)
     .where(owned(householdId, id))

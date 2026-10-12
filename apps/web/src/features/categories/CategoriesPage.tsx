@@ -27,11 +27,15 @@ export function CategoriesPage() {
                   {items.map((category) => (
                     <li key={category.id} className="flex items-center justify-between gap-4 py-2">
                       {category.name}
-                      <ConfirmButton
-                        title={`Видалити категорію «${category.name}»?`}
-                        disabled={remove.isPending}
-                        onConfirm={() => remove.mutate(category.id)}
-                      />
+                      {category.systemKey ? (
+                        <span className="text-xs text-muted-foreground">системна</span>
+                      ) : (
+                        <ConfirmButton
+                          title={`Видалити категорію «${category.name}»?`}
+                          disabled={remove.isPending}
+                          onConfirm={() => remove.mutate(category.id)}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>

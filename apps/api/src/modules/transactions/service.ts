@@ -8,13 +8,14 @@ import { findOccurrenceForLink } from '../incomes/repo.ts';
 import * as repo from './repo.ts';
 import type { ListTransactionsQuery, Transaction, TransactionInput } from './schema.ts';
 
-const toDto = (row: repo.TransactionRow): Transaction => ({
+export const toTransactionDto = (row: repo.TransactionRow): Transaction => ({
   id: row.id,
   type: row.type,
   accountId: row.accountId,
   toAccountId: row.toAccountId,
   categoryId: row.categoryId,
   occurrenceId: row.occurrenceId,
+  debtId: row.debtId,
   amountMinor: row.amountMinor,
   currency: row.currency,
   description: row.description,
@@ -95,13 +96,13 @@ async function resolveValues(
 
 export async function listTransactions(db: Db, auth: AuthContext, query: ListTransactionsQuery) {
   const { items, total } = await repo.listTransactions(db, auth.householdId, query);
-  return { items: items.map(toDto), total, limit: query.limit, offset: query.offset };
+  return { items: items.map(toTransactionDto), total, limit: query.limit, offset: query.offset };
 }
 
 export async function getTransaction(db: Db, auth: AuthContext, id: string): Promise<Transaction> {
   const row = await repo.findTransaction(db, auth.householdId, id);
   if (!row) throw notFound('Транзакція');
-  return toDto(row);
+  return toTransactionDto(row);
 }
 
 /**
@@ -131,7 +132,7 @@ export async function createTransaction(
 ): Promise<Transaction> {
   const values = await resolveValues(db, auth, input);
   if (values.type === 'expense') assertExpenseDateAllowed(values.occurredAt, now);
-  return toDto(await repo.insertTransaction(db, auth.householdId, auth.userId, values));
+  return toTransactionDto(await repo.insertTransaction(db, auth.householdId, auth.userId, values));
 }
 
 export async function replaceTransaction(
@@ -150,7 +151,7 @@ export async function replaceTransaction(
 
   const row = await repo.replaceTransaction(db, auth.householdId, id, values);
   if (!row) throw notFound('Транзакція');
-  return toDto(row);
+  return toTransactionDto(row);
 }
 
 export async function deleteTransaction(db: Db, auth: AuthContext, id: string): Promise<void> {

@@ -143,21 +143,20 @@ describe('баланс рахунку', () => {
     expect((await balances()).Картка).toBe(-7_000);
   });
 
-  it('службова зміна балансу додається зі своїм знаком, платіж по боргу віднімається', async () => {
+  it('службова зміна балансу додається зі своїм знаком', async () => {
     const { actor, card, balances } = await setup();
-    const insert = (type: 'balance_adjustment' | 'debt_payment', amountMinor: number) =>
+    const adjust = (amountMinor: number) =>
       insertTransaction(actor, {
-        type,
+        type: 'balance_adjustment',
         accountId: card.id,
         amountMinor,
         currency: 'UAH',
         occurredAt: new Date(at),
       });
 
-    await insert('balance_adjustment', 50_000);
-    await insert('balance_adjustment', -8_000);
-    await insert('debt_payment', 12_000);
-    expect((await balances()).Картка).toBe(30_000);
+    await adjust(50_000);
+    await adjust(-8_000);
+    expect((await balances()).Картка).toBe(42_000);
   });
 
   it('баланс рахується лише з транзакцій свого домогосподарства', async () => {

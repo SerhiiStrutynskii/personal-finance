@@ -7,6 +7,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -20,6 +21,8 @@ import {
 const id = () => uuid().primaryKey().defaultRandom();
 const instant = () => timestamp({ withTimezone: true, mode: 'date' });
 const createdAt = () => instant().notNull().defaultNow();
+
+export const SYSTEM_CATEGORY_KEYS = ['debt_repayment', 'interest_fees'] as const;
 
 export const memberRole = pgEnum('member_role', ['owner', 'member']);
 export const accountType = pgEnum('account_type', ['card', 'cash', 'deposit', 'credit_card']);
@@ -121,9 +124,11 @@ export const categories = pgTable(
       .references(() => households.id, { onDelete: 'cascade' }),
     name: text().notNull(),
     kind: categoryKind().notNull(),
+    // Системна категорія (погашення боргів, відсотки й комісії): її не можна змінити чи видалити.
+    systemKey: text('system_key', { enum: SYSTEM_CATEGORY_KEYS }),
     createdAt: createdAt(),
   },
-  (t) => [unique().on(t.householdId, t.kind, t.name)],
+  (t) => [unique().on(t.householdId, t.kind, t.name), unique().on(t.householdId, t.systemKey)],
 );
 
 export const transactions = pgTable(
@@ -150,6 +155,8 @@ export const transactions = pgTable(
     occurrenceId: uuid('occurrence_id').references(() => incomeOccurrences.id, {
       onDelete: 'set null',
     }),
+    // Борг, який гасить ця транзакція; заповнений тільки для debt_payment.
+    debtId: uuid('debt_id').references(() => debts.id),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: instant().notNull().defaultNow(),
@@ -170,6 +177,11 @@ export const transactions = pgTable(
       'transactions_amount_valid',
       sql`${t.amountMinor} > 0 OR ((${t.type})::text = 'balance_adjustment' AND ${t.amountMinor} <> 0)`,
     ),
+    check(
+      'transactions_debt_only_for_payment',
+      sql`((${t.type})::text = 'debt_payment') = (${t.debtId} IS NOT NULL)`,
+    ),
+    index().on(t.debtId),
     check(
       'transactions_adjustment_shape',
       sql`(${t.type})::text <> 'balance_adjustment' OR ${t.categoryId} IS NULL`,
@@ -300,5 +312,116 @@ export const incomeOccurrences = pgTable(
     index().on(t.householdId, t.plannedDate),
     check('income_occurrences_planned_positive', sql`${t.plannedAmount} > 0`),
     check('income_occurrences_status_valid', sql`${t.status} IN ('expected', 'skipped')`),
+  ],
+);
+
+export const DEBT_TYPES = ['credit_card', 'installment', 'mfo_loan', 'bank_loan'] as const;
+export const RATE_PERIODS = ['year', 'month', 'day'] as const;
+export const DEBT_STATUSES = ['active', 'closed'] as const;
+
+export const debts = pgTable(
+  'debts',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    description: text(),
+    type: text({ enum: DEBT_TYPES }).notNull(),
+    // Рахунок-картка; лише для кредитної картки, один борг на рахунок.
+    accountId: uuid('account_id')
+      .unique()
+      .references(() => accounts.id),
+    currency: char({ length: 3 }).notNull().default('UAH'),
+    // Сума боргу на startDate.
+    initialAmount: bigint('initial_amount', { mode: 'number' }).notNull(),
+    startDate: calendarDate('start_date').notNull(),
+    maturityDate: calendarDate('maturity_date'),
+    // Ставка у відсотках так, як її вказав користувач; період — у ratePeriod.
+    interestRate: numeric('interest_rate', { precision: 9, scale: 4 }).notNull(),
+    ratePeriod: text('rate_period', { enum: RATE_PERIODS }).notNull(),
+    monthlyPayment: bigint('monthly_payment', { mode: 'number' }).notNull(),
+    paymentDay: smallint('payment_day').notNull(),
+    earlyRepaymentAllowed: boolean('early_repayment_allowed').notNull().default(true),
+    // Рахунок, з якого зазвичай гаситься борг.
+    defaultAccountId: uuid('default_account_id').references(() => accounts.id, {
+      onDelete: 'set null',
+    }),
+    status: text({ enum: DEBT_STATUSES }).notNull().default('active'),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.householdId),
+    check(
+      'debts_type_valid',
+      sql`${t.type} IN ('credit_card', 'installment', 'mfo_loan', 'bank_loan')`,
+    ),
+    check('debts_rate_period_valid', sql`${t.ratePeriod} IN ('year', 'month', 'day')`),
+    check('debts_status_valid', sql`${t.status} IN ('active', 'closed')`),
+    check('debts_initial_amount_non_negative', sql`${t.initialAmount} >= 0`),
+    check('debts_interest_rate_non_negative', sql`${t.interestRate} >= 0`),
+    check('debts_monthly_payment_positive', sql`${t.monthlyPayment} > 0`),
+    check('debts_payment_day_valid', sql`${t.paymentDay} BETWEEN 1 AND 31`),
+    check(
+      'debts_card_has_account',
+      sql`(${t.type} = 'credit_card') = (${t.accountId} IS NOT NULL)`,
+    ),
+    check(
+      'debts_maturity_required',
+      sql`${t.type} = 'credit_card' OR ${t.maturityDate} IS NOT NULL`,
+    ),
+    check(
+      'debts_maturity_after_start',
+      sql`${t.maturityDate} IS NULL OR ${t.maturityDate} > ${t.startDate}`,
+    ),
+    check(
+      'debts_card_early_repayment',
+      sql`${t.type} <> 'credit_card' OR ${t.earlyRepaymentAllowed}`,
+    ),
+    check(
+      'debts_default_account_differs',
+      sql`${t.defaultAccountId} IS NULL OR ${t.defaultAccountId} IS DISTINCT FROM ${t.accountId}`,
+    ),
+  ],
+);
+
+export const DEBT_ENTRY_KINDS = ['payment', 'charge', 'adjustment'] as const;
+
+// Рухи позик і розстрочок; у кредитки їх немає — її рухи це транзакції рахунку-картки.
+export const debtEntries = pgTable(
+  'debt_entries',
+  {
+    id: id(),
+    debtId: uuid('debt_id')
+      .notNull()
+      .references(() => debts.id, { onDelete: 'cascade' }),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    kind: text({ enum: DEBT_ENTRY_KINDS }).notNull(),
+    // payment і charge — додатна сума; adjustment — знакова різниця звірки.
+    amount: bigint({ mode: 'number' }).notNull(),
+    principalPart: bigint('principal_part', { mode: 'number' }),
+    interestPart: bigint('interest_part', { mode: 'number' }),
+    // Транзакція рахунку, якою внесено платіж; видаляється разом із записом.
+    transactionId: uuid('transaction_id')
+      .unique()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    occurredAt: instant().notNull(),
+    note: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index().on(t.debtId, t.occurredAt),
+    check('debt_entries_kind_valid', sql`${t.kind} IN ('payment', 'charge', 'adjustment')`),
+    check('debt_entries_amount_valid', sql`${t.kind} = 'adjustment' OR ${t.amount} > 0`),
+    check(
+      'debt_entries_payment_shape',
+      sql`${t.kind} <> 'payment' OR (${t.transactionId} IS NOT NULL
+        AND ${t.principalPart} >= 0 AND ${t.interestPart} >= 0
+        AND ${t.principalPart} + ${t.interestPart} = ${t.amount})`,
+    ),
   ],
 );
