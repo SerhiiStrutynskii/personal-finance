@@ -473,3 +473,104 @@ monthlyPayment, paymentDay, earlyRepaymentAllowed?, defaultAccountId?, creditLim
 
 `PaymentPreview`: `{ amount, principalPart, interestPart, isEarly, requiresConfirmation, balanceAfter,
 projection, interestSaved }` — розбивка платежу на сьогодні й прогноз після нього.
+
+## Аналітика
+
+Лише читання: усе рахується з транзакцій, бюджетів, доходів і боргів. Суми — цілі числа в мінімальних
+одиницях валюти, частки й норми — відношення (0,15 = 15%). Враховуються лише транзакції в `UAH`.
+Правила — у `docs/domain.md`.
+
+| Метод | Шлях                                              | Відповідь            |
+| ----- | ------------------------------------------------- | -------------------- |
+| GET   | `/api/analytics/month?month=YYYY-MM`              | `200 AnalyticsMonth` |
+| GET   | `/api/analytics/trend?month=YYYY-MM&months=6\|12` | `200 AnalyticsTrend` |
+
+`month` за замовчуванням поточний; майбутній місяць — `400`. `months` — 6 (за замовчуванням) або 12;
+динаміка закінчується місяцем `month`.
+
+`AnalyticsMonth`:
+
+```json
+{
+  "month": "2026-10",
+  "currency": "UAH",
+  "today": "2026-10-12",
+  "isCurrentMonth": true,
+  "totalSpent": 3180000,
+  "previousTotalSpent": 2900000,
+  "change": 280000,
+  "categories": [
+    {
+      "categoryId": "…",
+      "categoryName": "Продукти",
+      "spent": 1350000,
+      "share": 0.4245,
+      "previousSpent": 1200000,
+      "change": 150000
+    }
+  ],
+  "budget": {
+    "overspent": [
+      {
+        "categoryId": "…",
+        "categoryName": "Продукти",
+        "planned": 1200000,
+        "spent": 1350000,
+        "overBy": 150000
+      }
+    ]
+  },
+  "forecast": {
+    "daysElapsed": 12,
+    "daysInMonth": 31,
+    "spent": 3180000,
+    "projected": 8215000,
+    "plannedExpenseTotal": 5200000,
+    "categories": [
+      {
+        "categoryId": "…",
+        "categoryName": "Продукти",
+        "planned": 1200000,
+        "spent": 1350000,
+        "projected": 3487500,
+        "projectedOverBy": 2287500
+      }
+    ]
+  }
+}
+```
+
+- `categories` — категорії з витратами в цьому або попередньому місяці, за спаданням `spent`;
+  `categoryId = null` — витрати без категорії.
+- `budget` — `null`, якщо бюджету на місяць немає. `overspent` — рядки бюджету зі статусом `over` і
+  незаплановані витрати (`planned = 0`).
+- `forecast` — лише для поточного місяця, інакше `null`: `projected = spent × daysInMonth / daysElapsed`.
+  Без бюджету `plannedExpenseTotal` дорівнює `null`, а `categories` порожній.
+
+`AnalyticsTrend`:
+
+```json
+{
+  "month": "2026-10",
+  "months": 6,
+  "currency": "UAH",
+  "points": [
+    {
+      "month": "2026-05",
+      "income": 6000000,
+      "expenses": 5100000,
+      "net": 900000,
+      "savingsRate": 0.15,
+      "netWorth": 12400000,
+      "debtPayments": 390000,
+      "debtLoad": 0.065
+    }
+  ],
+  "plannedDebtLoad": { "monthlyPayments": 390000, "plannedIncome": 6000000, "ratio": 0.065 }
+}
+```
+
+- `points` містить рівно `months` місяців від найдавнішого, включно з місяцями без даних.
+- `savingsRate` і `debtLoad` дорівнюють `null`, якщо доходу в місяці немає.
+- `netWorth` — на кінець місяця. `plannedDebtLoad` — сума щомісячних платежів активних боргів відносно
+  запланованого доходу місяця `month`.
