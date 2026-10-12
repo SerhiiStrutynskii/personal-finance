@@ -9,6 +9,7 @@ import { createLoginLimiter, type RateLimiter } from './modules/auth/rate-limite
 import { authRouter } from './modules/auth/routes.ts';
 import { createTokenService } from './modules/auth/tokens.ts';
 import { budgetsRouter } from './modules/budgets/routes.ts';
+import { dashboardRouter } from './modules/dashboard/routes.ts';
 import { debtsRouter } from './modules/debts/routes.ts';
 import { goalsRouter } from './modules/goals/routes.ts';
 import {
@@ -57,6 +58,7 @@ export function createApp({
   api.use('/analytics', analyticsRouter(db, now));
   api.use('/budgets', budgetsRouter(db, now));
   api.use('/categories', categoriesRouter(db));
+  api.use('/dashboard', dashboardRouter(db, now));
   api.use('/debts', debtsRouter(db, now));
   api.use('/goals', goalsRouter(db, now));
   api.use('/income-occurrences', incomeOccurrencesRouter(db, now));
