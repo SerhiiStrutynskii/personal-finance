@@ -26,57 +26,35 @@ describe('getPeriodState', () => {
 });
 
 describe('getAllowedExpenseDateRange', () => {
-  it('від початку поточного місяця в поясі домогосподарства до цієї миті', () => {
+  it('верхня межа — ця мить; нижньої немає', () => {
     const now = new Date('2026-10-15T12:00:00Z');
-    expect(getAllowedExpenseDateRange(now, KYIV)).toEqual({
-      start: new Date('2026-09-30T21:00:00Z'),
-      end: now,
-      minDate: '2026-10-01',
-      maxDate: '2026-10-15',
-    });
+    expect(getAllowedExpenseDateRange(now, KYIV)).toEqual({ end: now, maxDate: '2026-10-15' });
   });
 
-  it('1-ше число 00:00 за Києвом — уже новий період', () => {
-    const range = getAllowedExpenseDateRange(new Date('2026-10-31T22:00:00Z'), KYIV);
-    expect(range).toMatchObject({
-      start: new Date('2026-10-31T22:00:00Z'),
-      minDate: '2026-11-01',
-      maxDate: '2026-11-01',
-    });
-  });
-
-  it('31-ше 23:59 за Києвом — ще жовтень', () => {
-    const range = getAllowedExpenseDateRange(new Date('2026-10-31T21:59:00Z'), KYIV);
-    expect(range).toMatchObject({ minDate: '2026-10-01', maxDate: '2026-10-31' });
-  });
-
-  it('межі залежать від часового поясу', () => {
-    // 23:30 UTC 31 жовтня: у Києві вже листопад, у Нью-Йорку ще жовтень
+  it('сьогоднішня дата залежить від часового поясу', () => {
+    // 23:30 UTC 31 жовтня: у Києві вже 1 листопада, у Нью-Йорку ще 31 жовтня
     const now = new Date('2026-10-31T23:30:00Z');
-    expect(getAllowedExpenseDateRange(now, KYIV).minDate).toBe('2026-11-01');
-    expect(getAllowedExpenseDateRange(now, 'America/New_York')).toMatchObject({
-      minDate: '2026-10-01',
-      maxDate: '2026-10-31',
-    });
+    expect(getAllowedExpenseDateRange(now, KYIV).maxDate).toBe('2026-11-01');
+    expect(getAllowedExpenseDateRange(now, 'America/New_York').maxDate).toBe('2026-10-31');
   });
 });
 
 describe('isExpenseDateAllowed', () => {
   const now = new Date('2026-10-15T12:00:00Z');
-  const allowed = (occurredAt: string) => isExpenseDateAllowed(new Date(occurredAt), now, KYIV);
+  const allowed = (occurredAt: string) => isExpenseDateAllowed(new Date(occurredAt), now);
 
-  it('дозволяє поточний період до цієї миті включно', () => {
-    expect(allowed('2026-09-30T21:00:00Z')).toBe(true); // 1 жовтня 00:00 за Києвом
+  it('дозволяє поточний місяць до цієї миті включно', () => {
     expect(allowed('2026-10-10T08:00:00Z')).toBe(true);
     expect(allowed('2026-10-15T12:00:00Z')).toBe(true);
   });
 
-  it('минулий місяць недоступний', () => {
-    expect(allowed('2026-09-30T20:59:59Z')).toBe(false); // 30 вересня 23:59:59 за Києвом
-    expect(allowed('2026-09-15T12:00:00Z')).toBe(false);
+  it('дозволяє минулі місяці й роки', () => {
+    expect(allowed('2026-09-30T20:59:59Z')).toBe(true); // 30 вересня 23:59:59 за Києвом
+    expect(allowed('2026-09-15T12:00:00Z')).toBe(true);
+    expect(allowed('2024-01-01T00:00:00Z')).toBe(true);
   });
 
-  it('майбутня дата в межах місяця недоступна', () => {
+  it('майбутня дата недоступна, навіть у межах поточного місяця', () => {
     expect(allowed('2026-10-15T12:00:01Z')).toBe(false);
     expect(allowed('2026-10-20T12:00:00Z')).toBe(false);
     expect(allowed('2026-11-01T12:00:00Z')).toBe(false);

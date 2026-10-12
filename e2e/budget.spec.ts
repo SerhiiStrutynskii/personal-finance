@@ -93,12 +93,30 @@ test('видаток понад ліміт робить рядок катего�
   await page.getByRole('link', { name: 'Витрати' }).click();
   await expect(page.getByRole('row').filter({ hasText: 'Продукти' })).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Наступний місяць' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Додати', exact: true })).toBeVisible();
 
-  // У попередньому місяці видатків немає, і додати їх туди не можна.
+  // У попередньому місяці видатків ще немає, але додати їх туди можна.
   await page.getByRole('button', { name: 'Попередній місяць' }).click();
   await expect(page.getByText('За цей місяць витрат немає')).toBeVisible();
-  await expect(page.getByRole('row').filter({ hasText: 'Продукти' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Додати', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Наступний місяць' })).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Додати', exact: true }).click();
+  // Дата за замовчуванням — перше число цього місяця; майбутні дати недоступні.
+  const previousMonthStart = await dateInput.inputValue();
+  expect(previousMonthStart < `${today.slice(0, 8)}01`).toBe(true);
+  expect(previousMonthStart.endsWith('-01')).toBe(true);
+  await expect(dateInput).toHaveAttribute('max', today);
+  await expect(dateInput).not.toHaveAttribute('min');
+  await expenseDialog.getByLabel('Сума, UAH').fill('40');
+  await expenseDialog.getByRole('button', { name: 'Зберегти' }).click();
+  await expect(expenseDialog).toBeHidden();
+
+  // Видаток минулого місяця можна змінити.
+  const pastRow = page.getByRole('row').filter({ hasText: '40,00' });
+  await expect(pastRow).toHaveCount(1);
+  await pastRow.getByRole('button', { name: 'Дії із записом' }).click();
+  await page.getByRole('menuitem', { name: 'Змінити' }).click();
+  await expenseDialog.getByLabel('Сума, UAH').fill('45');
+  await expenseDialog.getByRole('button', { name: 'Зберегти' }).click();
+  await expect(expenseDialog).toBeHidden();
+  await expect(page.getByRole('row').filter({ hasText: '45,00' })).toHaveCount(1);
 });

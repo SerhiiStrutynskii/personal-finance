@@ -125,7 +125,6 @@ describe('разові доходи', () => {
     const ctx = await setup();
     const stranger = await setup();
     await oneTime(stranger);
-    // видаток минулого місяця через API внести не можна, тому вставляється напряму
     await insertTransaction(ctx.actor, {
       type: 'expense',
       accountId: ctx.card.id,

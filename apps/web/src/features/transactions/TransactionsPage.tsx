@@ -10,6 +10,7 @@ import { errorMessage } from '../../shared/api/index.ts';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
 import { useAccounts } from '../accounts/api.ts';
+import { defaultEntryDate } from '../budget/month.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
 import { useTransactions } from './api.ts';
@@ -45,7 +46,7 @@ export function TransactionsPage({ type }: { type: EntryType }) {
   const page = transactions.data;
   const hasAccounts = (accounts.data?.length ?? 0) > 0;
   const entryCategories = (categories.data ?? []).filter((category) => category.kind === type);
-  // Видатки можна вносити й змінювати лише в поточному місяці до сьогодні; для доходів меж немає.
+  // Видаток не може мати майбутню дату; для доходів меж немає.
   const expenseRange =
     type === 'expense' ? getAllowedExpenseDateRange(new Date(), user.timeZone) : undefined;
 
@@ -63,9 +64,7 @@ export function TransactionsPage({ type }: { type: EntryType }) {
                 setOffset(0);
               }}
             />
-            {hasAccounts && month === currentMonth && (
-              <Button onClick={() => setDialog({ open: true })}>Додати</Button>
-            )}
+            {hasAccounts && <Button onClick={() => setDialog({ open: true })}>Додати</Button>}
           </div>
         }
       />
@@ -84,11 +83,7 @@ export function TransactionsPage({ type }: { type: EntryType }) {
       {!page && !error && <Muted>Завантаження…</Muted>}
       {page && page.total === 0 && hasAccounts && <Muted>{config.empty}</Muted>}
       {type === 'expense' && (
-        <Muted>
-          {month === currentMonth
-            ? 'Видаток можна додати лише в поточному місяці й не на майбутню дату.'
-            : 'Видатки минулих місяців доступні тільки для перегляду.'}
-        </Muted>
+        <Muted>Видаток можна додати на сьогодні або будь-яку минулу дату.</Muted>
       )}
 
       {page && page.total > 0 && (
@@ -99,9 +94,6 @@ export function TransactionsPage({ type }: { type: EntryType }) {
             categories={categories.data ?? []}
             timeZone={user.timeZone}
             onEdit={(original) => setDialog({ open: true, original })}
-            isLocked={(transaction) =>
-              expenseRange !== undefined && new Date(transaction.occurredAt) < expenseRange.start
-            }
           />
           {page.total > PAGE_SIZE && (
             <div className="mt-4 flex items-center gap-3 text-sm">
@@ -132,8 +124,9 @@ export function TransactionsPage({ type }: { type: EntryType }) {
         open={dialog.open}
         onOpenChange={(open) => setDialog({ ...dialog, open })}
         original={dialog.original}
-        minDate={expenseRange?.minDate}
         maxDate={expenseRange?.maxDate}
+        // Новий запис потрапляє в місяць, який зараз переглядається.
+        defaults={{ date: defaultEntryDate(month, new Date(), user.timeZone) }}
         accounts={accounts.data ?? []}
         categories={entryCategories}
       />

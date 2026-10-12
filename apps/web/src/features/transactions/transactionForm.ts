@@ -37,7 +37,7 @@ export interface FormContext {
   /** Транзакція, яку редагують. */
   original?: Transaction | undefined;
   /**
-   * Межі дозволених дат (YYYY-MM-DD, включно). Для видатків це поточний місяць до сьогодні —
+   * Межі дозволених дат (YYYY-MM-DD, включно). Видаток не може мати майбутню дату —
    * див. getAllowedExpenseDateRange; остаточно правило перевіряє API.
    */
   minDate?: string | undefined;

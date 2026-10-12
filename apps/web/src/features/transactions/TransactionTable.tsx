@@ -29,18 +29,9 @@ interface Props {
   timeZone: string;
   /** Якщо задано, у меню рядка з'являється дія «Змінити». */
   onEdit?: (transaction: Transaction) => void;
-  /** Записи, які не можна змінювати (видатки минулих місяців): для них меню дій немає. */
-  isLocked?: (transaction: Transaction) => boolean;
 }
 
-export function TransactionTable({
-  items,
-  accounts,
-  categories,
-  timeZone,
-  onEdit,
-  isLocked,
-}: Props) {
+export function TransactionTable({ items, accounts, categories, timeZone, onEdit }: Props) {
   const remove = useDeleteTransaction();
   // id зберігається й після закриття, щоб діалог не втрачав ціль під час анімації.
   const [deletion, setDeletion] = useState<{ open: boolean; id?: string }>({ open: false });
@@ -83,33 +74,29 @@ export function TransactionTable({
               </TableCell>
               <TableCell className="text-right tabular-nums">{formatMoney(transaction)}</TableCell>
               <TableCell className="text-right">
-                {isLocked?.(transaction) ? (
-                  <span className="sr-only">Запис минулого місяця, змінити не можна</span>
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="Дії із записом">
-                        <MoreHorizontal />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {onEdit && (
-                        <DropdownMenuItem onSelect={() => onEdit(transaction)}>
-                          <Pencil />
-                          Змінити
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        variant="destructive"
-                        disabled={remove.isPending}
-                        onSelect={() => setDeletion({ open: true, id: transaction.id })}
-                      >
-                        <Trash2 />
-                        Видалити
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" aria-label="Дії із записом">
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {onEdit && (
+                      <DropdownMenuItem onSelect={() => onEdit(transaction)}>
+                        <Pencil />
+                        Змінити
                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                    )}
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={remove.isPending}
+                      onSelect={() => setDeletion({ open: true, id: transaction.id })}
+                    >
+                      <Trash2 />
+                      Видалити
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TableCell>
             </TableRow>
           ))}

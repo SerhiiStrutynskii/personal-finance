@@ -30,7 +30,7 @@ export function transactionsRouter(db: Db, now: () => Date): Router {
 
   router.delete('/:id', async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
-    await service.deleteTransaction(db, getAuth(res), id, now());
+    await service.deleteTransaction(db, getAuth(res), id);
     res.status(204).end();
   });
 

@@ -39,7 +39,8 @@ export function BudgetPage() {
   const expenseCategories = (categories.data ?? []).filter(
     (category) => category.kind === 'expense',
   );
-  // Те саме вікно, що й на сторінці видатків, із тими самими межами дат.
+  // Те саме вікно, що й на сторінці видатків. Кнопка є лише в поточному місяці, тож і дату
+  // обмежено ним: інакше видаток не з'явився б у бюджеті, з якого його додали.
   const expenseRange = getAllowedExpenseDateRange(new Date(), user.timeZone);
   // Чи показувати кнопку, вирішує бекенд; саме правило ще раз перевіряє API видатків.
   const canAddExpense = budget.data?.canAddExpense === true && accountList.length > 0;
@@ -85,7 +86,7 @@ export function BudgetPage() {
         type="expense"
         open={expenseOpen}
         onOpenChange={setExpenseOpen}
-        minDate={expenseRange.minDate}
+        minDate={`${month}-01`}
         maxDate={expenseRange.maxDate}
         accounts={accountList}
         categories={expenseCategories}
