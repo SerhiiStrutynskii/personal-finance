@@ -21,12 +21,14 @@ export function useTransactions(query: Partial<ListTransactionsQuery>) {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  // Транзакції змінюють і фактичні суми бюджету та доходів місяця.
+  // Транзакції змінюють і суми бюджету та доходів місяця, баланси рахунків і борги по картках.
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
       queryClient.invalidateQueries({ queryKey: ['budget'] }),
       queryClient.invalidateQueries({ queryKey: ['incomes'] }),
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+      queryClient.invalidateQueries({ queryKey: ['debts'] }),
     ]);
 }
 

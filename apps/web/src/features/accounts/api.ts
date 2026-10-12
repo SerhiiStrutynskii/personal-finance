@@ -1,14 +1,23 @@
-import type { Account, CreateAccountInput } from '@hf/shared';
+import type { Account, CreateAccountInput, PlainAccountType } from '@hf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
 
-const KEY = ['accounts'];
+export const ACCOUNTS_KEY = ['accounts'];
+const KEY = ACCOUNTS_KEY;
 
 export const ACCOUNT_TYPE_LABELS: Record<Account['type'], string> = {
   card: 'Картка',
   cash: 'Готівка',
   deposit: 'Депозит',
+  credit_card: 'Кредитна картка',
 };
+
+/** Типи, які можна вибрати під час створення рахунку; кредитна картка створюється з боргом. */
+export const PLAIN_ACCOUNT_TYPES: PlainAccountType[] = ['card', 'cash', 'deposit'];
+
+/** Рахунки, які можна вибрати для нового запису: архівні нових транзакцій не приймають. */
+export const activeAccounts = (accounts: readonly Account[] | undefined): Account[] =>
+  (accounts ?? []).filter((account) => !account.isArchived);
 
 export function useAccounts() {
   return useQuery({

@@ -1,6 +1,7 @@
 import type { Account } from '@hf/shared';
 import { errorMessage } from '../../shared/api/index.ts';
 import { ErrorText, Muted } from '../../shared/ui/controls.tsx';
+import { activeAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { AddTransferDialog } from './AddTransferDialog.tsx';
 import { useTransactions } from './api.ts';
@@ -15,7 +16,7 @@ export function TransfersSection({ accounts }: { accounts: Account[] }) {
     <section className="mt-8">
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="font-heading text-lg font-semibold">Перекази між рахунками</h2>
-        <AddTransferDialog accounts={accounts} />
+        <AddTransferDialog accounts={activeAccounts(accounts)} />
       </div>
       {accounts.length < 2 && <Muted>Для переказу потрібно щонайменше два рахунки.</Muted>}
 

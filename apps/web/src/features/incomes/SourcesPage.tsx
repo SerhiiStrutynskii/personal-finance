@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '../../shared/ui/dropdown-menu.tsx';
 import { formatDateString } from '../../shared/ui/format.ts';
-import { useAccounts } from '../accounts/api.ts';
+import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useDeactivateSource, useDeleteSource, useIncomeSources } from './api.ts';
 import { SourceDialog } from './SourceDialog.tsx';
@@ -34,7 +34,9 @@ export function SourcesPage() {
   const [confirmation, setConfirmation] = useState<Confirmation>({ open: false, kind: 'delete' });
 
   const currency = DEFAULT_CURRENCY;
-  const incomeAccounts = (accounts.data ?? []).filter((account) => account.currency === currency);
+  const incomeAccounts = activeAccounts(accounts.data).filter(
+    (account) => account.currency === currency,
+  );
   const accountName = (id: string | null) =>
     accounts.data?.find((account) => account.id === id)?.name ?? '—';
   const error = sources.error ?? accounts.error ?? deactivate.error ?? remove.error;

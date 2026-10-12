@@ -1,7 +1,8 @@
+import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { setupTestApp } from '../../../test/harness.ts';
 
-const { createActor, setNow } = setupTestApp();
+const { db, createActor, setNow, insertTransaction } = setupTestApp();
 const MISSING_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('accounts', () => {
@@ -75,5 +76,159 @@ describe('accounts', () => {
     expect((await actor.delete(`/api/accounts/${used.id}`)).status).toBe(409);
     expect((await actor.delete(`/api/accounts/${MISSING_ID}`)).status).toBe(404);
     expect((await actor.delete('/api/accounts/not-a-uuid')).status).toBe(400);
+  });
+
+  it('новий рахунок має нульовий баланс, без ліміту й не в архіві', async () => {
+    const actor = await createActor();
+    const { body } = await actor.post('/api/accounts', { name: 'Картка', type: 'card' });
+    expect(body).toMatchObject({ balance: 0, creditLimit: null, isArchived: false });
+  });
+
+  it('рахунок кредитної картки напряму не створюється й тип на нього не змінюється', async () => {
+    const actor = await createActor();
+    const created = await actor.post('/api/accounts', { name: 'Кредитка', type: 'credit_card' });
+    expect(created.status).toBe(400);
+
+    const { body: account } = await actor.post('/api/accounts', { name: 'Картка', type: 'card' });
+    const changed = await actor.patch(`/api/accounts/${account.id}`, { type: 'credit_card' });
+    expect(changed.status).toBe(400);
+  });
+});
+
+describe('баланс рахунку', () => {
+  const NOW = '2026-03-31T10:00:00Z';
+  const at = '2026-03-10T10:00:00Z';
+
+  async function setup() {
+    setNow(NOW);
+    const actor = await createActor();
+    const { body: card } = await actor.post('/api/accounts', { name: 'Картка', type: 'card' });
+    const { body: cash } = await actor.post('/api/accounts', { name: 'Готівка', type: 'cash' });
+    const balances = async () => {
+      const { body } = await actor.get('/api/accounts');
+      return Object.fromEntries(
+        body.items.map((item: { name: string; balance: number }) => [item.name, item.balance]),
+      );
+    };
+    return { actor, card, cash, balances };
+  }
+
+  it('доходи додаються, витрати віднімаються, переказ переносить суму між рахунками', async () => {
+    const { actor, card, cash, balances } = await setup();
+    const post = (body: object) =>
+      actor.post('/api/transactions', { accountId: card.id, occurredAt: at, ...body });
+
+    await post({ type: 'income', amountMinor: 100_000 });
+    await post({ type: 'expense', amountMinor: 30_000 });
+    await post({ type: 'transfer', amountMinor: 25_000, toAccountId: cash.id });
+    await actor.post('/api/transactions', {
+      type: 'expense',
+      accountId: cash.id,
+      amountMinor: 5_000,
+      occurredAt: at,
+    });
+
+    expect(await balances()).toEqual({ Картка: 45_000, Готівка: 20_000 });
+    expect((await actor.get(`/api/accounts/${card.id}`)).body.balance).toBe(45_000);
+  });
+
+  it('баланс може бути від’ємним', async () => {
+    const { actor, card, balances } = await setup();
+    await actor.post('/api/transactions', {
+      type: 'expense',
+      accountId: card.id,
+      amountMinor: 7_000,
+      occurredAt: at,
+    });
+    expect((await balances()).Картка).toBe(-7_000);
+  });
+
+  it('службова зміна балансу додається зі своїм знаком, платіж по боргу віднімається', async () => {
+    const { actor, card, balances } = await setup();
+    const insert = (type: 'balance_adjustment' | 'debt_payment', amountMinor: number) =>
+      insertTransaction(actor, {
+        type,
+        accountId: card.id,
+        amountMinor,
+        currency: 'UAH',
+        occurredAt: new Date(at),
+      });
+
+    await insert('balance_adjustment', 50_000);
+    await insert('balance_adjustment', -8_000);
+    await insert('debt_payment', 12_000);
+    expect((await balances()).Картка).toBe(30_000);
+  });
+
+  it('баланс рахується лише з транзакцій свого домогосподарства', async () => {
+    const { actor, card, balances } = await setup();
+    const stranger = await createActor();
+    const { body: other } = await stranger.post('/api/accounts', { name: 'Чужа', type: 'card' });
+    await stranger.post('/api/transactions', {
+      type: 'income',
+      accountId: other.id,
+      amountMinor: 999,
+      occurredAt: at,
+    });
+    await actor.post('/api/transactions', {
+      type: 'income',
+      accountId: card.id,
+      amountMinor: 100,
+      occurredAt: at,
+    });
+    expect(await balances()).toEqual({ Картка: 100, Готівка: 0 });
+  });
+
+  it('архівний рахунок не приймає нових транзакцій', async () => {
+    const { actor, card, cash } = await setup();
+    await db.execute(sql`UPDATE accounts SET is_archived = true WHERE id = ${card.id}`);
+
+    const expense = await actor.post('/api/transactions', {
+      type: 'expense',
+      accountId: card.id,
+      amountMinor: 100,
+      occurredAt: at,
+    });
+    expect(expense.status).toBe(400);
+
+    const transfer = await actor.post('/api/transactions', {
+      type: 'transfer',
+      accountId: cash.id,
+      toAccountId: card.id,
+      amountMinor: 100,
+      occurredAt: at,
+    });
+    expect(transfer.status).toBe(400);
+    expect((await actor.get(`/api/accounts/${card.id}`)).body.isArchived).toBe(true);
+  });
+
+  it('службові транзакції не створюються, не змінюються й не видаляються через /api/transactions', async () => {
+    const { actor, card } = await setup();
+    for (const type of ['debt_payment', 'balance_adjustment']) {
+      const res = await actor.post('/api/transactions', {
+        type,
+        accountId: card.id,
+        amountMinor: 100,
+        occurredAt: at,
+      });
+      expect(res.status).toBe(400);
+    }
+
+    const adjustment = await insertTransaction(actor, {
+      type: 'balance_adjustment',
+      accountId: card.id,
+      amountMinor: -500,
+      currency: 'UAH',
+      occurredAt: new Date(at),
+    });
+    const replaced = await actor.put(`/api/transactions/${adjustment.id}`, {
+      type: 'expense',
+      accountId: card.id,
+      amountMinor: 500,
+      occurredAt: at,
+    });
+    expect(replaced.status).toBe(400);
+    expect((await actor.delete(`/api/transactions/${adjustment.id}`)).status).toBe(400);
+    expect((await actor.get(`/api/transactions/${adjustment.id}`)).body.amountMinor).toBe(-500);
   });
 });

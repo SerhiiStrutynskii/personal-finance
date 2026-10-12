@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { DEFAULT_CURRENCY, currencySchema, positiveAmountMinorSchema } from './money.ts';
+import {
+  DEFAULT_CURRENCY,
+  amountMinorSchema,
+  currencySchema,
+  positiveAmountMinorSchema,
+} from './money.ts';
 
 export const idSchema = z.uuid();
 export const idParamsSchema = z.object({ id: idSchema });
@@ -9,19 +14,23 @@ const instantSchema = z.iso.datetime({ offset: true });
 
 // --- Account ---
 
-export const accountTypeSchema = z.enum(['card', 'cash', 'deposit']);
+export const accountTypeSchema = z.enum(['card', 'cash', 'deposit', 'credit_card']);
 export type AccountType = z.infer<typeof accountTypeSchema>;
+
+/** Типи, які можна задати напряму; рахунок кредитної картки створюється лише разом із боргом. */
+export const plainAccountTypeSchema = z.enum(['card', 'cash', 'deposit']);
+export type PlainAccountType = z.infer<typeof plainAccountTypeSchema>;
 
 export const createAccountSchema = z.object({
   name: nameSchema,
-  type: accountTypeSchema,
+  type: plainAccountTypeSchema,
   currency: currencySchema.default(DEFAULT_CURRENCY),
 });
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
 
 // Валюту рахунку змінити не можна: від неї залежать уже записані транзакції.
 export const updateAccountSchema = z
-  .object({ name: nameSchema, type: accountTypeSchema })
+  .object({ name: nameSchema, type: plainAccountTypeSchema })
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'Потрібне хоча б одне поле');
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
@@ -31,6 +40,15 @@ export const accountSchema = z.object({
   name: z.string(),
   type: accountTypeSchema,
   currency: currencySchema,
+  /**
+   * Баланс із транзакцій рахунку. Для кредитної картки від'ємний баланс — це борг,
+   * додатний — власні кошти.
+   */
+  balance: amountMinorSchema,
+  /** Кредитний ліміт; лише для кредитної картки. */
+  creditLimit: positiveAmountMinorSchema.nullable(),
+  /** Архівний рахунок не приймає нових транзакцій. */
+  isArchived: z.boolean(),
   createdAt: instantSchema,
 });
 export type Account = z.infer<typeof accountSchema>;
@@ -56,7 +74,14 @@ export type Category = z.infer<typeof categorySchema>;
 
 // --- Transaction ---
 
-export const transactionTypeSchema = z.enum(['income', 'expense', 'transfer']);
+export const transactionTypeSchema = z.enum([
+  'income',
+  'expense',
+  'transfer',
+  // Службові типи; створюються лише через борги, а не через /api/transactions.
+  'debt_payment',
+  'balance_adjustment',
+]);
 export type TransactionType = z.infer<typeof transactionTypeSchema>;
 
 const transactionBase = {
@@ -116,7 +141,8 @@ export const transactionSchema = z.object({
   toAccountId: idSchema.nullable(),
   categoryId: idSchema.nullable(),
   occurrenceId: idSchema.nullable(),
-  amountMinor: positiveAmountMinorSchema,
+  /** Додатна; знакова лише для balance_adjustment. */
+  amountMinor: amountMinorSchema,
   currency: currencySchema,
   description: z.string(),
   occurredAt: instantSchema,

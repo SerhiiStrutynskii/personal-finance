@@ -22,9 +22,17 @@ const instant = () => timestamp({ withTimezone: true, mode: 'date' });
 const createdAt = () => instant().notNull().defaultNow();
 
 export const memberRole = pgEnum('member_role', ['owner', 'member']);
-export const accountType = pgEnum('account_type', ['card', 'cash', 'deposit']);
+export const accountType = pgEnum('account_type', ['card', 'cash', 'deposit', 'credit_card']);
 export const categoryKind = pgEnum('category_kind', ['income', 'expense']);
-export const transactionType = pgEnum('transaction_type', ['income', 'expense', 'transfer']);
+export const transactionType = pgEnum('transaction_type', [
+  'income',
+  'expense',
+  'transfer',
+  // Платіж по позиці чи розстрочці з рахунку; створюється лише разом із записом боргу.
+  'debt_payment',
+  // Службова зміна балансу рахунку (початковий борг кредитки, звірка); сума знакова.
+  'balance_adjustment',
+]);
 
 export const users = pgTable('users', {
   id: id(),
@@ -87,9 +95,21 @@ export const accounts = pgTable(
     name: text().notNull(),
     type: accountType().notNull(),
     currency: char({ length: 3 }).notNull().default('UAH'),
+    // Кредитний ліміт у мінімальних одиницях; лише для кредитної картки.
+    creditLimit: bigint('credit_limit', { mode: 'number' }),
+    // Архівний рахунок лишається в історії, але нових транзакцій не приймає.
+    isArchived: boolean('is_archived').notNull().default(false),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.householdId)],
+  (t) => [
+    index().on(t.householdId),
+    // Порівняння через text: значення, додане до enum міграцією, не можна вживати в тій самій транзакції.
+    check(
+      'accounts_credit_limit_valid',
+      sql`((${t.type})::text = 'credit_card') = (${t.creditLimit} IS NOT NULL)
+        AND (${t.creditLimit} IS NULL OR ${t.creditLimit} > 0)`,
+    ),
+  ],
 );
 
 export const categories = pgTable(
@@ -120,7 +140,8 @@ export const transactions = pgTable(
     // Рахунок призначення; заповнений тільки для переказів.
     toAccountId: uuid('to_account_id').references(() => accounts.id, { onDelete: 'restrict' }),
     categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'restrict' }),
-    // Сума в мінімальних одиницях валюти (копійки), завжди додатна; напрям задає type.
+    // Сума в мінімальних одиницях валюти (копійки), додатна; напрям задає type.
+    // Виняток — balance_adjustment: сума знакова й додається до балансу як є.
     amountMinor: bigint('amount_minor', { mode: 'number' }).notNull(),
     currency: char({ length: 3 }).notNull().default('UAH'),
     description: text().notNull().default(''),
@@ -136,7 +157,8 @@ export const transactions = pgTable(
   (t) => [
     // Для агрегації витрат бюджету: домогосподарство, тип, період, категорія.
     index().on(t.householdId, t.type, t.occurredAt, t.categoryId),
-    index().on(t.accountId),
+    // Для балансу рахунку на дату.
+    index().on(t.accountId, t.occurredAt),
     index().on(t.toAccountId),
     index().on(t.categoryId),
     index().on(t.occurrenceId),
@@ -144,7 +166,14 @@ export const transactions = pgTable(
       'transactions_occurrence_only_for_income',
       sql`${t.occurrenceId} IS NULL OR ${t.type} = 'income'`,
     ),
-    check('transactions_amount_positive', sql`${t.amountMinor} > 0`),
+    check(
+      'transactions_amount_valid',
+      sql`${t.amountMinor} > 0 OR ((${t.type})::text = 'balance_adjustment' AND ${t.amountMinor} <> 0)`,
+    ),
+    check(
+      'transactions_adjustment_shape',
+      sql`(${t.type})::text <> 'balance_adjustment' OR ${t.categoryId} IS NULL`,
+    ),
     check(
       'transactions_transfer_shape',
       sql`(${t.type} = 'transfer' AND ${t.toAccountId} IS NOT NULL AND ${t.toAccountId} <> ${t.accountId} AND ${t.categoryId} IS NULL)

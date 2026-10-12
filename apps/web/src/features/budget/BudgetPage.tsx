@@ -15,7 +15,7 @@ import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { monthLabel } from '../../shared/ui/format.ts';
 import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
-import { useAccounts } from '../accounts/api.ts';
+import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
 import { TransactionDialog } from '../transactions/TransactionDialog.tsx';
@@ -35,7 +35,7 @@ export function BudgetPage() {
   const budget = useBudget(month);
   const [expenseOpen, setExpenseOpen] = useState(false);
 
-  const accountList = accounts.data ?? [];
+  const accountList = activeAccounts(accounts.data);
   const expenseCategories = (categories.data ?? []).filter(
     (category) => category.kind === 'expense',
   );

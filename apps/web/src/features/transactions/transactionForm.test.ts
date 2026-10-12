@@ -15,6 +15,9 @@ const account = (n: number, currency = 'UAH'): Account => ({
   name: `Рахунок ${n}`,
   type: 'card',
   currency,
+  balance: 0,
+  creditLimit: null,
+  isArchived: false,
   createdAt: '2026-01-01T00:00:00.000Z',
 });
 

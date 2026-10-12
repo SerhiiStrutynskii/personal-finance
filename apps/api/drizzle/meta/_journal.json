@@ -50,6 +50,13 @@
       "when": 1791751692468,
       "tag": "0006_budget_periods",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791796614561,
+      "tag": "0007_accounts_balance_types",
+      "breakpoints": true
     }
   ]
 }

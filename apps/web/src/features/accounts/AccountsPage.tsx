@@ -1,3 +1,4 @@
+import { formatMoney } from '@hf/shared';
 import { errorMessage } from '../../shared/api/index.ts';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
@@ -28,7 +29,11 @@ export function AccountsPage() {
                 {account.name}{' '}
                 <span className="text-muted-foreground">
                   · {ACCOUNT_TYPE_LABELS[account.type]} · {account.currency}
+                  {account.isArchived && ' · в архіві'}
                 </span>
+              </span>
+              <span className="ml-auto tabular-nums" data-testid="account-balance">
+                {formatMoney({ amountMinor: account.balance, currency: account.currency })}
               </span>
               <ConfirmButton
                 title={`Видалити рахунок «${account.name}»?`}

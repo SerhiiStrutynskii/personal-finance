@@ -39,6 +39,9 @@ async function resolveValues(
 
   const account = accountsById.get(input.accountId);
   if (!account) throw badRequest('Рахунок не знайдено');
+  if (found.some((item) => item.isArchived)) {
+    throw badRequest('Архівний рахунок не приймає нових транзакцій');
+  }
   if (account.currency !== input.currency) {
     throw badRequest('Валюта транзакції має збігатися з валютою рахунку');
   }
@@ -110,6 +113,16 @@ function assertExpenseDateAllowed(occurredAt: Date, now: Date) {
   if (!isExpenseDateAllowed(occurredAt, now)) throw expenseDateInFuture();
 }
 
+/**
+ * Платежі по боргах і службові зміни балансу пов'язані із записами боргів, тому змінюються
+ * й видаляються лише через борги.
+ */
+function assertNotServiceTransaction(existing: repo.TransactionRow) {
+  if (existing.type === 'debt_payment' || existing.type === 'balance_adjustment') {
+    throw badRequest('Цей запис створено боргом; змініть або видаліть його на сторінці боргу');
+  }
+}
+
 export async function createTransaction(
   db: Db,
   auth: AuthContext,
@@ -130,6 +143,7 @@ export async function replaceTransaction(
 ): Promise<Transaction> {
   const existing = await repo.findTransaction(db, auth.householdId, id);
   if (!existing) throw notFound('Транзакція');
+  assertNotServiceTransaction(existing);
 
   const values = await resolveValues(db, auth, input);
   if (values.type === 'expense') assertExpenseDateAllowed(values.occurredAt, now);
@@ -142,5 +156,6 @@ export async function replaceTransaction(
 export async function deleteTransaction(db: Db, auth: AuthContext, id: string): Promise<void> {
   const existing = await repo.findTransaction(db, auth.householdId, id);
   if (!existing) throw notFound('Транзакція');
+  assertNotServiceTransaction(existing);
   await repo.deleteTransaction(db, auth.householdId, id);
 }

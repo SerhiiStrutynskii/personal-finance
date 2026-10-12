@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../shared/ui/table.tsx';
-import { useAccounts } from '../accounts/api.ts';
+import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { defaultEntryDate } from '../budget/month.ts';
 import { useCategories } from '../categories/api.ts';
@@ -105,7 +105,9 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
     open: false,
   });
 
-  const incomeAccounts = (accounts.data ?? []).filter((account) => account.currency === currency);
+  const incomeAccounts = activeAccounts(accounts.data).filter(
+    (account) => account.currency === currency,
+  );
   const incomeCategories = (categories.data ?? []).filter((category) => category.kind === 'income');
   const canAdd = incomeAccounts.length > 0;
   const openAction = (kind: OccurrenceAction) => (occurrence: Occurrence) =>

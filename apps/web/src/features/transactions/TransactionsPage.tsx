@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
-import { useAccounts } from '../accounts/api.ts';
+import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { defaultEntryDate } from '../budget/month.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
@@ -44,7 +44,8 @@ export function TransactionsPage({ type }: { type: EntryType }) {
 
   const error = transactions.error ?? accounts.error ?? categories.error;
   const page = transactions.data;
-  const hasAccounts = (accounts.data?.length ?? 0) > 0;
+  const usableAccounts = activeAccounts(accounts.data);
+  const hasAccounts = usableAccounts.length > 0;
   const entryCategories = (categories.data ?? []).filter((category) => category.kind === type);
   // Видаток не може мати майбутню дату; для доходів меж немає.
   const expenseRange =
@@ -127,7 +128,7 @@ export function TransactionsPage({ type }: { type: EntryType }) {
         maxDate={expenseRange?.maxDate}
         // Новий запис потрапляє в місяць, який зараз переглядається.
         defaults={{ date: defaultEntryDate(month, new Date(), user.timeZone) }}
-        accounts={accounts.data ?? []}
+        accounts={usableAccounts}
         categories={entryCategories}
       />
     </div>
