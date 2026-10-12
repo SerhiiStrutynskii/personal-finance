@@ -4,3 +4,4 @@ export * from './schemas.ts';
 export * from './budget/index.ts';
 export * from './incomes/index.ts';
 export * from './debts/index.ts';
+export * from './analytics/index.ts';
