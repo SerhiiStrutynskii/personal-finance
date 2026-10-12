@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @hf/api & npm run dev -w @hf/web & wait",
+    "build": "npm run build -w @hf/web",
+    "start": "npm run db:migrate:prod -w @hf/api && npm run start -w @hf/api",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint . && npm run lint -w @hf/web && prettier --check .",
     "format": "prettier --write .",

@@ -27,6 +27,12 @@ export interface AppOptions {
   loginLimiter?: RateLimiter;
   /** Поточний момент; підміняється в тестах, щоб перевіряти правила про періоди. */
   now?: () => Date;
+  /** false закриває реєстрацію нових користувачів. */
+  registrationEnabled?: boolean;
+  /** Каталог зі зібраним фронтендом, який API роздає з того самого домену. */
+  webDistDir?: string | undefined;
+  /** Кількість проксі перед застосунком — щоб req.ip був адресою клієнта. */
+  trustProxy?: number;
 }
 
 export function createApp({
@@ -35,11 +41,15 @@ export function createApp({
   jwtSecret,
   loginLimiter,
   now = () => new Date(),
+  registrationEnabled = true,
+  webDistDir,
+  trustProxy = 0,
 }: AppOptions) {
   const tokens = createTokenService(jwtSecret);
 
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', trustProxy);
   app.use(cors({ origin: corsOrigin }));
   app.use(express.json({ limit: '100kb' }));
 
@@ -49,7 +59,12 @@ export function createApp({
 
   app.use(
     '/api/auth',
-    authRouter({ db, tokens, loginLimiter: loginLimiter ?? createLoginLimiter() }),
+    authRouter({
+      db,
+      tokens,
+      loginLimiter: loginLimiter ?? createLoginLimiter(),
+      registrationEnabled,
+    }),
   );
 
   const api = Router();
@@ -66,6 +81,15 @@ export function createApp({
   api.use('/incomes', incomesRouter(db, now));
   api.use('/transactions', transactionsRouter(db, now));
   app.use('/api', api);
+
+  if (webDistDir) {
+    // Статичні файли фронтенду; будь-який інший маршрут поза /api — це сторінка застосунку,
+    // тож віддається index.html, а далі маршрут розбирає клієнт.
+    app.use(express.static(webDistDir, { index: false, maxAge: '1h' }));
+    app.get(/^\/(?!api(\/|$)|health$).*/, (_req, res) => {
+      res.sendFile('index.html', { root: webDistDir, maxAge: 0 });
+    });
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -10,7 +10,10 @@ window.addEventListener('storage', (event) => {
 });
 
 export const api = createApiClient({
-  baseUrl: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
+  // У зібраному застосунку API живе на тому самому домені; у розробці — окремий сервер.
+  baseUrl:
+    import.meta.env.VITE_API_URL ??
+    (import.meta.env.DEV ? 'http://localhost:3000' : window.location.origin),
   tokenStore,
   // Web Locks серіалізує оновлення токена між вкладками, що ділять один refresh-токен.
   ...('locks' in navigator && {

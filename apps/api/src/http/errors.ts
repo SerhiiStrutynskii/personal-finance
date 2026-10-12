@@ -28,6 +28,9 @@ export const budgetPeriodClosed = () =>
   );
 /** Запит коректний за формою, але порушує правило домену, яке має власний код. */
 export const unprocessable = (code: string, message: string) => new AppError(422, code, message);
+/** Реєстрацію нових користувачів вимкнено налаштуванням сервера. */
+export const registrationClosed = () =>
+  new AppError(403, 'REGISTRATION_CLOSED', 'Реєстрацію нових користувачів закрито');
 export const conflict = (message: string) => new AppError(409, 'CONFLICT', message);
 
 // ON DELETE RESTRICT повідомляє 23001, звичайний зовнішній ключ — 23503

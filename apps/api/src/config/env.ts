@@ -6,6 +6,15 @@ const envSchema = z.object({
   DATABASE_URL: z.url(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   JWT_SECRET: z.string().min(32, 'Потрібно щонайменше 32 символи'),
+  /** false закриває реєстрацію нових користувачів; входити можуть лише наявні. */
+  REGISTRATION_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  /** Каталог зі зібраним фронтендом; якщо задано, API роздає його з того самого домену. */
+  WEB_DIST_DIR: z.string().min(1).optional(),
+  /** Скільки проксі стоїть перед застосунком: від цього залежить, чию адресу бачить обмеження спроб входу. */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
 });
 
 export type Env = z.infer<typeof envSchema>;

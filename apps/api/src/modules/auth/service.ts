@@ -18,6 +18,8 @@ export interface AuthDeps {
   db: Db;
   tokens: TokenService;
   loginLimiter: RateLimiter;
+  /** false — нові користувачі не реєструються. */
+  registrationEnabled: boolean;
 }
 
 type Membership = NonNullable<Awaited<ReturnType<typeof repo.findMembership>>>;

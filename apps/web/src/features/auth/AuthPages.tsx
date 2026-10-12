@@ -1,7 +1,8 @@
 import { PASSWORD_MIN_LENGTH, loginSchema, registerSchema } from '@hf/shared';
+import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { errorMessage } from '../../shared/api/index.ts';
+import { Link, Navigate } from 'react-router-dom';
+import { api, errorMessage } from '../../shared/api/index.ts';
 import { ErrorText, Field } from '../../shared/ui/controls.tsx';
 import { useAuth } from './authContext.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -40,6 +41,20 @@ function AuthLayout({
   );
 }
 
+/**
+ * Чи відкрита реєстрація на цьому сервері. Поки відповіді немає — undefined,
+ * і посилання на реєстрацію не показується.
+ */
+function useRegistrationEnabled(): boolean | undefined {
+  const config = useQuery({
+    queryKey: ['auth-config'],
+    queryFn: () =>
+      api.get<{ registrationEnabled: boolean }>('/api/auth/config', undefined, { auth: false }),
+    staleTime: Infinity,
+  });
+  return config.data?.registrationEnabled;
+}
+
 function useSubmit(action: () => Promise<void>) {
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -60,6 +75,7 @@ function useSubmit(action: () => Promise<void>) {
 
 export function LoginPage() {
   const { login } = useAuth();
+  const registrationEnabled = useRegistrationEnabled();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -73,12 +89,16 @@ export function LoginPage() {
     <AuthLayout
       title="Вхід"
       footer={
-        <>
-          Ще немає облікового запису?{' '}
-          <Link className="underline" to="/register">
-            Зареєструватися
-          </Link>
-        </>
+        registrationEnabled ? (
+          <>
+            Ще немає облікового запису?{' '}
+            <Link className="underline" to="/register">
+              Зареєструватися
+            </Link>
+          </>
+        ) : (
+          registrationEnabled === false && 'Реєстрацію нових користувачів закрито.'
+        )
       }
     >
       <form className="space-y-3" onSubmit={submit} noValidate>
@@ -109,6 +129,7 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const { register } = useAuth();
+  const registrationEnabled = useRegistrationEnabled();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -130,6 +151,9 @@ export function RegisterPage() {
     setFieldErrors({});
     await register(parsed.data);
   });
+
+  // Реєстрацію закрито на сервері — показувати форму немає сенсу.
+  if (registrationEnabled === false) return <Navigate to="/login" replace />;
 
   return (
     <AuthLayout

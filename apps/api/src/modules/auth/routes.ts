@@ -1,12 +1,19 @@
 import { Router } from 'express';
 import { getAuth, requireAuth } from '../../http/auth.ts';
+import { registrationClosed } from '../../http/errors.ts';
 import { loginSchema, refreshSchema, registerSchema } from './schema.ts';
 import * as service from './service.ts';
 
 export function authRouter(deps: service.AuthDeps): Router {
   const router = Router();
 
+  // Відкрите налаштування для екрана входу: чи показувати реєстрацію.
+  router.get('/config', (_req, res) => {
+    res.json({ registrationEnabled: deps.registrationEnabled });
+  });
+
   router.post('/register', async (req, res) => {
+    if (!deps.registrationEnabled) throw registrationClosed();
     const input = registerSchema.parse(req.body);
     res.status(201).json(await service.register(deps, input));
   });
