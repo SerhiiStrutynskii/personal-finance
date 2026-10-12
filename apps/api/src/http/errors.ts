@@ -26,6 +26,8 @@ export const budgetPeriodClosed = () =>
     'BUDGET_PERIOD_CLOSED',
     'Бюджет можна створити лише для поточного або майбутнього місяця',
   );
+/** Запит коректний за формою, але порушує правило домену, яке має власний код. */
+export const unprocessable = (code: string, message: string) => new AppError(422, code, message);
 export const conflict = (message: string) => new AppError(409, 'CONFLICT', message);
 
 // ON DELETE RESTRICT повідомляє 23001, звичайний зовнішній ключ — 23503
