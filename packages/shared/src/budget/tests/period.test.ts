@@ -41,7 +41,8 @@ describe('getAllowedExpenseDateRange', () => {
 
 describe('isExpenseDateAllowed', () => {
   const now = new Date('2026-10-15T12:00:00Z');
-  const allowed = (occurredAt: string) => isExpenseDateAllowed(new Date(occurredAt), now);
+  const allowed = (occurredAt: string, timeZone = KYIV) =>
+    isExpenseDateAllowed(new Date(occurredAt), now, timeZone);
 
   it('дозволяє поточний місяць до цієї миті включно', () => {
     expect(allowed('2026-10-10T08:00:00Z')).toBe(true);
@@ -54,8 +55,19 @@ describe('isExpenseDateAllowed', () => {
     expect(allowed('2024-01-01T00:00:00Z')).toBe(true);
   });
 
+  it('пізніший момент сьогоднішнього дня дозволений: годинник пристрою може випереджати', () => {
+    expect(allowed('2026-10-15T12:00:01Z')).toBe(true);
+    expect(allowed('2026-10-15T20:59:59Z')).toBe(true); // 15 жовтня 23:59:59 за Києвом
+  });
+
+  it('сьогодні рахується в часовому поясі користувача', () => {
+    // 21:00 UTC: у Києві вже 16 жовтня, у Нью-Йорку ще 15-те
+    expect(allowed('2026-10-15T21:00:00Z')).toBe(false);
+    expect(allowed('2026-10-15T21:00:00Z', 'America/New_York')).toBe(true);
+  });
+
   it('майбутня дата недоступна, навіть у межах поточного місяця', () => {
-    expect(allowed('2026-10-15T12:00:01Z')).toBe(false);
+    expect(allowed('2026-10-16T12:00:00Z')).toBe(false);
     expect(allowed('2026-10-20T12:00:00Z')).toBe(false);
     expect(allowed('2026-11-01T12:00:00Z')).toBe(false);
   });

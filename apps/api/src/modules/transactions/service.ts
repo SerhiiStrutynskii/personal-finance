@@ -3,6 +3,7 @@ import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import { badRequest, expenseDateInFuture, notFound } from '../../http/errors.ts';
 import { findAccountsByIds } from '../accounts/repo.ts';
+import { findHouseholdTimeZone } from '../budgets/repo.ts';
 import { findCategory } from '../categories/repo.ts';
 import { findOccurrenceForLink } from '../incomes/repo.ts';
 import * as repo from './repo.ts';
@@ -107,11 +108,22 @@ export async function getTransaction(db: Db, auth: AuthContext, id: string): Pro
 
 /**
  * Обмеження видатків, спільне для всього застосунку: видаток можна створити чи перенести на
- * будь-яку дату до цієї миті, зокрема в минулі місяці, але не в майбутнє. Доходів і переказів
- * це не стосується.
+ * будь-яку дату до сьогодні включно (за часовим поясом домогосподарства), зокрема в минулі
+ * місяці, але не в майбутнє. Доходів і переказів це не стосується.
+ *
+ * Повертає момент для запису: пізніший за «зараз» момент сьогоднішнього дня (годинник пристрою
+ * випереджає серверний) записується поточним часом, щоб видаток не опинився в майбутньому.
  */
-function assertExpenseDateAllowed(occurredAt: Date, now: Date) {
-  if (!isExpenseDateAllowed(occurredAt, now)) throw expenseDateInFuture();
+async function resolveExpenseInstant(
+  db: Db,
+  auth: AuthContext,
+  occurredAt: Date,
+  now: Date,
+): Promise<Date> {
+  const timeZone = await findHouseholdTimeZone(db, auth.householdId);
+  if (!timeZone) throw notFound('Домогосподарство');
+  if (!isExpenseDateAllowed(occurredAt, now, timeZone)) throw expenseDateInFuture();
+  return occurredAt.getTime() > now.getTime() ? now : occurredAt;
 }
 
 /**
@@ -131,7 +143,9 @@ export async function createTransaction(
   now: Date = new Date(),
 ): Promise<Transaction> {
   const values = await resolveValues(db, auth, input);
-  if (values.type === 'expense') assertExpenseDateAllowed(values.occurredAt, now);
+  if (values.type === 'expense') {
+    values.occurredAt = await resolveExpenseInstant(db, auth, values.occurredAt, now);
+  }
   return toTransactionDto(await repo.insertTransaction(db, auth.householdId, auth.userId, values));
 }
 
@@ -147,7 +161,9 @@ export async function replaceTransaction(
   assertNotServiceTransaction(existing);
 
   const values = await resolveValues(db, auth, input);
-  if (values.type === 'expense') assertExpenseDateAllowed(values.occurredAt, now);
+  if (values.type === 'expense') {
+    values.occurredAt = await resolveExpenseInstant(db, auth, values.occurredAt, now);
+  }
 
   const row = await repo.replaceTransaction(db, auth.householdId, id, values);
   if (!row) throw notFound('Транзакція');

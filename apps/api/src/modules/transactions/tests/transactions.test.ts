@@ -425,11 +425,31 @@ describe('обмеження дати видатку', () => {
     const actor = await createActor();
     const { card } = await createFixtures(actor);
 
-    const laterToday = await expenseAt(actor, card.id, '2026-03-31T20:30:01Z');
-    expect(laterToday.status).toBe(422);
-    expect(laterToday.body.error.code).toBe('EXPENSE_DATE_IN_FUTURE');
+    // 31 березня 21:00 UTC — у Києві вже 1 квітня
+    const tomorrow = await expenseAt(actor, card.id, '2026-03-31T21:00:00Z');
+    expect(tomorrow.status).toBe(422);
+    expect(tomorrow.body.error.code).toBe('EXPENSE_DATE_IN_FUTURE');
     expect((await expenseAt(actor, card.id, '2026-04-10T10:00:00Z')).status).toBe(422);
     expect((await actor.get('/api/transactions')).body.total).toBe(0);
+  });
+
+  it('видаток на сьогодні з часом, пізнішим за серверний, записується поточним часом', async () => {
+    const actor = await createActor();
+    const { card } = await createFixtures(actor);
+
+    // Годинник пристрою випереджає серверний на дві хвилини.
+    const created = await expenseAt(actor, card.id, '2026-03-31T20:32:00Z');
+    expect(created.status).toBe(201);
+    expect(created.body.occurredAt).toBe('2026-03-31T20:30:00.000Z');
+
+    const moved = await actor.put(`/api/transactions/${created.body.id}`, {
+      type: 'expense',
+      accountId: card.id,
+      amountMinor: 100,
+      occurredAt: '2026-03-31T20:59:59Z',
+    });
+    expect(moved.status).toBe(200);
+    expect(moved.body.occurredAt).toBe('2026-03-31T20:30:00.000Z');
   });
 
   it('видаток минулого місяця можна змінити й видалити', async () => {

@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   cardAvailable,
   creditLimitExcess,
+  defaultTransferTarget,
   initialValues,
   toTransactionInput,
+  transferTargets,
   type FormContext,
   type TransactionFormValues,
 } from './transactionForm.ts';
@@ -317,6 +319,26 @@ describe('межі дат (minDate / maxDate)', () => {
   it('сьогоднішня дата отримує поточний час, тож не виходить у майбутнє', () => {
     const result = toTransactionInput('expense', values({ date: '2026-03-15' }), limited);
     expect(result.ok && result.input.occurredAt).toBe(now.toISOString());
+  });
+});
+
+describe('рахунок призначення переказу', () => {
+  const accounts = [card, usd, cash, yen];
+
+  it('серед варіантів немає рахунку, з якого переказують', () => {
+    expect(transferTargets(accounts, card.id)).toEqual([usd, cash, yen]);
+    expect(transferTargets(accounts, cash.id)).toEqual([card, usd, yen]);
+  });
+
+  it('за замовчуванням — перший інший рахунок у тій самій валюті', () => {
+    expect(defaultTransferTarget(accounts, card.id)).toBe(cash.id);
+    expect(defaultTransferTarget(accounts, cash.id)).toBe(card.id);
+  });
+
+  it('порожньо, якщо іншого рахунку в цій валюті немає', () => {
+    expect(defaultTransferTarget(accounts, usd.id)).toBe('');
+    expect(defaultTransferTarget([card], card.id)).toBe('');
+    expect(defaultTransferTarget([], '')).toBe('');
   });
 });
 

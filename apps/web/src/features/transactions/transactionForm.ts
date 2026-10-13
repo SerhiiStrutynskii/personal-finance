@@ -70,6 +70,21 @@ export function initialValues(
   };
 }
 
+/** Рахунки, на які можна переказати з обраного: усі, крім нього самого. */
+export function transferTargets(accounts: readonly Account[], accountId: string): Account[] {
+  return accounts.filter((account) => account.id !== accountId);
+}
+
+/**
+ * Рахунок призначення, який пропонується для нового переказу: перший інший рахунок у тій самій
+ * валюті. Порожній рядок — такого немає, користувач обирає сам.
+ */
+export function defaultTransferTarget(accounts: readonly Account[], accountId: string): string {
+  const currency = accounts.find((account) => account.id === accountId)?.currency;
+  const target = transferTargets(accounts, accountId).find((item) => item.currency === currency);
+  return target?.id ?? '';
+}
+
 /**
  * Момент транзакції для обраної дати. У формі вибирається лише день, тому:
  * якщо дата не змінилася під час редагування — лишається початковий час;

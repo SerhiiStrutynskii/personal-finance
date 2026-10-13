@@ -17,7 +17,13 @@ import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useSaveTransaction } from './api.ts';
-import { initialValues, toTransactionInput, type FormErrors } from './transactionForm.ts';
+import {
+  defaultTransferTarget,
+  initialValues,
+  toTransactionInput,
+  transferTargets,
+  type FormErrors,
+} from './transactionForm.ts';
 
 /** Кнопка «Новий переказ» із формою переказу між рахунками в модальному вікні. */
 export function AddTransferDialog({ accounts }: { accounts: Account[] }) {
@@ -25,7 +31,10 @@ export function AddTransferDialog({ accounts }: { accounts: Account[] }) {
   const save = useSaveTransaction();
 
   const context = () => ({ accounts, timeZone: user.timeZone, now: new Date() });
-  const blank = () => initialValues(context(), { toAccountId: accounts[1]?.id ?? '' });
+  const blank = () => {
+    const values = initialValues(context());
+    return { ...values, toAccountId: defaultTransferTarget(accounts, values.accountId) };
+  };
 
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState(blank);
@@ -53,10 +62,8 @@ export function AddTransferDialog({ accounts }: { accounts: Account[] }) {
     save.mutate({ input: result.input }, { onSuccess: () => setOpen(false) });
   }
 
-  const accountOptions = accounts.map((account) => ({
-    value: account.id,
-    label: `${account.name} (${account.currency})`,
-  }));
+  const toOptions = (items: readonly Account[]) =>
+    items.map((account) => ({ value: account.id, label: `${account.name} (${account.currency})` }));
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -77,9 +84,15 @@ export function AddTransferDialog({ accounts }: { accounts: Account[] }) {
             <Field label="З рахунку" error={errors.accountId}>
               <SelectField
                 value={values.accountId}
-                onChange={(accountId) => set({ accountId })}
+                onChange={(accountId) =>
+                  // Переказ на той самий рахунок неможливий: призначення треба обрати заново.
+                  set({
+                    accountId,
+                    toAccountId: values.toAccountId === accountId ? '' : values.toAccountId,
+                  })
+                }
                 invalid={Boolean(errors.accountId)}
-                options={accountOptions}
+                options={toOptions(accounts)}
               />
             </Field>
             <Field label="На рахунок" error={errors.toAccountId}>
@@ -87,7 +100,8 @@ export function AddTransferDialog({ accounts }: { accounts: Account[] }) {
                 value={values.toAccountId}
                 onChange={(toAccountId) => set({ toAccountId })}
                 invalid={Boolean(errors.toAccountId)}
-                options={accountOptions}
+                placeholder="Оберіть рахунок"
+                options={toOptions(transferTargets(accounts, values.accountId))}
               />
             </Field>
             <Field label="Сума" error={errors.amount}>
