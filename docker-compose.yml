@@ -19,6 +19,7 @@ services:
 
   app:
     build: .
+    image: ${APP_IMAGE:-personal-finance-app}:${IMAGE_TAG:-local}
     restart: unless-stopped
     depends_on:
       db:
