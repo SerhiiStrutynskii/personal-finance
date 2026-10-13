@@ -4,6 +4,8 @@ import { dateStringSchema, occurrenceStatusSchema } from '../incomes/schemas.ts'
 import { idSchema } from '../schemas.ts';
 import { monthSchema } from './month.ts';
 
+export const planStateSchema = z.enum(['balanced', 'deficit']);
+
 export const categoryStatusSchema = z.enum(['over', 'surplus', 'neutral']);
 
 /** Запланована сума в мінімальних одиницях валюти; нуль дозволено. */
@@ -60,6 +62,8 @@ export const budgetViewSchema = z.object({
     spentTotal: z.number().int(),
     plannedBalance: z.number().int(),
     actualBalance: z.number().int(),
+    /** balanced — заплановані витрати не більші за заплановані доходи. */
+    planState: planStateSchema,
   }),
   /** Доходи місяця з фічі доходів — лише для перегляду. */
   incomes: z.object({

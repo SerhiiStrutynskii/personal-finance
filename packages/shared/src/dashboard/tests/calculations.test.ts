@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAttention,
+  buildMonthPlan,
   buildUpcoming,
   netWorthOf,
+  summarizeDebtPayments,
   type DashboardDebt,
   type DashboardGoal,
   type DashboardOccurrence,
@@ -247,5 +249,58 @@ describe('netWorthOf', () => {
     expect(netWorthOf(1_000_000, [300_000, 50_000])).toBe(650_000);
     expect(netWorthOf(-20_000, [])).toBe(-20_000);
     expect(netWorthOf(100, [500])).toBe(-400);
+  });
+});
+
+describe('summarizeDebtPayments', () => {
+  it('без боргів — нулі', () => {
+    expect(summarizeDebtPayments([])).toEqual({ required: 0, paid: 0, remaining: 0 });
+  });
+
+  it('складає платежі місяця, сплачене й залишок', () => {
+    expect(
+      summarizeDebtPayments([
+        debt('A'),
+        debt('B', { paid: 4_000, status: 'partial' }),
+        debt('C', { required: 25_000, paid: 25_000, status: 'paid' }),
+      ]),
+    ).toEqual({ required: 45_000, paid: 29_000, remaining: 16_000 });
+  });
+
+  it('переплата одного боргу не зменшує залишок іншого', () => {
+    expect(summarizeDebtPayments([debt('A'), debt('B', { paid: 30_000, status: 'paid' })])).toEqual(
+      { required: 20_000, paid: 10_000, remaining: 10_000 },
+    );
+  });
+
+  it('борг без платежу цього місяця й закритий борг не рахуються', () => {
+    expect(
+      summarizeDebtPayments([
+        debt('A'),
+        debt('Ще не почався', { required: 0, status: 'none' }),
+        debt('Закритий', {}, 'closed'),
+      ]),
+    ).toEqual({ required: 10_000, paid: 0, remaining: 10_000 });
+  });
+});
+
+describe('buildMonthPlan', () => {
+  it('без бюджету витрати, різниця й стан невідомі', () => {
+    expect(buildMonthPlan(50_000, null)).toEqual({
+      plannedIncome: 50_000,
+      plannedExpenses: null,
+      balance: null,
+      state: null,
+    });
+  });
+
+  it('витрати не більші за доходи — бюджет сходиться', () => {
+    expect(buildMonthPlan(50_000, 30_000)).toMatchObject({ balance: 20_000, state: 'balanced' });
+    expect(buildMonthPlan(50_000, 50_000)).toMatchObject({ balance: 0, state: 'balanced' });
+    expect(buildMonthPlan(0, 0)).toMatchObject({ balance: 0, state: 'balanced' });
+  });
+
+  it('витрати більші за доходи — дефіцит', () => {
+    expect(buildMonthPlan(50_000, 50_001)).toMatchObject({ balance: -1, state: 'deficit' });
   });
 });

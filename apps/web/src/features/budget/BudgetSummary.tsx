@@ -1,7 +1,6 @@
 import { formatMoney, type BudgetView } from '@hf/shared';
-import { TriangleAlert } from 'lucide-react';
-import { Alert, AlertDescription } from '../../shared/ui/alert.tsx';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
+import { PlanSummary } from './PlanSummary.tsx';
 
 function Figure({ title, planned, actual }: { title: string; planned: string; actual: string }) {
   return (
@@ -16,11 +15,16 @@ function Figure({ title, planned, actual }: { title: string; planned: string; ac
 export function BudgetSummary({ budget }: { budget: BudgetView }) {
   const { summary, currency } = budget;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
-  const shortfall = summary.plannedExpenseTotal - summary.plannedIncomeTotal;
 
   return (
     <div className="space-y-3">
-      <Card>
+      <PlanSummary
+        plannedIncome={summary.plannedIncomeTotal}
+        plannedExpenses={summary.plannedExpenseTotal}
+        state={summary.planState}
+        currency={currency}
+      />
+      <Card data-testid="budget-summary">
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Figure
             title="Доходи"
@@ -39,14 +43,6 @@ export function BudgetSummary({ budget }: { budget: BudgetView }) {
           />
         </CardContent>
       </Card>
-      {shortfall > 0 && (
-        <Alert>
-          <TriangleAlert aria-hidden />
-          <AlertDescription>
-            Заплановані витрати перевищують заплановані доходи на {money(shortfall)}.
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 }

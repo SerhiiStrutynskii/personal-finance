@@ -93,6 +93,13 @@
     "daysElapsed": 12,
     "daysInMonth": 31
   },
+  "plan": {
+    "plannedIncome": 6000000,
+    "plannedExpenses": 5200000,
+    "balance": 800000,
+    "state": "balanced"
+  },
+  "debtPayments": { "required": 390000, "paid": 270000, "remaining": 120000 },
   "attention": [
     { "kind": "debt_overdue", "id": "…", "name": "Позика", "amount": 100000, "date": "2026-10-10" }
   ],
@@ -118,6 +125,12 @@
 - `money.accountsTotal` — сума балансів рахунків у гривні; `netWorth` — вона ж мінус залишки активних
   позик і розстрочок; `debtTotal` — усі борги разом із кредитками. `accounts` — неархівні рахунки.
 - `monthSummary.plannedExpenseTotal` — сума лімітів бюджету; `null`, якщо бюджету на місяць немає.
+- `plan` — план місяця: `plannedIncome` — планова сума надходжень (`plannedTotal` доходів),
+  `plannedExpenses` — сума лімітів, `balance` — їхня різниця, `state` — `balanced` (витрати не більші
+  за доходи) або `deficit`. Без бюджету `plannedExpenses`, `balance` і `state` дорівнюють `null`.
+- `debtPayments` — обов'язкові платежі місяця по активних боргах, зокрема мінімальні по кредитках:
+  `required` — сума платежів, `paid` — сплачене з них, `remaining` — решта (те саме, що `dueThisMonth`
+  огляду боргів). Борг, перший платіж якого ще не настав, сюди не входить.
 - `attention[].kind` — `debt_overdue` \| `income_overdue` \| `budget_over` \| `goal_overdue` \|
   `debt_due_soon` \| `goal_behind`, у цьому порядку. `id` — борг, надходження чи ціль; для
   `budget_over` — категорія або `null`. `amount` і `date` можуть бути `null`.
@@ -259,7 +272,8 @@
     "plannedExpenseTotal": 5200000,
     "spentTotal": 3180000,
     "plannedBalance": 800000,
-    "actualBalance": 2070000
+    "actualBalance": 2070000,
+    "planState": "balanced"
   },
   "incomes": {
     "occurrences": [

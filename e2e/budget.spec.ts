@@ -68,7 +68,7 @@ test('видаток понад ліміт робить рядок катего�
   expect(colors.border).toBe(colors.expected);
 
   // Підсумок оновився.
-  const summary = page.locator('[data-slot=card]').first();
+  const summary = page.getByTestId('budget-summary');
   await expect(summary).toContainText('Витрати150,00');
   await page.screenshot({ path: 'test-results/budget-over-limit.png', fullPage: true });
 

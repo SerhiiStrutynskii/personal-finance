@@ -98,7 +98,13 @@ spentTotal          = сума всіх видатків за період (вк
 plannedBalance = plannedIncomeTotal - plannedExpenseTotal
 actualBalance  = receivedIncomeTotal - spentTotal
 ```
-Якщо `plannedExpenseTotal > plannedIncomeTotal`, показується попередження, але збереження не блокується.
+Стан плану `getPlanState(plannedIncome, plannedExpenses)` повертається в `summary.planState`:
+```
+if plannedExpenseTotal > plannedIncomeTotal → "deficit"   (бюджет не сходиться)
+else                                        → "balanced"  (сходиться, зокрема коли суми рівні)
+```
+Дефіцит лише показується; збереження лімітів він не блокує. Стан залежить тільки від плану:
+фактичні витрати й отримані доходи на нього не впливають.
 
 ## 4. Обмеження за періодом
 
@@ -140,7 +146,7 @@ DELETE /budgets/:id/expense-lines/:lineId
   "canAddExpense": true, "canEditLimits": true,
   "summary": { "plannedIncomeTotal": 6000000, "receivedIncomeTotal": 5250000,
                "plannedExpenseTotal": 5200000, "spentTotal": 3180000,
-               "plannedBalance": 800000, "actualBalance": 2070000 },
+               "plannedBalance": 800000, "actualBalance": 2070000, "planState": "balanced" },
   "incomes": {
     "occurrences": [
       { "name": "Зарплата", "plannedDate": "2026-10-05", "plannedAmount": 4500000,
@@ -198,6 +204,9 @@ CREATE TABLE budget_expense_lines (
 Екран «Бюджет на місяць»:
 - перемикач місяця (← жовтень 2026 →); якщо бюджету немає (поточний або майбутній місяць) —
   кнопки «Створити» та «Скопіювати ліміти з попереднього»;
+- блок «План місяця» (спільний компонент `PlanSummary`, той самий, що на головній): очікувані доходи,
+  очікувані витрати, різниця й індикатор з іконкою та текстом — «Бюджет сходиться» (`balanced`)
+  або «Бюджет не сходиться: … на X» (`deficit`);
 - картка підсумку: план/факт доходів, план/факт витрат, залишок;
 - блок «Доходи» — лише перегляд: надходження з індикаторами статусу (як у скілі `incomes`),
   сума разових доходів, посилання «Перейти до доходів». Кнопок додавання доходу тут немає;

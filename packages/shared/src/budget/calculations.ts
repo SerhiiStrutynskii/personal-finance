@@ -62,6 +62,13 @@ export interface UnplannedExpense extends CategorySpending {
   status: CategoryStatus;
 }
 
+/** Чи сходиться план місяця: заплановані витрати не більші за заплановані доходи. */
+export type PlanState = 'balanced' | 'deficit';
+
+export function getPlanState(plannedIncome: number, plannedExpenses: number): PlanState {
+  return plannedExpenses > plannedIncome ? 'deficit' : 'balanced';
+}
+
 export interface BudgetSummary {
   plannedIncomeTotal: number;
   receivedIncomeTotal: number;
@@ -69,6 +76,7 @@ export interface BudgetSummary {
   spentTotal: number;
   plannedBalance: number;
   actualBalance: number;
+  planState: PlanState;
 }
 
 export interface BudgetCalculation {
@@ -129,6 +137,7 @@ export function calculateBudget({
       spentTotal,
       plannedBalance: plannedIncome - plannedExpenseTotal,
       actualBalance: receivedIncome - spentTotal,
+      planState: getPlanState(plannedIncome, plannedExpenseTotal),
     },
     expenseLines: expenseResults,
     unplannedExpenses,

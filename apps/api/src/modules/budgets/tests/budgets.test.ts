@@ -83,6 +83,7 @@ describe('створення й читання бюджету', () => {
         spentTotal: 0,
         plannedBalance: 0,
         actualBalance: 0,
+        planState: 'balanced',
       },
       incomes: { occurrences: [], oneTimeTotal: 0 },
       expenseLines: [],
@@ -545,6 +546,7 @@ describe('доходи в бюджеті', () => {
       spentTotal: 250000,
       plannedBalance: incomes.summary.plannedTotal - 1500000,
       actualBalance: incomes.summary.receivedTotal - 250000,
+      planState: 'balanced',
     });
     // конкретні числа: план 45 000 + 15 000 + 8 000, отримано 45 000 + 3 000 + 7 500
     expect(view.summary).toMatchObject({

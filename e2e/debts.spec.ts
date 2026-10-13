@@ -48,7 +48,7 @@ test('кредитка: видаток з картки збільшує борг
   await expenseDialog.getByRole('button', { name: 'Зберегти' }).click();
   await expect(expenseDialog).toBeHidden();
 
-  const summary = page.locator('[data-slot=card]').first();
+  const summary = page.getByTestId('budget-summary');
   await expect(summary).toContainText('Витрати150,00');
   await expect(page.getByText('Продукти').first()).toBeVisible();
 
@@ -105,6 +105,11 @@ test('позика банку: місячний платіж дає статус
   const line = page.getByTestId('expense-line').filter({ hasText: 'Погашення боргів' });
   await expect(line).toContainText('Залишок 100,00');
 
+  // На головній — сума обов'язкових платежів місяця.
+  await page.getByRole('link', { name: 'Головна' }).click();
+  await expect(page.getByTestId('dashboard-debt-payments')).toContainText('100,00');
+  await expect(page.getByTestId('dashboard-debt-payments')).toContainText('лишилось 100,00');
+
   await page.getByRole('link', { name: 'Борги' }).click();
   await expect(page.getByTestId('debts-summary')).toContainText('900,00');
   await page.getByRole('link', { name: 'Позика на ремонт' }).click();
@@ -132,7 +137,7 @@ test('позика банку: місячний платіж дає статус
   await page.getByRole('link', { name: 'Бюджет' }).click();
   await expect(line).toHaveAttribute('data-status', 'neutral');
   await expect(line).toContainText('Залишок 0,00');
-  await expect(page.locator('[data-slot=card]').first()).toContainText('Витрати100,00');
+  await expect(page.getByTestId('budget-summary')).toContainText('Витрати100,00');
 
   // Умови змінюються з меню рядка у списку боргів.
   await page.getByRole('link', { name: 'Борги' }).click();

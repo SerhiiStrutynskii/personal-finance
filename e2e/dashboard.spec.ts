@@ -21,7 +21,9 @@ test('головна: кроки для нового користувача, в�
   await expect(setup.locator('li[data-done=true]')).toHaveCount(1);
   await expect(page.getByTestId('dashboard-money')).toContainText('Чисті активи');
   await expect(page.getByTestId('dashboard-attention')).toContainText('Усе під контролем');
-  await expect(page.getByTestId('dashboard-month')).toContainText('немає бюджету');
+  const plan = page.getByTestId('dashboard-plan').getByTestId('month-plan');
+  await expect(plan).toHaveAttribute('data-state', 'none');
+  await expect(plan).toContainText('немає бюджету');
 
   // Бюджет із лімітом 100 грн на «Продукти».
   await page.getByRole('link', { name: 'Бюджет', exact: true }).click();
@@ -31,9 +33,16 @@ test('головна: кроки для нового користувача, в�
   await limitDialog.getByLabel('Ліміт, UAH').fill('100');
   await limitDialog.getByRole('button', { name: 'Зберегти' }).click();
   await expect(limitDialog).toBeHidden();
+  // Доходів не заплановано, тож ліміт 100 грн уже більший за них.
+  await expect(page.getByTestId('month-plan')).toHaveAttribute('data-state', 'deficit');
+  await expect(page.getByTestId('month-plan')).toContainText(
+    'заплановані витрати більші за доходи на 100,00',
+  );
 
   // Видаток 150 грн із головної — тією самою модалкою, що й у розділі витрат.
   await page.getByRole('link', { name: 'Головна' }).click();
+  await expect(plan).toHaveAttribute('data-state', 'deficit');
+  await expect(plan).toContainText('Очікувані витрати100,00');
   await page.getByRole('button', { name: 'Видаток', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Нова витрата' })).toBeVisible();

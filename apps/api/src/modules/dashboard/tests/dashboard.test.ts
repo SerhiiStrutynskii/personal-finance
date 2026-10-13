@@ -76,6 +76,8 @@ describe('головна: новий користувач', () => {
         daysElapsed: 12,
         daysInMonth: 31,
       },
+      plan: { plannedIncome: 0, plannedExpenses: null, balance: null, state: null },
+      debtPayments: { required: 0, paid: 0, remaining: 0 },
       attention: [],
       upcoming: [],
       goals: [],
@@ -198,6 +200,92 @@ describe('головна: цей місяць', () => {
       plannedAmount: 500_000,
     });
     expect((await dashboardOf(actor)).monthSummary.plannedExpenseTotal).toBe(500_000);
+  });
+});
+
+describe('головна: план місяця й платежі по боргах', () => {
+  const salary = (actor: Actor, accountId: string, plannedAmount: number) =>
+    actor.post('/api/income-sources', {
+      name: 'Зарплата',
+      accountId,
+      plannedAmount,
+      frequency: 'monthly',
+      dayOfMonth: 5,
+      startDate: '2026-01-01',
+    });
+
+  it('без бюджету є лише очікувані доходи', async () => {
+    const { actor, card } = await setup();
+    await salary(actor, card.id, 4_000_000);
+    expect((await dashboardOf(actor)).plan).toEqual({
+      plannedIncome: 4_000_000,
+      plannedExpenses: null,
+      balance: null,
+      state: null,
+    });
+  });
+
+  it('бюджет сходиться, поки ліміти не більші за очікувані доходи; збігається з бюджетом', async () => {
+    const { actor, card, category } = await setup();
+    await salary(actor, card.id, 4_000_000);
+    const food = await category('Продукти');
+    const { body: budget } = await actor.post('/api/budgets', { month: '2026-10' });
+    const { body: withLine } = await actor.post(`/api/budgets/${budget.id}/expense-lines`, {
+      categoryId: food.id,
+      plannedAmount: 4_000_000,
+    });
+    expect((await dashboardOf(actor)).plan).toEqual({
+      plannedIncome: 4_000_000,
+      plannedExpenses: 4_000_000,
+      balance: 0,
+      state: 'balanced',
+    });
+
+    const lineId = withLine.expenseLines[0].id;
+    await actor.patch(`/api/budgets/${budget.id}/expense-lines/${lineId}`, {
+      plannedAmount: 4_000_001,
+    });
+    const { plan } = await dashboardOf(actor);
+    expect(plan).toEqual({
+      plannedIncome: 4_000_000,
+      plannedExpenses: 4_000_001,
+      balance: -1,
+      state: 'deficit',
+    });
+    const { summary } = (await actor.get('/api/budgets?month=2026-10')).body;
+    expect(summary).toMatchObject({
+      plannedIncomeTotal: plan.plannedIncome,
+      plannedExpenseTotal: plan.plannedExpenses,
+      plannedBalance: plan.balance,
+      planState: plan.state,
+    });
+  });
+
+  it('обов’язкові платежі: позики й кредитки, без боргів із пізнішим першим платежем', async () => {
+    const { actor, card, income } = await setup();
+    await income(2_000_000, '2026-10-01T10:00:00Z');
+    const { body: loan } = await actor.post('/api/debts', loanInput());
+    await actor.post('/api/debts', cardDebtInput());
+    await actor.post(
+      '/api/debts',
+      loanInput({ name: 'Відкладена', monthlyPayment: 70_000, firstPaymentMonth: '2026-11' }),
+    );
+    // 100 000 позика + 50 000 мінімальний платіж кредитки
+    expect((await dashboardOf(actor)).debtPayments).toEqual({
+      required: 150_000,
+      paid: 0,
+      remaining: 150_000,
+    });
+
+    await actor.post(`/api/debts/${loan.id}/payments`, {
+      accountId: card.id,
+      amount: 40_000,
+      date: TODAY,
+    });
+    const { debtPayments } = await dashboardOf(actor);
+    expect(debtPayments).toEqual({ required: 150_000, paid: 40_000, remaining: 110_000 });
+    const { body: debts } = await actor.get('/api/debts');
+    expect(debtPayments.remaining).toBe(debts.summary.dueThisMonth);
   });
 });
 

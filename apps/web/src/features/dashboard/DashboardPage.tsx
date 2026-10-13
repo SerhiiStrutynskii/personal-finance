@@ -16,6 +16,7 @@ import { Progress } from '../../shared/ui/progress.tsx';
 import { ACCOUNT_TYPE_LABELS, activeAccounts, useAccounts } from '../accounts/api.ts';
 import { signedMoney } from '../analytics/signedMoney.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
+import { PlanSummary } from '../budget/PlanSummary.tsx';
 import { useCategories } from '../categories/api.ts';
 import { GoalStateLabel } from '../goals/GoalStateLabel.tsx';
 import { AddTransferDialog } from '../transactions/AddTransferDialog.tsx';
@@ -79,6 +80,9 @@ export function DashboardPage() {
             <SetupSteps setup={data.setup} />
           )}
           <MoneyBlock data={data} />
+          <Block title="План місяця" to="/budget" testId="dashboard-plan">
+            <PlanSummary {...data.plan} currency={data.currency} />
+          </Block>
           <MonthBlock data={data} />
           <AttentionBlock data={data} />
           <UpcomingBlock data={data} />
@@ -168,7 +172,7 @@ function SetupSteps({ setup }: { setup: Dashboard['setup'] }) {
 }
 
 function MoneyBlock({ data }: { data: Dashboard }) {
-  const { money, currency } = data;
+  const { money, debtPayments, currency } = data;
   const format = (amountMinor: number, code = currency) =>
     signedMoney(amountMinor, code).replace(/^\+/, '');
   return (
@@ -184,6 +188,18 @@ function MoneyBlock({ data }: { data: Dashboard }) {
             <Figure title="На рахунках" value={format(money.accountsTotal)} />
             <Figure title="Загальний борг" value={format(money.debtTotal)} />
           </div>
+          {debtPayments.required > 0 && (
+            <p className="text-sm" data-testid="dashboard-debt-payments">
+              <Link className="underline underline-offset-4" to="/debts">
+                Обов’язкові платежі по боргах цього місяця
+              </Link>
+              : <span className="font-medium tabular-nums">{format(debtPayments.required)}</span>
+              <span className="text-muted-foreground">
+                {' '}
+                · сплачено {format(debtPayments.paid)} · лишилось {format(debtPayments.remaining)}
+              </span>
+            </p>
+          )}
           <ul className="divide-y text-sm">
             {money.accounts.map((account) => (
               <li key={account.id} className="flex justify-between gap-4 py-1.5">
@@ -232,14 +248,6 @@ function MonthBlock({ data }: { data: Dashboard }) {
                 aria-label="Витрачено від суми лімітів"
               />
             </div>
-          )}
-          {planned === null && (
-            <Muted>
-              На цей місяць немає бюджету.{' '}
-              <Link className="underline underline-offset-4" to="/budget">
-                Створити бюджет
-              </Link>
-            </Muted>
           )}
           <p className="text-sm text-muted-foreground">
             Прогноз на кінець місяця за поточного темпу: {money(month.projected)} (минуло{' '}

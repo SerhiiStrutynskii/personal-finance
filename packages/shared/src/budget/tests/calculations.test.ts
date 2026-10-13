@@ -3,6 +3,7 @@ import { monthPeriod } from '../../dates.ts';
 import {
   calculateBudget,
   getCategoryStatus,
+  getPlanState,
   getUsage,
   summarizeTransactions,
   type BudgetTransaction,
@@ -230,6 +231,7 @@ describe('calculateBudget', () => {
       spentTotal: 1955000,
       plannedBalance: 4100000,
       actualBalance: 2595000,
+      planState: 'balanced',
     });
   });
 
@@ -241,6 +243,7 @@ describe('calculateBudget', () => {
       now: during,
     });
     expect(summary.plannedBalance).toBe(-900000);
+    expect(summary.planState).toBe('deficit');
     expect(summary.actualBalance).toBe(-1455000);
   });
 
@@ -261,9 +264,26 @@ describe('calculateBudget', () => {
         spentTotal: 0,
         plannedBalance: 0,
         actualBalance: 0,
+        planState: 'balanced',
       },
       expenseLines: [],
       unplannedExpenses: [],
     });
+  });
+});
+
+describe('getPlanState', () => {
+  it('витрати менші за доходи — бюджет сходиться', () => {
+    expect(getPlanState(1000, 999)).toBe('balanced');
+  });
+
+  it('витрати рівно дорівнюють доходам — ще сходиться', () => {
+    expect(getPlanState(1000, 1000)).toBe('balanced');
+    expect(getPlanState(0, 0)).toBe('balanced');
+  });
+
+  it('витрати більші на копійку — дефіцит', () => {
+    expect(getPlanState(1000, 1001)).toBe('deficit');
+    expect(getPlanState(0, 1)).toBe('deficit');
   });
 });

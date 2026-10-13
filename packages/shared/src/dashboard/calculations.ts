@@ -1,5 +1,6 @@
 // Списки головної сторінки. Нових розрахунків тут немає: елементи складаються зі статусів,
 // які вже порахували борги, доходи, бюджет і цілі.
+import { getPlanState, type PlanState } from '../budget/calculations.ts';
 import type { PaymentStatus } from '../debts/calculations.ts';
 import type { DateString } from '../incomes/recurrence.ts';
 import type { OccurrenceStatus } from '../incomes/status.ts';
@@ -65,6 +66,42 @@ export interface DashboardOverspent {
 const unpaid = (debt: DashboardDebt) => Math.max(0, debt.month.required - debt.month.paid);
 const missing = (occurrence: DashboardOccurrence) =>
   Math.max(0, occurrence.plannedAmount - occurrence.actualAmount);
+
+export interface DebtPaymentsSummary {
+  /** Скільки треба сплатити по боргах за місяць. */
+  required: number;
+  /** Скільки з цього вже сплачено; переплата понад потрібне не рахується. */
+  paid: number;
+  remaining: number;
+}
+
+/** Обов'язкові платежі місяця по активних боргах: сума їхніх платежів і сплаченого з них. */
+export function summarizeDebtPayments(debts: readonly DashboardDebt[]): DebtPaymentsSummary {
+  const active = debts.filter((debt) => debt.status === 'active');
+  const required = active.reduce((sum, debt) => sum + debt.month.required, 0);
+  const remaining = active.reduce((sum, debt) => sum + unpaid(debt), 0);
+  return { required, paid: required - remaining, remaining };
+}
+
+export interface MonthPlan {
+  plannedIncome: number;
+  plannedExpenses: number | null;
+  balance: number | null;
+  state: PlanState | null;
+}
+
+/** План місяця; без бюджету витрати невідомі, тож різниці й стану немає. */
+export function buildMonthPlan(plannedIncome: number, plannedExpenses: number | null): MonthPlan {
+  if (plannedExpenses === null) {
+    return { plannedIncome, plannedExpenses, balance: null, state: null };
+  }
+  return {
+    plannedIncome,
+    plannedExpenses,
+    balance: plannedIncome - plannedExpenses,
+    state: getPlanState(plannedIncome, plannedExpenses),
+  };
+}
 
 /** Список «Потребує уваги» з готових статусів боргів, доходів, бюджету й цілей. */
 export function buildAttention(input: {

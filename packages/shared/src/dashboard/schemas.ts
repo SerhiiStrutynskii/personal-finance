@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { monthSchema } from '../budget/month.ts';
+import { planStateSchema } from '../budget/schemas.ts';
 import { goalSchema } from '../goals/schemas.ts';
 import { dateStringSchema } from '../incomes/schemas.ts';
 import { amountMinorSchema, currencySchema } from '../money.ts';
@@ -52,6 +53,21 @@ export const dashboardSchema = z.object({
     projected: nonNegativeSchema,
     daysElapsed: z.number().int(),
     daysInMonth: z.number().int(),
+  }),
+  /** План місяця: очікувані доходи проти суми лімітів бюджету. */
+  plan: z.object({
+    plannedIncome: nonNegativeSchema,
+    /** Сума лімітів; null, якщо бюджету на місяць немає. */
+    plannedExpenses: nonNegativeSchema.nullable(),
+    /** Доходи мінус витрати; null без бюджету. */
+    balance: amountMinorSchema.nullable(),
+    state: planStateSchema.nullable(),
+  }),
+  /** Обов'язкові платежі по активних боргах за місяць. */
+  debtPayments: z.object({
+    required: nonNegativeSchema,
+    paid: nonNegativeSchema,
+    remaining: nonNegativeSchema,
   }),
   attention: z.array(
     z.object({

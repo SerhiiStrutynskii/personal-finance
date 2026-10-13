@@ -1,8 +1,10 @@
 import {
   DEFAULT_CURRENCY,
   buildAttention,
+  buildMonthPlan,
   buildUpcoming,
   netWorthOf,
+  summarizeDebtPayments,
   type Dashboard,
 } from '@hf/shared';
 import type { Db } from '../../db/client.ts';
@@ -80,6 +82,8 @@ export async function getDashboard(db: Db, auth: AuthContext, now: Date): Promis
       daysElapsed: forecast.daysElapsed,
       daysInMonth: forecast.daysInMonth,
     },
+    plan: buildMonthPlan(incomes.summary.plannedTotal, forecast.plannedExpenseTotal),
+    debtPayments: summarizeDebtPayments(debts.debts),
     attention: buildAttention({
       debts: debts.debts,
       occurrences: incomes.occurrences,
