@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '../../shared/ui/button.tsx';
 import { Muted } from '../../shared/ui/controls.tsx';
 import { Progress } from '../../shared/ui/progress.tsx';
+import { AddCategoryDialog } from '../categories/AddCategoryDialog.tsx';
 import { InlineLimit } from './InlineLimit.tsx';
 import { CategoryStatusLabel } from './status.tsx';
 import { STATUS_BAR_CLASS, STATUS_ROW_CLASS } from './statusStyles.ts';
@@ -19,6 +20,7 @@ interface Props {
 /**
  * Ліміти й фактичні витрати по категоріях. Видатки тут не додаються: для цього є кнопка
  * «+ Видаток» у шапці екрана. Чи можна змінювати ліміти, вирішує бекенд (canEditLimits).
+ * Нова категорія витрат одразу відкриває вікно ліміту на неї.
  */
 export function ExpenseSection({ budget, onAddLimit, onDeleteLine }: Props) {
   const { currency, canEditLimits } = budget;
@@ -29,9 +31,16 @@ export function ExpenseSection({ budget, onAddLimit, onDeleteLine }: Props) {
       <div className="flex items-center justify-between gap-4">
         <h2 className="font-heading text-lg font-semibold">Витрати</h2>
         {canEditLimits && (
-          <Button variant="outline" onClick={() => onAddLimit()}>
-            Додати ліміт
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <AddCategoryDialog
+              fixedKind="expense"
+              trigger={<Button variant="ghost">Нова категорія</Button>}
+              onCreated={(category) => onAddLimit(category.id)}
+            />
+            <Button variant="outline" onClick={() => onAddLimit()}>
+              Додати ліміт
+            </Button>
+          </div>
         )}
       </div>
 

@@ -120,3 +120,29 @@ test('видаток понад ліміт робить рядок катего�
   await expect(expenseDialog).toBeHidden();
   await expect(page.getByRole('row').filter({ hasText: '45,00' })).toHaveCount(1);
 });
+
+test('нова категорія з екрана бюджету одразу пропонує задати на неї ліміт', async ({ page }) => {
+  await register(page);
+  await addAccount(page, 'Картка');
+  await addExpenseCategory(page, 'Продукти');
+
+  await page.getByRole('link', { name: 'Бюджет' }).click();
+  await page.getByRole('button', { name: 'Створити' }).click();
+
+  await page.getByRole('button', { name: 'Нова категорія' }).click();
+  const dialog = page.getByRole('dialog');
+  // Тип не обирається: на екрані бюджету це завжди категорія витрат.
+  await expect(dialog.getByRole('combobox')).toHaveCount(0);
+  await dialog.getByLabel('Назва').fill('Кафе');
+  await dialog.getByRole('button', { name: 'Додати' }).click();
+
+  // Відкривається вікно ліміту з новою категорією, обраною заздалегідь.
+  await expect(dialog.getByRole('heading', { name: 'Новий ліміт витрат' })).toBeVisible();
+  await expect(dialog.getByRole('combobox')).toHaveText('Кафе');
+  await dialog.getByLabel('Ліміт, UAH').fill('300');
+  await dialog.getByRole('button', { name: 'Зберегти' }).click();
+  await expect(dialog).toBeHidden();
+
+  const row = page.getByTestId('expense-line').filter({ hasText: 'Кафе' });
+  await expect(row).toContainText('Залишок 300,00');
+});
