@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import type { Db } from '../../db/client.ts';
 import { getAuth } from '../../http/auth.ts';
-import { createAccountSchema, idParamsSchema, updateAccountSchema } from './schema.ts';
+import {
+  accountBalanceAdjustmentSchema,
+  createAccountSchema,
+  idParamsSchema,
+  updateAccountSchema,
+} from './schema.ts';
 import * as service from './service.ts';
 
 export function accountsRouter(db: Db, now: () => Date): Router {
@@ -25,6 +30,12 @@ export function accountsRouter(db: Db, now: () => Date): Router {
     const { id } = idParamsSchema.parse(req.params);
     const input = updateAccountSchema.parse(req.body);
     res.json(await service.updateAccount(db, getAuth(res), id, input));
+  });
+
+  router.post('/:id/balance', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = accountBalanceAdjustmentSchema.parse(req.body);
+    res.json(await service.adjustBalance(db, getAuth(res), id, input, now()));
   });
 
   router.delete('/:id', async (req, res) => {

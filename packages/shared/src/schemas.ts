@@ -37,6 +37,16 @@ export const updateAccountSchema = z
   .refine((value) => Object.keys(value).length > 0, 'Потрібне хоча б одне поле');
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
 
+/**
+ * Коригування балансу: фактичний баланс рахунку на зараз, у мінімальних одиницях; може бути
+ * від'ємним. Різниця з обліковим балансом записується службовою транзакцією.
+ */
+export const accountBalanceAdjustmentSchema = z.object({
+  actualBalance: amountMinorSchema,
+  note: z.string().trim().max(500).nullish(),
+});
+export type AccountBalanceAdjustmentInput = z.infer<typeof accountBalanceAdjustmentSchema>;
+
 export const accountSchema = z.object({
   id: idSchema,
   name: z.string(),

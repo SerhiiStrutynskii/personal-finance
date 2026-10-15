@@ -310,3 +310,120 @@ describe('баланс рахунку', () => {
     expect((await actor.get(`/api/transactions/${adjustment.id}`)).body.amountMinor).toBe(-500);
   });
 });
+
+describe('коригування балансу', () => {
+  const NOW = '2026-03-15T12:00:00Z';
+
+  async function setup() {
+    setNow('2026-03-01T08:00:00Z');
+    const actor = await createActor();
+    const { body: card } = await actor.post('/api/accounts', {
+      name: 'Картка',
+      type: 'card',
+      openingBalance: 100_000,
+    });
+    setNow(NOW);
+    const adjust = (body: object, id: string = card.id) =>
+      actor.post(`/api/accounts/${id}/balance`, body);
+    return { actor, card, adjust };
+  }
+
+  it('записує різницю службовою транзакцією поточним моментом', async () => {
+    const { actor, card, adjust } = await setup();
+
+    const down = await adjust({ actualBalance: 75_050 });
+    expect(down.status).toBe(200);
+    expect(down.body).toMatchObject({ id: card.id, balance: 75_050 });
+
+    setNow('2026-03-16T09:00:00Z');
+    const up = await adjust({ actualBalance: 90_000, note: '  Знайшов готівку  ' });
+    expect(up.body.balance).toBe(90_000);
+    expect((await actor.get(`/api/accounts/${card.id}`)).body.balance).toBe(90_000);
+
+    const { body: page } = await actor.get('/api/transactions');
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        type: 'balance_adjustment',
+        amountMinor: 14_950,
+        description: 'Знайшов готівку',
+        occurredAt: '2026-03-16T09:00:00.000Z',
+      }),
+      expect.objectContaining({
+        type: 'balance_adjustment',
+        amountMinor: -24_950,
+        description: 'Коригування балансу',
+        occurredAt: '2026-03-15T12:00:00.000Z',
+      }),
+      expect.objectContaining({ description: 'Початковий залишок' }),
+    ]);
+  });
+
+  it("баланс може стати від'ємним; без різниці нічого не записується", async () => {
+    const { actor, adjust } = await setup();
+    expect((await adjust({ actualBalance: 100_000 })).body.balance).toBe(100_000);
+    expect((await actor.get('/api/transactions')).body.total).toBe(1);
+
+    setNow('2026-03-15T13:00:00Z');
+    expect((await adjust({ actualBalance: -5_000 })).body.balance).toBe(-5_000);
+    expect((await actor.get('/api/transactions')).body.items[0].amountMinor).toBe(-105_000);
+  });
+
+  it('коригування не є ні доходом, ні витратою бюджету', async () => {
+    const { actor, adjust } = await setup();
+    await adjust({ actualBalance: 10_000 });
+    await adjust({ actualBalance: 500_000 });
+    expect((await actor.post('/api/budgets', { month: '2026-03' })).status).toBe(201);
+
+    const { body: budget } = await actor.get('/api/budgets?month=2026-03');
+    expect(budget.summary).toMatchObject({ spentTotal: 0, receivedIncomeTotal: 0 });
+    expect(budget.unplannedExpenses).toEqual([]);
+  });
+
+  it.each([
+    [{}],
+    [{ actualBalance: 1.5 }],
+    [{ actualBalance: '100' }],
+    [{ actualBalance: 1, note: 'x'.repeat(501) }],
+  ])('відхиляє некоректні дані %j', async (body) => {
+    const { actor, adjust } = await setup();
+    expect((await adjust(body)).status).toBe(400);
+    expect((await actor.get('/api/transactions')).body.total).toBe(1);
+  });
+
+  it('архівний рахунок, кредитна картка й чужий рахунок не коригуються', async () => {
+    const { actor, card, adjust } = await setup();
+    await db.execute(sql`UPDATE accounts SET is_archived = true WHERE id = ${card.id}`);
+    expect((await adjust({ actualBalance: 0 })).status).toBe(400);
+
+    const { body: debt } = await actor.post('/api/debts', {
+      name: 'Кредитка',
+      type: 'credit_card',
+      initialAmount: 0,
+      startDate: '2026-03-01',
+      interestRate: 3.1,
+      ratePeriod: 'month',
+      monthlyPayment: 120_000,
+      paymentDay: 25,
+      creditLimit: 5_000_000,
+    });
+    const credit = await adjust({ actualBalance: 1_000 }, debt.accountId);
+    expect(credit.status).toBe(400);
+    expect(credit.body.error.message).toContain('сторінці її боргу');
+
+    const stranger = await createActor();
+    const { body: own } = await stranger.post('/api/accounts', { name: 'Чужий', type: 'cash' });
+    expect((await adjust({ actualBalance: 1_000 }, own.id)).status).toBe(404);
+    expect((await adjust({ actualBalance: 1_000 }, MISSING_ID)).status).toBe(404);
+    expect((await stranger.get(`/api/accounts/${own.id}`)).body.balance).toBe(0);
+    expect((await actor.get('/api/transactions')).body.total).toBe(1);
+  });
+
+  it('рахунок лише з початковим залишком і коригуваннями видаляється разом із ними', async () => {
+    const { actor, card, adjust } = await setup();
+    await adjust({ actualBalance: 50_000 });
+    await adjust({ actualBalance: -1_000 });
+
+    expect((await actor.delete(`/api/accounts/${card.id}`)).status).toBe(204);
+    expect((await actor.get('/api/transactions')).body.total).toBe(0);
+  });
+});
