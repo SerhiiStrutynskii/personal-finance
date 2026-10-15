@@ -22,6 +22,14 @@ export async function findCategory(db: DbOrTx, householdId: string, id: string) 
   return row;
 }
 
+/** Підкатегорії категорії. */
+export function listChildren(db: DbOrTx, householdId: string, parentId: string) {
+  return db
+    .select()
+    .from(categories)
+    .where(and(eq(categories.householdId, householdId), eq(categories.parentId, parentId)));
+}
+
 export async function insertCategory(db: DbOrTx, householdId: string, input: CreateCategoryInput) {
   const [row] = await db
     .insert(categories)
@@ -36,11 +44,11 @@ export async function updateCategory(
   id: string,
   input: UpdateCategoryInput,
 ) {
-  const [row] = await db
-    .update(categories)
-    .set({ name: input.name })
-    .where(owned(householdId, id))
-    .returning();
+  const patch = {
+    ...(input.name !== undefined && { name: input.name }),
+    ...(input.parentId !== undefined && { parentId: input.parentId }),
+  };
+  const [row] = await db.update(categories).set(patch).where(owned(householdId, id)).returning();
   return row;
 }
 
@@ -79,6 +87,8 @@ export async function ensureSystemCategory(
         eq(categories.kind, 'expense'),
         eq(categories.name, name),
         isNull(categories.systemKey),
+        // Підкатегорія з такою назвою системною не стає: системні — лише верхнього рівня.
+        isNull(categories.parentId),
       ),
     )
     .returning();

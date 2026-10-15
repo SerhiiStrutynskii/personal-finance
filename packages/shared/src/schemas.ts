@@ -60,10 +60,19 @@ export type Account = z.infer<typeof accountSchema>;
 export const categoryKindSchema = z.enum(['income', 'expense']);
 export type CategoryKind = z.infer<typeof categoryKindSchema>;
 
-export const createCategorySchema = z.object({ name: nameSchema, kind: categoryKindSchema });
+export const createCategorySchema = z.object({
+  name: nameSchema,
+  kind: categoryKindSchema,
+  /** Батьківська категорія; null — категорія верхнього рівня. Рівнів лише два. */
+  parentId: idSchema.nullable().default(null),
+});
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 
-export const updateCategorySchema = z.object({ name: nameSchema });
+/** Перейменування та/або перенесення: parentId = null робить категорію верхнього рівня. */
+export const updateCategorySchema = z
+  .object({ name: nameSchema, parentId: idSchema.nullable() })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'Потрібне хоча б одне поле');
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 
 /** Системні категорії витрат: їх створює застосунок, змінити чи видалити їх не можна. */
@@ -81,9 +90,16 @@ export const categorySchema = z.object({
   kind: categoryKindSchema,
   /** Ключ системної категорії; null для звичайних. */
   systemKey: systemCategoryKeySchema.nullable(),
+  /** Батьківська категорія; null — категорія верхнього рівня. */
+  parentId: idSchema.nullable(),
   createdAt: instantSchema,
 });
 export type Category = z.infer<typeof categorySchema>;
+
+/** Повна назва категорії для списків і звітів: «Комунальні › Вода». */
+export function categoryPathName(name: string, parentName: string | null | undefined): string {
+  return parentName ? `${parentName} › ${name}` : name;
+}
 
 // --- Transaction ---
 

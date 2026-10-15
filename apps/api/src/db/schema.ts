@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   char,
@@ -127,9 +128,19 @@ export const categories = pgTable(
     kind: categoryKind().notNull(),
     // Системна категорія (погашення боргів, відсотки й комісії): її не можна змінити чи видалити.
     systemKey: text('system_key', { enum: SYSTEM_CATEGORY_KEYS }),
+    // Підкатегорія: батько — категорія верхнього рівня того самого типу. Глибина й тип
+    // перевіряються в сервісі; батька з підкатегоріями видалити не можна.
+    parentId: uuid('parent_id').references((): AnyPgColumn => categories.id),
     createdAt: createdAt(),
   },
-  (t) => [unique().on(t.householdId, t.kind, t.name), unique().on(t.householdId, t.systemKey)],
+  (t) => [
+    // Назва унікальна серед «сусідів»: «Інше» може бути і в «Комунальних», і в «Транспорті».
+    unique('categories_household_kind_parent_name_unique')
+      .on(t.householdId, t.kind, t.parentId, t.name)
+      .nullsNotDistinct(),
+    unique().on(t.householdId, t.systemKey),
+    check('categories_parent_not_self', sql`${t.parentId} IS NULL OR ${t.parentId} <> ${t.id}`),
+  ],
 );
 
 export const transactions = pgTable(

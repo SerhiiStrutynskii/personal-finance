@@ -45,6 +45,30 @@ export async function insertBudget(
 
 // --- Статті ---
 
+/**
+ * Чи є бюджет, у якому ліміт стоїть і на групі, і на її підкатегорії. Таке поєднання заборонене:
+ * витрату підкатегорії порахувало б двічі.
+ */
+export async function hasLinesOnBoth(
+  db: DbOrTx,
+  householdId: string,
+  parentId: string,
+  childIds: readonly string[],
+): Promise<boolean> {
+  if (childIds.length === 0) return false;
+  const result = await db.execute(sql`
+    SELECT 1
+    FROM ${budgetExpenseLines} parent_line
+    JOIN ${budgetExpenseLines} child_line ON child_line.budget_id = parent_line.budget_id
+    JOIN ${budgets} b ON b.id = parent_line.budget_id
+    WHERE b.household_id = ${householdId}
+      AND parent_line.category_id = ${parentId}
+      AND child_line.category_id IN ${childIds}
+    LIMIT 1
+  `);
+  return result.rows.length > 0;
+}
+
 export function listExpenseLines(db: DbOrTx, budgetId: string) {
   return db
     .select({

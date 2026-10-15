@@ -78,6 +78,13 @@
       "when": 1791838841981,
       "tag": "0010_debt_first_payment_month",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792065623361,
+      "tag": "0011_category_parent",
+      "breakpoints": true
     }
   ]
 }
