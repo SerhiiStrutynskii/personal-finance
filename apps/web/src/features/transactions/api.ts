@@ -19,7 +19,8 @@ export function useTransactions(query: Partial<ListTransactionsQuery>) {
   });
 }
 
-function useInvalidate() {
+/** Оновлює все, що залежить від транзакцій; потрібне й іншим фічам, що створюють транзакції. */
+export function useInvalidateTransactionData() {
   const queryClient = useQueryClient();
   // Транзакції змінюють і суми бюджету та доходів місяця, баланси рахунків і борги по картках.
   return () =>
@@ -37,7 +38,7 @@ function useInvalidate() {
 
 /** Створює транзакцію або повністю замінює наявну, якщо передано id. */
 export function useSaveTransaction() {
-  const invalidate = useInvalidate();
+  const invalidate = useInvalidateTransactionData();
   return useMutation({
     mutationFn: ({ id, input }: { id?: string | undefined; input: TransactionInput }) =>
       id
@@ -48,7 +49,7 @@ export function useSaveTransaction() {
 }
 
 export function useDeleteTransaction() {
-  const invalidate = useInvalidate();
+  const invalidate = useInvalidateTransactionData();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/transactions/${id}`),
     onSuccess: invalidate,

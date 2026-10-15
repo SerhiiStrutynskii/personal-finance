@@ -1,6 +1,7 @@
 import type { Account, CreateAccountInput, PlainAccountType } from '@hf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
+import { useInvalidateTransactionData } from '../transactions/api.ts';
 
 export const ACCOUNTS_KEY = ['accounts'];
 const KEY = ACCOUNTS_KEY;
@@ -27,10 +28,11 @@ export function useAccounts() {
 }
 
 export function useCreateAccount() {
-  const queryClient = useQueryClient();
+  // Початковий залишок — транзакція: змінюються капітал, цілі й головна, а не лише список рахунків.
+  const invalidate = useInvalidateTransactionData();
   return useMutation({
     mutationFn: (input: CreateAccountInput) => api.post<Account>('/api/accounts', input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+    onSuccess: invalidate,
   });
 }
 

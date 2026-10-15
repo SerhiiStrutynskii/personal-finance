@@ -60,6 +60,85 @@ describe('accounts', () => {
     expect((await owner.get(`/api/accounts/${account.id}`)).body.name).toBe('Картка');
   });
 
+  it('початковий залишок задає баланс і записується службовою транзакцією', async () => {
+    setNow('2026-03-15T12:00:00Z');
+    const actor = await createActor();
+    const res = await actor.post('/api/accounts', {
+      name: 'Депозит',
+      type: 'deposit',
+      currency: 'USD',
+      openingBalance: 150_000,
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.balance).toBe(150_000);
+    expect((await actor.get(`/api/accounts/${res.body.id}`)).body.balance).toBe(150_000);
+
+    const { body: page } = await actor.get('/api/transactions');
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        type: 'balance_adjustment',
+        accountId: res.body.id,
+        amountMinor: 150_000,
+        currency: 'USD',
+        description: 'Початковий залишок',
+        occurredAt: '2026-03-15T12:00:00.000Z',
+      }),
+    ]);
+  });
+
+  it('без початкового залишку чи з нулем транзакція не створюється', async () => {
+    const actor = await createActor();
+    const zero = await actor.post('/api/accounts', { name: 'A', type: 'cash', openingBalance: 0 });
+    const none = await actor.post('/api/accounts', { name: 'B', type: 'cash' });
+    expect(zero.body.balance).toBe(0);
+    expect(none.body.balance).toBe(0);
+    expect((await actor.get('/api/transactions')).body.total).toBe(0);
+  });
+
+  it.each([[-1], [1.5], ['100']])('відхиляє початковий залишок %j', async (openingBalance) => {
+    const actor = await createActor();
+    const res = await actor.post('/api/accounts', { name: 'A', type: 'cash', openingBalance });
+    expect(res.status).toBe(400);
+    expect((await actor.get('/api/accounts')).body.items).toEqual([]);
+  });
+
+  it('початковий залишок не є ні доходом, ні витратою бюджету', async () => {
+    setNow('2026-03-15T12:00:00Z');
+    const actor = await createActor();
+    await actor.post('/api/accounts', { name: 'Картка', type: 'card', openingBalance: 500_000 });
+    expect((await actor.post('/api/budgets', { month: '2026-03' })).status).toBe(201);
+
+    const { body: budget } = await actor.get('/api/budgets?month=2026-03');
+    expect(budget.summary).toMatchObject({ spentTotal: 0, receivedIncomeTotal: 0 });
+    expect(budget.unplannedExpenses).toEqual([]);
+  });
+
+  it('рахунок лише з початковим залишком видаляється разом із ним, з іншими транзакціями — ні', async () => {
+    setNow('2026-03-15T12:00:00Z');
+    const actor = await createActor();
+    const account = async (name: string) =>
+      (await actor.post('/api/accounts', { name, type: 'card', openingBalance: 1000 })).body;
+    const fresh = await account('Новий');
+    const used = await account('Використаний');
+    const target = await account('Призначення');
+    await actor.post('/api/transactions', {
+      type: 'transfer',
+      accountId: used.id,
+      toAccountId: target.id,
+      amountMinor: 100,
+      occurredAt: '2026-03-15T12:00:00Z',
+    });
+
+    expect((await actor.delete(`/api/accounts/${fresh.id}`)).status).toBe(204);
+    // Вхідний переказ теж тримає рахунок.
+    expect((await actor.delete(`/api/accounts/${target.id}`)).status).toBe(409);
+    expect((await actor.delete(`/api/accounts/${used.id}`)).status).toBe(409);
+    expect((await actor.get(`/api/accounts/${used.id}`)).body.balance).toBe(900);
+    expect((await actor.get(`/api/accounts/${target.id}`)).body.balance).toBe(1100);
+    // Лишилися два початкові залишки й переказ.
+    expect((await actor.get('/api/transactions')).body.total).toBe(3);
+  });
+
   it('видаляє порожній рахунок, а рахунок із транзакціями — ні', async () => {
     setNow('2026-03-15T12:00:00Z');
     const actor = await createActor();

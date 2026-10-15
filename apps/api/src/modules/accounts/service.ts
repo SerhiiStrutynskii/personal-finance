@@ -1,6 +1,7 @@
 import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import { badRequest, conflict, isForeignKeyViolation, notFound } from '../../http/errors.ts';
+import { insertTransaction } from '../transactions/repo.ts';
 import * as repo from './repo.ts';
 import type { Account, CreateAccountInput, UpdateAccountInput } from './schema.ts';
 
@@ -34,12 +35,34 @@ export async function getAccount(db: Db, auth: AuthContext, id: string): Promise
   return withBalance(db, auth, row);
 }
 
+/**
+ * Створює рахунок. Початковий залишок записується службовою транзакцією balance_adjustment
+ * з поточним моментом: вона змінює баланс, але не є ні доходом, ні витратою.
+ */
 export async function createAccount(
   db: Db,
   auth: AuthContext,
-  input: CreateAccountInput,
+  { openingBalance, ...input }: CreateAccountInput,
+  now: Date = new Date(),
 ): Promise<Account> {
-  return toAccountDto(await repo.insertAccount(db, auth.householdId, input), 0);
+  const row = await db.transaction(async (tx) => {
+    const created = await repo.insertAccount(tx, auth.householdId, input);
+    if (openingBalance > 0) {
+      await insertTransaction(tx, auth.householdId, auth.userId, {
+        type: 'balance_adjustment',
+        accountId: created.id,
+        toAccountId: null,
+        categoryId: null,
+        occurrenceId: null,
+        amountMinor: openingBalance,
+        currency: created.currency,
+        description: 'Початковий залишок',
+        occurredAt: now,
+      });
+    }
+    return created;
+  });
+  return toAccountDto(row, openingBalance);
 }
 
 export async function updateAccount(
@@ -60,7 +83,12 @@ export async function updateAccount(
 
 export async function deleteAccount(db: Db, auth: AuthContext, id: string): Promise<void> {
   try {
-    if (!(await repo.deleteAccount(db, auth.householdId, id))) throw notFound('Рахунок');
+    // Рахунок, у якому є лише початковий залишок, видаляється разом із ним.
+    const deleted = await db.transaction(async (tx) => {
+      await repo.deleteOpeningBalanceIfAlone(tx, auth.householdId, id);
+      return repo.deleteAccount(tx, auth.householdId, id);
+    });
+    if (!deleted) throw notFound('Рахунок');
   } catch (error) {
     if (isForeignKeyViolation(error)) {
       throw conflict(

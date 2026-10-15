@@ -69,7 +69,7 @@ export function createApp({
 
   const api = Router();
   api.use(requireAuth(db, tokens));
-  api.use('/accounts', accountsRouter(db));
+  api.use('/accounts', accountsRouter(db, now));
   api.use('/analytics', analyticsRouter(db, now));
   api.use('/budgets', budgetsRouter(db, now));
   api.use('/categories', categoriesRouter(db));

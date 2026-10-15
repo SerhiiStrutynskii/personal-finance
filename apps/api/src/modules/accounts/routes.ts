@@ -4,7 +4,7 @@ import { getAuth } from '../../http/auth.ts';
 import { createAccountSchema, idParamsSchema, updateAccountSchema } from './schema.ts';
 import * as service from './service.ts';
 
-export function accountsRouter(db: Db): Router {
+export function accountsRouter(db: Db, now: () => Date): Router {
   const router = Router();
 
   router.get('/', async (_req, res) => {
@@ -13,7 +13,7 @@ export function accountsRouter(db: Db): Router {
 
   router.post('/', async (req, res) => {
     const input = createAccountSchema.parse(req.body);
-    res.status(201).json(await service.createAccount(db, getAuth(res), input));
+    res.status(201).json(await service.createAccount(db, getAuth(res), input, now()));
   });
 
   router.get('/:id', async (req, res) => {

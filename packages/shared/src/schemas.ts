@@ -25,6 +25,8 @@ export const createAccountSchema = z.object({
   name: nameSchema,
   type: plainAccountTypeSchema,
   currency: currencySchema.default(DEFAULT_CURRENCY),
+  /** Гроші на рахунку в момент створення, у мінімальних одиницях; записуються службовою транзакцією. */
+  openingBalance: amountMinorSchema.nonnegative().default(0),
 });
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
 

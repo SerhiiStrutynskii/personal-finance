@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, not, or, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import { accounts, transactions } from '../../db/schema.ts';
 import type { CreateAccountInput, UpdateAccountInput } from './schema.ts';
@@ -28,10 +28,14 @@ export function findAccountsByIds(db: DbOrTx, householdId: string, ids: string[]
     .where(and(eq(accounts.householdId, householdId), inArray(accounts.id, ids)));
 }
 
-export async function insertAccount(db: DbOrTx, householdId: string, input: CreateAccountInput) {
+export async function insertAccount(
+  db: DbOrTx,
+  householdId: string,
+  input: Omit<CreateAccountInput, 'openingBalance'>,
+) {
   const [row] = await db
     .insert(accounts)
-    .values({ ...input, householdId })
+    .values({ name: input.name, type: input.type, currency: input.currency, householdId })
     .returning();
   return row!;
 }
@@ -48,6 +52,31 @@ export async function updateAccount(
   };
   const [row] = await db.update(accounts).set(patch).where(owned(householdId, id)).returning();
   return row;
+}
+
+/**
+ * Видаляє початковий залишок рахунку, якщо інших транзакцій у рахунку немає. Інакше нічого не
+ * робить: тоді рахунок не видалиться через зовнішній ключ, як і раніше.
+ */
+export async function deleteOpeningBalanceIfAlone(db: DbOrTx, householdId: string, id: string) {
+  const opening = and(
+    eq(transactions.householdId, householdId),
+    eq(transactions.accountId, id),
+    eq(transactions.type, 'balance_adjustment'),
+    isNull(transactions.debtId),
+  );
+  const [other] = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.householdId, householdId),
+        or(eq(transactions.accountId, id), eq(transactions.toAccountId, id)),
+        not(opening!),
+      ),
+    )
+    .limit(1);
+  if (!other) await db.delete(transactions).where(opening);
 }
 
 export async function deleteAccount(db: DbOrTx, householdId: string, id: string): Promise<boolean> {

@@ -16,6 +16,7 @@ import {
 import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
 import { ACCOUNT_TYPE_LABELS, PLAIN_ACCOUNT_TYPES, useCreateAccount } from './api.ts';
+import { parseOpeningBalance } from './openingBalance.ts';
 
 const CURRENCIES = ['UAH', 'USD', 'EUR'];
 
@@ -26,7 +27,9 @@ export function AddAccountDialog() {
   const [name, setName] = useState('');
   const [type, setType] = useState<PlainAccountType>('card');
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const [openingBalance, setOpeningBalance] = useState('');
   const [nameError, setNameError] = useState<string>();
+  const [balanceError, setBalanceError] = useState<string>();
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -35,20 +38,21 @@ export function AddAccountDialog() {
       setName('');
       setType('card');
       setCurrency(DEFAULT_CURRENCY);
+      setOpeningBalance('');
       setNameError(undefined);
+      setBalanceError(undefined);
       create.reset();
     }
   }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    const balance = parseOpeningBalance(openingBalance, currency);
+    setBalanceError(typeof balance === 'string' ? balance : undefined);
     const parsed = createAccountSchema.safeParse({ name, type, currency });
-    if (!parsed.success) {
-      setNameError('Вкажіть назву до 100 символів');
-      return;
-    }
-    setNameError(undefined);
-    create.mutate(parsed.data, { onSuccess: () => setOpen(false) });
+    setNameError(parsed.success ? undefined : 'Вкажіть назву до 100 символів');
+    if (!parsed.success || typeof balance === 'string') return;
+    create.mutate({ ...parsed.data, openingBalance: balance }, { onSuccess: () => setOpen(false) });
   }
 
   return (
@@ -89,6 +93,15 @@ export function AddAccountDialog() {
               />
             </Field>
           </div>
+          <Field label={`Поточний залишок, ${currency} (необов’язково)`} error={balanceError}>
+            <Input
+              inputMode="decimal"
+              placeholder="0,00"
+              value={openingBalance}
+              aria-invalid={balanceError ? true : undefined}
+              onChange={(e) => setOpeningBalance(e.target.value)}
+            />
+          </Field>
           <ErrorText>{create.isError && errorMessage(create.error)}</ErrorText>
           <DialogFooter>
             <DialogClose asChild>
