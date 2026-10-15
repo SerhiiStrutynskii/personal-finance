@@ -50,6 +50,7 @@ async function loadSpending(db: DbOrTx, budget: repo.BudgetRow) {
         ? categoryPathName(row.categoryName, row.parentName)
         : UNCATEGORIZED_NAME,
       parentId: row.parentId,
+      ...(row.categoryName && row.parentName && { shortName: row.categoryName }),
       spent: row.total,
     };
   });

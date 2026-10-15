@@ -766,6 +766,11 @@ describe('ліміти й підкатегорії', () => {
         spent: 55_000,
         remaining: -5_000,
         status: 'over',
+        subcategories: [
+          { categoryId: water.id, categoryName: 'Вода', spent: 30_000 },
+          { categoryId: gas.id, categoryName: 'Газ', spent: 20_000 },
+          { categoryId: utilities.id, categoryName: 'Без підкатегорії', spent: 5_000 },
+        ],
       }),
     ]);
     expect(view.unplannedExpenses).toEqual([]);

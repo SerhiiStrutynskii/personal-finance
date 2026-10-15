@@ -89,6 +89,12 @@ export const budgetViewSchema = z.object({
       /** Частка використаного ліміту; null, коли ліміт 0, а витрати є. */
       usage: z.number().nullable(),
       status: categoryStatusSchema,
+      /** Розбивка ліміту групи за підкатегоріями; лише якщо в групі були витрати підкатегорій. */
+      subcategories: z
+        .array(
+          z.object({ categoryId: idSchema, categoryName: z.string(), spent: z.number().int() }),
+        )
+        .optional(),
     }),
   ),
   unplannedExpenses: z.array(

@@ -1,5 +1,6 @@
 import { formatMoney, type BudgetView } from '@hf/shared';
-import { Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '../../shared/ui/button.tsx';
 import { Muted } from '../../shared/ui/controls.tsx';
 import { Progress } from '../../shared/ui/progress.tsx';
@@ -87,6 +88,9 @@ export function ExpenseSection({ budget, onAddLimit, canAddLimit, onDeleteLine }
                 currency={currency}
               />
             </div>
+            {line.subcategories && (
+              <SubcategoryBreakdown items={line.subcategories} money={money} />
+            )}
           </li>
         ))}
       </ul>
@@ -128,5 +132,43 @@ export function ExpenseSection({ budget, onAddLimit, canAddLimit, onDeleteLine }
         </div>
       )}
     </section>
+  );
+}
+
+/** Розгортний список витрат підкатегорій у рядку ліміту групи. */
+function SubcategoryBreakdown({
+  items,
+  money,
+}: {
+  items: NonNullable<ExpenseLine['subcategories']>;
+  money: (amountMinor: number) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const Chevron = open ? ChevronDown : ChevronRight;
+  return (
+    <div className="mt-1 text-sm">
+      <button
+        type="button"
+        className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 text-muted-foreground hover:bg-muted"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <Chevron className="size-4" aria-hidden />
+        За підкатегоріями
+      </button>
+      {open && (
+        <ul className="mt-1 ml-5 space-y-0.5" data-testid="budget-subcategories">
+          {items.map((item) => (
+            <li
+              key={`${item.categoryId}:${item.categoryName}`}
+              className="flex justify-between gap-4"
+            >
+              <span>{item.categoryName}</span>
+              <span className="tabular-nums">{money(item.spent)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

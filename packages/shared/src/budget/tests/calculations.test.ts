@@ -193,6 +193,34 @@ describe('calculateBudget з підкатегоріями', () => {
     expect(result.summary.spentTotal).toBe(1500);
   });
 
+  it('рядок ліміту групи має розбивку за підкатегоріями з власними назвами', () => {
+    const result = calculateBudget({
+      ...base,
+      expenseLines: [
+        { id: 'l1', categoryId: 'utilities', categoryName: 'Комунальні', planned: 1400 },
+      ],
+      spending: spending.map((item) =>
+        item.parentId ? { ...item, shortName: item.categoryName.split(' › ')[1] } : item,
+      ),
+    });
+    expect(result.expenseLines[0]!.subcategories).toEqual([
+      { categoryId: 'utilities', categoryName: 'Без підкатегорії', spent: 1000 },
+      { categoryId: 'water', categoryName: 'Вода', spent: 300 },
+      { categoryId: 'gas', categoryName: 'Газ', spent: 200 },
+    ]);
+  });
+
+  it('розбивки немає, якщо підкатегорії групи нічого не витратили', () => {
+    const result = calculateBudget({
+      ...base,
+      expenseLines: [
+        { id: 'l1', categoryId: 'utilities', categoryName: 'Комунальні', planned: 1400 },
+      ],
+      spending: spending.filter((item) => !item.parentId),
+    });
+    expect(result.expenseLines[0]).not.toHaveProperty('subcategories');
+  });
+
   it('ліміт на підкатегорію рахує лише її; решта групи без ліміту — незапланована', () => {
     const result = calculateBudget({
       ...base,
@@ -202,6 +230,7 @@ describe('calculateBudget з підкатегоріями', () => {
       spending,
     });
     expect(result.expenseLines[0]).toMatchObject({ spent: 300, remaining: 200, status: 'neutral' });
+    expect(result.expenseLines[0]).not.toHaveProperty('subcategories');
     expect(result.unplannedExpenses.map((item) => item.categoryId)).toEqual(['utilities', 'gas']);
     expect(result.summary.spentTotal).toBe(1500);
   });

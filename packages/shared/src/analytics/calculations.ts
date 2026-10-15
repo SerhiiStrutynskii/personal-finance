@@ -1,5 +1,6 @@
 // Розрахунки аналітики. Усі суми — цілі числа в мінімальних одиницях валюти (копійки);
 // частки й норми — відношення, а не суми.
+import { GROUP_OWN_SPENDING } from '../budget/calculations.ts';
 import { shiftMonth } from '../budget/month.ts';
 import type { DateString } from '../incomes/recurrence.ts';
 
@@ -31,9 +32,6 @@ export interface CategoryBreakdownRow extends BreakdownRow {
    */
   subcategories?: BreakdownRow[];
 }
-
-/** Назва рядка з витратами, записаними на саму групу, а не на її підкатегорію. */
-export const GROUP_OWN_SPENDING_NAME = 'Без підкатегорії';
 
 export interface CategoryBreakdown {
   totalSpent: number;
@@ -120,7 +118,7 @@ export function breakdownByCategory(
 
     const asSubcategory = (row: CategoryAmount): Amount => ({
       categoryId: row.categoryId,
-      categoryName: row.parentId ? row.categoryName : GROUP_OWN_SPENDING_NAME,
+      categoryName: row.parentId ? row.categoryName : GROUP_OWN_SPENDING,
       spent: row.spent,
     });
     const subcategories = compareMonths(

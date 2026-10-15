@@ -44,6 +44,8 @@ export interface CategorySpending {
   spent: number;
   /** Батьківська категорія, якщо це підкатегорія: її витрати входять і в ліміт групи. */
   parentId?: string | null | undefined;
+  /** Власна назва підкатегорії без групи («Вода») — для розбивки рядка групи. */
+  shortName?: string | undefined;
 }
 
 export interface BudgetFacts {
@@ -52,12 +54,27 @@ export interface BudgetFacts {
   receivedIncome: number;
 }
 
+/** Витрати однієї підкатегорії в рядку ліміту групи. */
+export interface SubcategorySpending {
+  categoryId: string;
+  categoryName: string;
+  spent: number;
+}
+
+/** Назва частини витрат групи, записаних на саму групу, а не на підкатегорію. */
+export const GROUP_OWN_SPENDING = 'Без підкатегорії';
+
 export interface ExpenseLineResult extends PlannedExpenseLine {
   spent: number;
   /** Може бути від'ємним, якщо ліміт перевищено. */
   remaining: number;
   usage: number | null;
   status: CategoryStatus;
+  /**
+   * Розбивка ліміту групи за підкатегоріями, від більших витрат до менших; лише якщо в групі були
+   * витрати підкатегорій. Витрати на саму групу — рядок «Без підкатегорії» з id групи.
+   */
+  subcategories?: SubcategorySpending[];
 }
 
 export interface UnplannedExpense {
@@ -126,14 +143,31 @@ export function calculateBudget({
       spentByLine.set(lineCategory, (spentByLine.get(lineCategory) ?? 0) + item.spent);
   }
 
+  const subcategoriesOf = (line: PlannedExpenseLine): SubcategorySpending[] | undefined => {
+    const members = spending.filter((item) => lineCategoryOf(item) === line.categoryId);
+    if (!members.some((item) => item.parentId === line.categoryId)) return undefined;
+    return members
+      .map((item) => ({
+        categoryId: item.categoryId!,
+        categoryName:
+          item.categoryId === line.categoryId
+            ? GROUP_OWN_SPENDING
+            : (item.shortName ?? item.categoryName),
+        spent: item.spent,
+      }))
+      .sort((a, b) => b.spent - a.spent || a.categoryName.localeCompare(b.categoryName, 'uk'));
+  };
+
   const expenseResults = expenseLines.map((line): ExpenseLineResult => {
     const spent = spentByLine.get(line.categoryId) ?? 0;
+    const subcategories = subcategoriesOf(line);
     return {
       ...line,
       spent,
       remaining: line.planned - spent,
       usage: getUsage(line.planned, spent),
       status: getCategoryStatus(line.planned, spent, now, periodEnd),
+      ...(subcategories && { subcategories }),
     };
   });
 

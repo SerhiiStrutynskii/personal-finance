@@ -53,6 +53,10 @@ test('підкатегорії: створення, видаток на підк
   const row = page.getByTestId('expense-line').filter({ hasText: 'Комунальні' });
   await expect(row).toHaveAttribute('data-status', 'over');
   await expect(row).toContainText('Перевищено на 50,00');
+  // Рядок групи розгортається до витрат підкатегорій.
+  await row.getByRole('button', { name: 'За підкатегоріями' }).click();
+  const breakdown = row.getByTestId('budget-subcategories').getByRole('listitem');
+  await expect(breakdown).toHaveText([/Вода\s*300,00/, /Газ\s*250,00/]);
   // Ліміт на підкатегорію групи з лімітом не пропонується.
   await page.getByRole('button', { name: 'Додати ліміт' }).click();
   await expect(dialog.getByText('Усі категорії витрат уже мають ліміт')).toBeVisible();
