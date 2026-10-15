@@ -24,6 +24,7 @@ import { useBudget, useCreateBudget, useDeleteExpenseLine } from './api.ts';
 import { BudgetSummary } from './BudgetSummary.tsx';
 import { ExpenseSection } from './ExpenseSection.tsx';
 import { IncomeSection } from './IncomeSection.tsx';
+import { limitableCategories } from './limitable.ts';
 
 type ExpenseLine = BudgetView['expenseLines'][number];
 
@@ -140,6 +141,12 @@ function BudgetContent({
   categories: React.ComponentProps<typeof AddLimitDialog>['categories'];
 }) {
   const deleteExpenseLine = useDeleteExpenseLine(budget.id);
+  const limitable = new Set(
+    limitableCategories(
+      categories,
+      new Set(budget.expenseLines.map((line) => line.categoryId)),
+    ).map((category) => category.id),
+  );
 
   // Вміст вікон зберігається й після закриття, щоб не змінюватися під час анімації.
   const [limitDialog, setLimitDialog] = useState<{ open: boolean; categoryId?: string }>({
@@ -161,6 +168,7 @@ function BudgetContent({
         onAddLimit={(categoryId) =>
           setLimitDialog({ open: true, ...(categoryId && { categoryId }) })
         }
+        canAddLimit={(categoryId) => limitable.has(categoryId)}
         onDeleteLine={(line) => setDeletion({ open: true, line })}
       />
 

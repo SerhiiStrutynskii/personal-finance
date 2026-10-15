@@ -90,6 +90,17 @@ describe('summarizeTransactions', () => {
     expect(facts.receivedIncome).toBe(5000);
   });
 
+  it('витрата підкатегорії зберігає посилання на групу', () => {
+    const facts = summarizeTransactions(
+      [tx({ categoryId: 'water', categoryName: 'Вода', categoryParentId: 'utilities' })],
+      october,
+      'UAH',
+    );
+    expect(facts.spending).toEqual([
+      { categoryId: 'water', categoryName: 'Вода', parentId: 'utilities', spent: 100 },
+    ]);
+  });
+
   it('платіж по позиці — витрата своєї категорії; службова зміна балансу не враховується', () => {
     const facts = summarizeTransactions(
       [
@@ -158,6 +169,54 @@ describe('summarizeTransactions', () => {
     );
     expect(facts.spending[0]!.spent).toBe(100);
     expect(facts.receivedIncome).toBe(0);
+  });
+});
+
+describe('calculateBudget з підкатегоріями', () => {
+  const base = { plannedIncome: 0, receivedIncome: 0, now: during, periodEnd };
+  const spending = [
+    { categoryId: 'utilities', categoryName: 'Комунальні', spent: 1000 },
+    { categoryId: 'water', categoryName: 'Комунальні › Вода', parentId: 'utilities', spent: 300 },
+    { categoryId: 'gas', categoryName: 'Комунальні › Газ', parentId: 'utilities', spent: 200 },
+  ];
+
+  it('ліміт групи рахує витрати самої групи й усіх її підкатегорій', () => {
+    const result = calculateBudget({
+      ...base,
+      expenseLines: [
+        { id: 'l1', categoryId: 'utilities', categoryName: 'Комунальні', planned: 1400 },
+      ],
+      spending,
+    });
+    expect(result.expenseLines[0]).toMatchObject({ spent: 1500, remaining: -100, status: 'over' });
+    expect(result.unplannedExpenses).toEqual([]);
+    expect(result.summary.spentTotal).toBe(1500);
+  });
+
+  it('ліміт на підкатегорію рахує лише її; решта групи без ліміту — незапланована', () => {
+    const result = calculateBudget({
+      ...base,
+      expenseLines: [
+        { id: 'l1', categoryId: 'water', categoryName: 'Комунальні › Вода', planned: 500 },
+      ],
+      spending,
+    });
+    expect(result.expenseLines[0]).toMatchObject({ spent: 300, remaining: 200, status: 'neutral' });
+    expect(result.unplannedExpenses.map((item) => item.categoryId)).toEqual(['utilities', 'gas']);
+    expect(result.summary.spentTotal).toBe(1500);
+  });
+
+  it('витрата підкатегорії з власним лімітом не рахується вдруге в групі', () => {
+    // Таке поєднання бекенд не допускає, але розрахунок і тоді не подвоює суму.
+    const result = calculateBudget({
+      ...base,
+      expenseLines: [
+        { id: 'l1', categoryId: 'utilities', categoryName: 'Комунальні', planned: 2000 },
+        { id: 'l2', categoryId: 'water', categoryName: 'Комунальні › Вода', planned: 500 },
+      ],
+      spending,
+    });
+    expect(result.expenseLines.map((line) => line.spent)).toEqual([1200, 300]);
   });
 });
 

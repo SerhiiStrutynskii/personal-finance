@@ -730,3 +730,72 @@ describe('ізоляція домогосподарств', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('ліміти й підкатегорії', () => {
+  async function setup() {
+    const actor = await createActor();
+    const { body: card } = await actor.post('/api/accounts', { name: 'Картка', type: 'card' });
+    const category = async (name: string, parentId: string | null = null) =>
+      (await actor.post('/api/categories', { name, kind: 'expense', parentId })).body;
+    const utilities = await category('Комунальні');
+    const water = await category('Вода', utilities.id);
+    const gas = await category('Газ', utilities.id);
+    const spend = (categoryId: string, amountMinor: number) =>
+      actor.post('/api/transactions', {
+        type: 'expense',
+        accountId: card.id,
+        categoryId,
+        amountMinor,
+        occurredAt: '2026-10-10T10:00:00Z',
+      });
+    const { body: budget } = await createBudget(actor, CURRENT);
+    return { actor, utilities, water, gas, spend, budget };
+  }
+
+  it('ліміт групи включає витрати всіх підкатегорій і самої групи', async () => {
+    const { actor, utilities, water, gas, spend, budget } = await setup();
+    await spend(water.id, 30_000);
+    await spend(gas.id, 20_000);
+    await spend(utilities.id, 5_000);
+    expect((await addLimit(actor, budget.id, utilities.id, 50_000)).status).toBe(201);
+
+    const view = await getBudget(actor, CURRENT);
+    expect(view.expenseLines).toEqual([
+      expect.objectContaining({
+        categoryName: 'Комунальні',
+        spent: 55_000,
+        remaining: -5_000,
+        status: 'over',
+      }),
+    ]);
+    expect(view.unplannedExpenses).toEqual([]);
+  });
+
+  it('ліміт на підкатегорію має повну назву; решта групи — незапланована', async () => {
+    const { actor, water, gas, spend, budget } = await setup();
+    await spend(water.id, 30_000);
+    await spend(gas.id, 20_000);
+    await addLimit(actor, budget.id, water.id, 40_000);
+
+    const view = await getBudget(actor, CURRENT);
+    expect(view.expenseLines).toEqual([
+      expect.objectContaining({ categoryName: 'Комунальні › Вода', spent: 30_000 }),
+    ]);
+    expect(view.unplannedExpenses).toEqual([
+      expect.objectContaining({ categoryId: gas.id, categoryName: 'Комунальні › Газ' }),
+    ]);
+    expect(view.summary.spentTotal).toBe(50_000);
+  });
+
+  it('не можна ліміт і на групу, і на її підкатегорію в одному бюджеті', async () => {
+    const { actor, utilities, water, gas, budget } = await setup();
+    expect((await addLimit(actor, budget.id, water.id, 100)).status).toBe(201);
+    expect((await addLimit(actor, budget.id, gas.id, 100)).status).toBe(201);
+    expect((await addLimit(actor, budget.id, utilities.id, 100)).status).toBe(409);
+
+    // В іншому бюджеті — навпаки: спершу група, тоді підкатегорія не додається.
+    const { body: next } = await createBudget(actor, FUTURE);
+    expect((await addLimit(actor, next.id, utilities.id, 100)).status).toBe(201);
+    expect((await addLimit(actor, next.id, water.id, 100)).status).toBe(409);
+  });
+});

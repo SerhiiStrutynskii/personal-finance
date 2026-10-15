@@ -1,6 +1,7 @@
 import {
   UNCATEGORIZED_NAME,
   budgetPeriod,
+  categoryPathName,
   calculateBudget,
   getPeriodState,
   localMonthKey,
@@ -15,7 +16,7 @@ import {
   isUniqueViolation,
   notFound,
 } from '../../http/errors.ts';
-import { ensureSystemCategory, findCategory } from '../categories/repo.ts';
+import { ensureSystemCategory, findCategory, listChildren } from '../categories/repo.ts';
 import { sumActiveLoanPayments } from '../debts/repo.ts';
 import { getIncomes } from '../incomes/occurrences.service.ts';
 import * as repo from './repo.ts';
@@ -45,7 +46,10 @@ async function loadSpending(db: DbOrTx, budget: repo.BudgetRow) {
     if (!Number.isSafeInteger(row.total)) throw new Error('Сума бюджету поза безпечним діапазоном');
     return {
       categoryId: row.categoryId,
-      categoryName: row.categoryName ?? UNCATEGORIZED_NAME,
+      categoryName: row.categoryName
+        ? categoryPathName(row.categoryName, row.parentName)
+        : UNCATEGORIZED_NAME,
+      parentId: row.parentId,
       spent: row.total,
     };
   });
@@ -72,7 +76,7 @@ async function buildView(
     expenseLines: expenseLines.map((line) => ({
       id: line.id,
       categoryId: line.categoryId,
-      categoryName: line.categoryName,
+      categoryName: categoryPathName(line.categoryName, line.parentName),
       planned: line.plannedAmount,
     })),
     spending,
@@ -194,6 +198,27 @@ export async function createBudget(
 
 // --- Статті витрат ---
 
+/**
+ * Ліміт ставиться або на групу (рахує всі її підкатегорії), або на окремі підкатегорії, але не
+ * на обидва рівні в одному бюджеті: інакше витрату підкатегорії порахувало б двічі.
+ */
+async function assertNoGroupOverlap(
+  db: Db,
+  auth: AuthContext,
+  budgetId: string,
+  category: { id: string; parentId: string | null },
+) {
+  const lines = await repo.listExpenseLines(db, budgetId);
+  const planned = new Set(lines.map((line) => line.categoryId));
+  if (category.parentId && planned.has(category.parentId)) {
+    throw conflict('Ліміт уже задано на всю групу; ліміт на її підкатегорію не можна додати');
+  }
+  const children = await listChildren(db, auth.householdId, category.id);
+  if (children.some((child) => planned.has(child.id))) {
+    throw conflict('На підкатегорії цієї групи вже є ліміти; приберіть їх, щоб задати ліміт групі');
+  }
+}
+
 export async function addExpenseLine(
   db: Db,
   auth: AuthContext,
@@ -205,6 +230,7 @@ export async function addExpenseLine(
   const category = await findCategory(db, auth.householdId, input.categoryId);
   if (!category) throw badRequest('Категорію не знайдено');
   if (category.kind !== 'expense') throw badRequest('Ліміт можна задати лише для категорії витрат');
+  await assertNoGroupOverlap(db, auth, budget.id, category);
 
   try {
     await repo.insertExpenseLine(db, budget.id, input);

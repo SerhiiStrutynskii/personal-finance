@@ -15,7 +15,9 @@ import {
 } from '../../shared/ui/dialog.tsx';
 import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
+import { categoryOptions } from '../categories/tree.ts';
 import { useSaveExpenseLine } from './api.ts';
+import { limitableCategories } from './limitable.ts';
 import { parsePlannedAmount } from './plannedAmount.ts';
 
 interface Props {
@@ -53,12 +55,14 @@ function AddLimitForm({
   onSaved,
 }: Omit<Props, 'open' | 'onOpenChange'> & { onSaved: () => void }) {
   const save = useSaveExpenseLine(budget.id);
-  // Категорія може мати лише один ліміт на місяць.
+  // Категорія може мати лише один ліміт на місяць, а група й її підкатегорії — не разом.
   const planned = new Set(budget.expenseLines.map((item) => item.categoryId));
-  const available = categories.filter((category) => !planned.has(category.id));
+  const availableIds = new Set(limitableCategories(categories, planned).map((item) => item.id));
+  // Порядок і повні назви — як в усіх списках категорій: підкатегорії під своєю групою.
+  const options = categoryOptions(categories).filter((option) => availableIds.has(option.value));
 
   const [categoryId, setCategoryId] = useState(
-    available.find((category) => category.id === defaultCategoryId)?.id ?? available[0]?.id ?? '',
+    options.find((option) => option.value === defaultCategoryId)?.value ?? options[0]?.value ?? '',
   );
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string>();
@@ -74,11 +78,11 @@ function AddLimitForm({
     save.mutate({ input: { categoryId, plannedAmount } }, { onSuccess: onSaved });
   }
 
-  if (available.length === 0) {
+  if (options.length === 0) {
     return (
       <Muted>
-        На всі категорії витрат уже задано ліміти. Нову категорію можна додати кнопкою «Нова
-        категорія» або на сторінці{' '}
+        Усі категорії витрат уже мають ліміт — свій або своєї групи. Нову категорію можна додати
+        кнопкою «Нова категорія» або на сторінці{' '}
         <Link className="underline" to="/categories">
           «Категорії»
         </Link>
@@ -90,11 +94,7 @@ function AddLimitForm({
   return (
     <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
       <Field label="Категорія">
-        <SelectField
-          value={categoryId}
-          onChange={setCategoryId}
-          options={available.map((category) => ({ value: category.id, label: category.name }))}
-        />
+        <SelectField value={categoryId} onChange={setCategoryId} options={options} />
       </Field>
       <Field label={`Ліміт, ${budget.currency}`} error={amountError}>
         <Input

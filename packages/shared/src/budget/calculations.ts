@@ -42,6 +42,8 @@ export interface CategorySpending {
   categoryId: string | null;
   categoryName: string;
   spent: number;
+  /** Батьківська категорія, якщо це підкатегорія: її витрати входять і в ліміт групи. */
+  parentId?: string | null | undefined;
 }
 
 export interface BudgetFacts {
@@ -58,7 +60,10 @@ export interface ExpenseLineResult extends PlannedExpenseLine {
   status: CategoryStatus;
 }
 
-export interface UnplannedExpense extends CategorySpending {
+export interface UnplannedExpense {
+  categoryId: string | null;
+  categoryName: string;
+  spent: number;
   status: CategoryStatus;
 }
 
@@ -104,11 +109,25 @@ export function calculateBudget({
   now,
   periodEnd,
 }: BudgetCalculationInput): BudgetCalculation {
-  const spentByCategory = new Map(spending.map((item) => [item.categoryId, item.spent]));
   const plannedCategoryIds = new Set(expenseLines.map((line) => line.categoryId));
+  /**
+   * Рядок бюджету, куди йде витрата: ліміт самої категорії, а якщо його немає — ліміт її групи.
+   * Ліміт і на групі, і на її підкатегорії бекенд не допускає, тож витрата рахується один раз.
+   */
+  const lineCategoryOf = (item: CategorySpending): string | null => {
+    if (item.categoryId !== null && plannedCategoryIds.has(item.categoryId)) return item.categoryId;
+    if (item.parentId && plannedCategoryIds.has(item.parentId)) return item.parentId;
+    return null;
+  };
+  const spentByLine = new Map<string, number>();
+  for (const item of spending) {
+    const lineCategory = lineCategoryOf(item);
+    if (lineCategory)
+      spentByLine.set(lineCategory, (spentByLine.get(lineCategory) ?? 0) + item.spent);
+  }
 
   const expenseResults = expenseLines.map((line): ExpenseLineResult => {
-    const spent = spentByCategory.get(line.categoryId) ?? 0;
+    const spent = spentByLine.get(line.categoryId) ?? 0;
     return {
       ...line,
       spent,
@@ -119,10 +138,11 @@ export function calculateBudget({
   });
 
   const unplannedExpenses = spending
-    .filter((item) => item.spent > 0)
-    .filter((item) => item.categoryId === null || !plannedCategoryIds.has(item.categoryId))
+    .filter((item) => item.spent > 0 && lineCategoryOf(item) === null)
     .map((item): UnplannedExpense => ({
-      ...item,
+      categoryId: item.categoryId,
+      categoryName: item.categoryName,
+      spent: item.spent,
       status: getCategoryStatus(0, item.spent, now, periodEnd),
     }));
 
@@ -152,6 +172,8 @@ export interface BudgetTransaction {
   occurredAt: Date;
   categoryId: string | null;
   categoryName?: string | null;
+  /** Батьківська категорія категорії транзакції, якщо це підкатегорія. */
+  categoryParentId?: string | null;
 }
 
 export const UNCATEGORIZED_NAME = 'Без категорії';
@@ -178,6 +200,7 @@ export function summarizeTransactions(
       const entry = spending.get(transaction.categoryId) ?? {
         categoryId: transaction.categoryId,
         categoryName: transaction.categoryName ?? UNCATEGORIZED_NAME,
+        ...(transaction.categoryParentId && { parentId: transaction.categoryParentId }),
         spent: 0,
       };
       entry.spent += transaction.amountMinor;

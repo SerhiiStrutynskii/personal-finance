@@ -1,4 +1,5 @@
 import { and, asc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { DbOrTx } from '../../db/client.ts';
 import {
   budgetExpenseLines,
@@ -9,6 +10,9 @@ import {
 } from '../../db/schema.ts';
 
 export type BudgetRow = typeof budgets.$inferSelect;
+
+/** Батьківська категорія — для повної назви підкатегорії й ліміту групи. */
+const parentCategories = alias(categories, 'parent_categories');
 export type ExpenseLineRow = typeof budgetExpenseLines.$inferSelect;
 
 export async function findHouseholdTimeZone(db: DbOrTx, householdId: string) {
@@ -75,11 +79,13 @@ export function listExpenseLines(db: DbOrTx, budgetId: string) {
       id: budgetExpenseLines.id,
       categoryId: budgetExpenseLines.categoryId,
       categoryName: categories.name,
+      parentName: parentCategories.name,
       plannedAmount: budgetExpenseLines.plannedAmount,
       sortOrder: budgetExpenseLines.sortOrder,
     })
     .from(budgetExpenseLines)
     .innerJoin(categories, eq(categories.id, budgetExpenseLines.categoryId))
+    .leftJoin(parentCategories, eq(parentCategories.id, categories.parentId))
     .where(eq(budgetExpenseLines.budgetId, budgetId))
     .orderBy(asc(budgetExpenseLines.sortOrder), asc(budgetExpenseLines.id));
 }
@@ -161,10 +167,13 @@ export function aggregateSpending(
     .select({
       categoryId: transactions.categoryId,
       categoryName: categories.name,
+      parentId: categories.parentId,
+      parentName: parentCategories.name,
       total: sql<number>`sum(${transactions.amountMinor})`.mapWith(Number),
     })
     .from(transactions)
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
+    .leftJoin(parentCategories, eq(parentCategories.id, categories.parentId))
     .where(
       and(
         eq(transactions.householdId, householdId),
@@ -175,5 +184,5 @@ export function aggregateSpending(
         inArray(transactions.type, ['expense', 'debt_payment']),
       ),
     )
-    .groupBy(transactions.categoryId, categories.name);
+    .groupBy(transactions.categoryId, categories.name, categories.parentId, parentCategories.name);
 }

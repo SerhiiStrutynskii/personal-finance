@@ -14,6 +14,8 @@ interface Props {
   budget: BudgetView;
   /** Відкриває вікно нового ліміту; categoryId — категорія, обрана заздалегідь. */
   onAddLimit: (categoryId?: string) => void;
+  /** Чи можна ще задати ліміт на категорію (немає конфлікту з групою чи підкатегоріями). */
+  canAddLimit: (categoryId: string) => boolean;
   onDeleteLine: (line: ExpenseLine) => void;
 }
 
@@ -22,7 +24,7 @@ interface Props {
  * «+ Видаток» у шапці екрана. Чи можна змінювати ліміти, вирішує бекенд (canEditLimits).
  * Нова категорія витрат одразу відкриває вікно ліміту на неї.
  */
-export function ExpenseSection({ budget, onAddLimit, onDeleteLine }: Props) {
+export function ExpenseSection({ budget, onAddLimit, canAddLimit, onDeleteLine }: Props) {
   const { currency, canEditLimits } = budget;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
 
@@ -111,7 +113,7 @@ export function ExpenseSection({ budget, onAddLimit, onDeleteLine }: Props) {
                   </div>
                 </div>
                 {/* Для витрат без категорії ліміт задати неможливо: його прив'язано до категорії. */}
-                {canEditLimits && item.categoryId && (
+                {canEditLimits && item.categoryId && canAddLimit(item.categoryId) && (
                   <Button
                     variant="outline"
                     size="sm"
