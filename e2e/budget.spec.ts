@@ -132,7 +132,7 @@ test('нова категорія з екрана бюджету одразу п
   await page.getByRole('button', { name: 'Нова категорія' }).click();
   const dialog = page.getByRole('dialog');
   // Тип не обирається: на екрані бюджету це завжди категорія витрат.
-  await expect(dialog.getByRole('combobox')).toHaveCount(0);
+  await expect(dialog.getByText('Тип', { exact: true })).toHaveCount(0);
   await dialog.getByLabel('Назва').fill('Кафе');
   await dialog.getByRole('button', { name: 'Додати' }).click();
 

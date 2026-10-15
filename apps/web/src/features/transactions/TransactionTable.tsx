@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../shared/ui/table.tsx';
+import { categoryLabel } from '../categories/tree.ts';
 import { useDeleteTransaction } from './api.ts';
 
 interface Props {
@@ -37,8 +38,11 @@ export function TransactionTable({ items, accounts, categories, timeZone, onEdit
   const [deletion, setDeletion] = useState<{ open: boolean; id?: string }>({ open: false });
 
   const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.name ?? '—';
-  const categoryName = (id: string | null) =>
-    id ? (categories.find((c) => c.id === id)?.name ?? '—') : 'Без категорії';
+  const categoryName = (id: string | null) => {
+    const category = id ? categories.find((c) => c.id === id) : undefined;
+    if (!category) return id ? '—' : 'Без категорії';
+    return categoryLabel(category, categories);
+  };
 
   return (
     <>

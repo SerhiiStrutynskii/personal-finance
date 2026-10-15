@@ -15,6 +15,7 @@ import {
 import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
 import { parsePlannedAmount } from '../budget/plannedAmount.ts';
+import { categoryOptions } from '../categories/tree.ts';
 import { useCreateOneTimeIncome } from './api.ts';
 
 interface Props {
@@ -113,10 +114,7 @@ function OneTimeForm({
         <SelectField
           value={categoryId}
           onChange={setCategoryId}
-          options={[
-            { value: '', label: 'Без категорії' },
-            ...categories.map((category) => ({ value: category.id, label: category.name })),
-          ]}
+          options={[{ value: '', label: 'Без категорії' }, ...categoryOptions(categories)]}
         />
       </Field>
       <ErrorText>{create.isError && errorMessage(create.error)}</ErrorText>

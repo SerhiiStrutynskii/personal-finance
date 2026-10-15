@@ -7,6 +7,7 @@ import { ErrorText, Field } from '../../shared/ui/controls.tsx';
 import { Input } from '../../shared/ui/input.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
 import { useCurrentUser } from '../auth/authContext.ts';
+import { categoryOptions } from '../categories/tree.ts';
 import { useSaveTransaction } from './api.ts';
 import type { EntryType } from './config.ts';
 import {
@@ -118,10 +119,7 @@ export function TransactionForm({
         <SelectField
           value={values.categoryId}
           onChange={(categoryId) => set({ categoryId })}
-          options={[
-            { value: '', label: 'Без категорії' },
-            ...categories.map((category) => ({ value: category.id, label: category.name })),
-          ]}
+          options={[{ value: '', label: 'Без категорії' }, ...categoryOptions(categories)]}
         />
       </Field>
       <Field label="Дата" error={errors.date}>
