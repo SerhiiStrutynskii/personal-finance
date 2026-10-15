@@ -50,6 +50,8 @@ async function spendingOf(db: Db, auth: AuthContext, month: string, timeZone: st
   return rows.map((row) => ({
     categoryId: row.categoryId,
     categoryName: row.categoryName ?? UNCATEGORIZED_NAME,
+    parentId: row.parentId,
+    parentName: row.parentName,
     spent: row.total,
   }));
 }

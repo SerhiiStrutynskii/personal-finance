@@ -59,6 +59,73 @@ describe('breakdownByCategory', () => {
     });
   });
 
+  it('підкатегорії згортаються в групу з розбивкою; витрати самої групи — «Без підкатегорії»', () => {
+    const sub = (categoryId: string, categoryName: string, spent: number) => ({
+      categoryId,
+      categoryName,
+      spent,
+      parentId: 'utilities',
+      parentName: 'Комунальні',
+    });
+    const result = breakdownByCategory(
+      [
+        sub('water', 'Вода', 300),
+        sub('gas', 'Газ', 100),
+        row('utilities', 100, 'Комунальні'),
+        row('food', 500),
+      ],
+      [sub('water', 'Вода', 200), sub('power', 'Електрика', 50)],
+    );
+    expect(result.totalSpent).toBe(1000);
+    expect(result.categories).toEqual([
+      // Однакові суми: вище рядок із більшими витратами попереднього місяця.
+      {
+        categoryId: 'utilities',
+        categoryName: 'Комунальні',
+        spent: 500,
+        share: 0.5,
+        previousSpent: 250,
+        change: 250,
+        subcategories: [
+          {
+            categoryId: 'water',
+            categoryName: 'Вода',
+            spent: 300,
+            share: 0.3,
+            previousSpent: 200,
+            change: 100,
+          },
+          {
+            categoryId: 'utilities',
+            categoryName: 'Без підкатегорії',
+            spent: 100,
+            share: 0.1,
+            previousSpent: 0,
+            change: 100,
+          },
+          {
+            categoryId: 'gas',
+            categoryName: 'Газ',
+            spent: 100,
+            share: 0.1,
+            previousSpent: 0,
+            change: 100,
+          },
+          {
+            categoryId: 'power',
+            categoryName: 'Електрика',
+            spent: 0,
+            share: 0,
+            previousSpent: 50,
+            change: -50,
+          },
+        ],
+      },
+      expect.objectContaining({ categoryId: 'food', spent: 500 }),
+    ]);
+    expect(result.categories[1]).not.toHaveProperty('subcategories');
+  });
+
   it('категорія лише в попередньому місяці лишається в списку з нулем', () => {
     const result = breakdownByCategory([row('food', 300)], [row('gifts', 80)]);
     expect(result.categories).toEqual([

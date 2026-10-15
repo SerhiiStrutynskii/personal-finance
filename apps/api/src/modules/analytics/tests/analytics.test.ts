@@ -66,6 +66,35 @@ const cardInput = (override: object = {}) => ({
 });
 
 describe('аналітика місяця: витрати за категоріями', () => {
+  it('підкатегорії згортаються в групу з розбивкою', async () => {
+    const { actor, expense } = await setup();
+    const category = async (name: string, parentId: string | null = null) =>
+      (await actor.post('/api/categories', { name, kind: 'expense', parentId })).body as {
+        id: string;
+      };
+    const utilities = await category('Комунальні');
+    const water = await category('Вода', utilities.id);
+    await expense(30_000, '2026-10-05T10:00:00Z', water.id);
+    await expense(10_000, '2026-10-06T10:00:00Z', utilities.id);
+
+    const { categories } = await monthOf(actor);
+    expect(categories).toEqual([
+      expect.objectContaining({
+        categoryId: utilities.id,
+        categoryName: 'Комунальні',
+        spent: 40_000,
+        subcategories: [
+          expect.objectContaining({ categoryId: water.id, categoryName: 'Вода', spent: 30_000 }),
+          expect.objectContaining({
+            categoryId: utilities.id,
+            categoryName: 'Без підкатегорії',
+            spent: 10_000,
+          }),
+        ],
+      }),
+    ]);
+  });
+
   it('порожній місяць', async () => {
     const { actor } = await setup();
     expect(await monthOf(actor)).toEqual({

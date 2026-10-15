@@ -472,6 +472,23 @@ describe('головна: останні операції', () => {
     expect(recent[1]).toMatchObject({ type: 'expense', categoryName: 'Продукти' });
   });
 
+  it('підкатегорія показується разом із групою', async () => {
+    const { actor, expense } = await setup();
+    const { body: utilities } = await actor.post('/api/categories', {
+      name: 'Комунальні',
+      kind: 'expense',
+    });
+    const { body: water } = await actor.post('/api/categories', {
+      name: 'Вода',
+      kind: 'expense',
+      parentId: utilities.id,
+    });
+    await expense(500, '2026-10-02T10:00:00Z', { categoryId: water.id });
+
+    const { recent } = await dashboardOf(actor);
+    expect(recent[0]).toMatchObject({ categoryName: 'Комунальні › Вода' });
+  });
+
   it('перекази й службові зміни балансу не показуються, платіж по боргу — так', async () => {
     const { actor, account, card, expense } = await setup();
     const cash = await account('Готівка', { type: 'cash' });

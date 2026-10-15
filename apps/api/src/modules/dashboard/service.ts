@@ -3,6 +3,7 @@ import {
   buildAttention,
   buildMonthPlan,
   buildUpcoming,
+  categoryPathName,
   netWorthOf,
   summarizeDebtPayments,
   type Dashboard,
@@ -50,7 +51,17 @@ export async function getDashboard(db: Db, auth: AuthContext, now: Date): Promis
     .map((debt) => debt.balance);
 
   const accountNames = new Map(accounts.map((account) => [account.id, account.name]));
-  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  // Підкатегорія показується з групою: «Комунальні › Вода».
+  const categoryNames = new Map(
+    categories.map((category) => [
+      category.id,
+      categoryPathName(
+        category.name,
+        category.parentId ? byId.get(category.parentId)?.name : undefined,
+      ),
+    ]),
+  );
   const income = incomes.summary.receivedTotal;
   const expenses = analytics.totalSpent;
   // Аналітика завжди дає прогноз для поточного місяця.

@@ -8,15 +8,32 @@ export interface CategoryAmount {
   categoryId: string | null;
   categoryName: string;
   spent: number;
+  /** Група підкатегорії: її витрати показуються в рядку групи. */
+  parentId?: string | null | undefined;
+  parentName?: string | null | undefined;
 }
 
-export interface CategoryBreakdownRow extends CategoryAmount {
+interface BreakdownRow {
+  categoryId: string | null;
+  categoryName: string;
+  spent: number;
   /** Частка у витратах місяця: 0,4245 — це 42,45%. */
   share: number;
   previousSpent: number;
   /** Зміна відносно попереднього місяця; від'ємна — витрачено менше. */
   change: number;
 }
+
+export interface CategoryBreakdownRow extends BreakdownRow {
+  /**
+   * Розбивка групи за підкатегоріями; лише для груп, у яких були витрати підкатегорій. Частки —
+   * від усіх витрат місяця. Витрати на саму групу йдуть рядком «Без підкатегорії».
+   */
+  subcategories?: BreakdownRow[];
+}
+
+/** Назва рядка з витратами, записаними на саму групу, а не на її підкатегорію. */
+export const GROUP_OWN_SPENDING_NAME = 'Без підкатегорії';
 
 export interface CategoryBreakdown {
   totalSpent: number;
@@ -25,20 +42,18 @@ export interface CategoryBreakdown {
   categories: CategoryBreakdownRow[];
 }
 
-/**
- * Розподіл витрат місяця за категоріями з порівнянням із попереднім місяцем.
- * До списку входять і категорії, що мали витрати лише в попередньому місяці.
- */
-export function breakdownByCategory(
-  current: readonly CategoryAmount[],
-  previous: readonly CategoryAmount[],
-): CategoryBreakdown {
-  const totalSpent = current.reduce((sum, row) => sum + row.spent, 0);
-  const previousTotalSpent = previous.reduce((sum, row) => sum + row.spent, 0);
+type Amount = Pick<CategoryAmount, 'categoryId' | 'categoryName' | 'spent'>;
+
+/** Рядки з порівнянням, без нулів в обох місяцях, від більших витрат до менших. */
+function compareMonths(
+  current: readonly Amount[],
+  previous: readonly Amount[],
+  totalSpent: number,
+): BreakdownRow[] {
   const previousById = new Map(previous.map((row) => [row.categoryId, row]));
   const currentIds = new Set(current.map((row) => row.categoryId));
 
-  const rows = [
+  return [
     ...current,
     ...previous
       .filter((row) => !currentIds.has(row.categoryId))
@@ -62,12 +77,65 @@ export function breakdownByCategory(
         b.previousSpent - a.previousSpent ||
         a.categoryName.localeCompare(b.categoryName, 'uk'),
     );
+}
+
+const groupIdOf = (row: CategoryAmount) => row.parentId ?? row.categoryId;
+
+/** Сумує витрати підкатегорій у рядки їхніх груп. */
+function rollUpToGroups(rows: readonly CategoryAmount[]): Amount[] {
+  const groups = new Map<string | null, Amount>();
+  for (const row of rows) {
+    const id = groupIdOf(row);
+    const group = groups.get(id) ?? {
+      categoryId: id,
+      categoryName: row.parentId ? (row.parentName ?? row.categoryName) : row.categoryName,
+      spent: 0,
+    };
+    group.spent += row.spent;
+    groups.set(id, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Розподіл витрат місяця за категоріями з порівнянням із попереднім місяцем.
+ * До списку входять і категорії, що мали витрати лише в попередньому місяці. Підкатегорії
+ * згортаються в рядок своєї групи, а їхня розбивка — у `subcategories` цього рядка.
+ */
+export function breakdownByCategory(
+  current: readonly CategoryAmount[],
+  previous: readonly CategoryAmount[],
+): CategoryBreakdown {
+  const totalSpent = current.reduce((sum, row) => sum + row.spent, 0);
+  const previousTotalSpent = previous.reduce((sum, row) => sum + row.spent, 0);
+
+  const categories = compareMonths(
+    rollUpToGroups(current),
+    rollUpToGroups(previous),
+    totalSpent,
+  ).map((group): CategoryBreakdownRow => {
+    const inGroup = (row: CategoryAmount) => groupIdOf(row) === group.categoryId;
+    const members = [...current, ...previous].filter(inGroup);
+    if (!members.some((row) => row.parentId)) return group;
+
+    const asSubcategory = (row: CategoryAmount): Amount => ({
+      categoryId: row.categoryId,
+      categoryName: row.parentId ? row.categoryName : GROUP_OWN_SPENDING_NAME,
+      spent: row.spent,
+    });
+    const subcategories = compareMonths(
+      current.filter(inGroup).map(asSubcategory),
+      previous.filter(inGroup).map(asSubcategory),
+      totalSpent,
+    );
+    return { ...group, subcategories };
+  });
 
   return {
     totalSpent,
     previousTotalSpent,
     change: totalSpent - previousTotalSpent,
-    categories: rows,
+    categories,
   };
 }
 

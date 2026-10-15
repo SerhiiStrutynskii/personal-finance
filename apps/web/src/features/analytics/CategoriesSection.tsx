@@ -1,4 +1,6 @@
 import { formatMoney, type AnalyticsMonth } from '@hf/shared';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Fragment, useState } from 'react';
 import { Bar, BarChart, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
@@ -29,6 +31,15 @@ export function CategoriesSection({ data }: { data: AnalyticsMonth }) {
   const { currency } = data;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
   const spending = data.categories.filter((row) => row.spent > 0);
+  // Групи з підкатегоріями розгортаються; ключ — id групи ('none' для витрат без категорії).
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (key: string) =>
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   return (
     <Section
@@ -74,19 +85,60 @@ export function CategoriesSection({ data }: { data: AnalyticsMonth }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.categories.map((row) => (
-              <TableRow key={row.categoryId ?? 'none'}>
-                <TableCell>{row.categoryName}</TableCell>
-                <TableCell className="text-right tabular-nums">{money(row.spent)}</TableCell>
-                <TableCell className="text-right tabular-nums">{percentText(row.share)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {money(row.previousSpent)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {signedMoney(row.change, currency)}
-                </TableCell>
-              </TableRow>
-            ))}
+            {data.categories.map((row) => {
+              const key = row.categoryId ?? 'none';
+              const isOpen = expanded.has(key);
+              const Chevron = isOpen ? ChevronDown : ChevronRight;
+              const numbers = (
+                item: Pick<typeof row, 'spent' | 'share' | 'previousSpent' | 'change'>,
+              ) => (
+                <>
+                  <TableCell className="text-right tabular-nums">{money(item.spent)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {percentText(item.share)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {money(item.previousSpent)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {signedMoney(item.change, currency)}
+                  </TableCell>
+                </>
+              );
+              return (
+                <Fragment key={key}>
+                  <TableRow>
+                    <TableCell>
+                      {row.subcategories ? (
+                        <button
+                          type="button"
+                          className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 hover:bg-muted"
+                          aria-expanded={isOpen}
+                          onClick={() => toggle(key)}
+                        >
+                          <Chevron className="size-4 text-muted-foreground" aria-hidden />
+                          {row.categoryName}
+                        </button>
+                      ) : (
+                        row.categoryName
+                      )}
+                    </TableCell>
+                    {numbers(row)}
+                  </TableRow>
+                  {isOpen &&
+                    row.subcategories?.map((child) => (
+                      <TableRow
+                        key={`${key}:${child.categoryId}:${child.categoryName}`}
+                        className="text-muted-foreground"
+                        data-testid="analytics-subcategory"
+                      >
+                        <TableCell className="pl-9">{child.categoryName}</TableCell>
+                        {numbers(child)}
+                      </TableRow>
+                    ))}
+                </Fragment>
+              );
+            })}
           </TableBody>
           <TableFooter>
             <TableRow>

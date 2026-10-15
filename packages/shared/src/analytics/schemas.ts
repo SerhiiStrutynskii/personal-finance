@@ -28,6 +28,13 @@ const categoryRowSchema = z.object({
   categoryName: z.string(),
 });
 
+const breakdownRowSchema = categoryRowSchema.extend({
+  spent: nonNegativeSchema,
+  share: z.number(),
+  previousSpent: nonNegativeSchema,
+  change: amountMinorSchema,
+});
+
 export const analyticsMonthSchema = z.object({
   month: monthSchema,
   currency: currencySchema,
@@ -38,11 +45,9 @@ export const analyticsMonthSchema = z.object({
   previousTotalSpent: nonNegativeSchema,
   change: amountMinorSchema,
   categories: z.array(
-    categoryRowSchema.extend({
-      spent: nonNegativeSchema,
-      share: z.number(),
-      previousSpent: nonNegativeSchema,
-      change: amountMinorSchema,
+    breakdownRowSchema.extend({
+      /** Розбивка групи за підкатегоріями; лише якщо в групі були витрати підкатегорій. */
+      subcategories: z.array(breakdownRowSchema).optional(),
     }),
   ),
   /** Перевитрати за бюджетом місяця; null, якщо бюджету немає. */
