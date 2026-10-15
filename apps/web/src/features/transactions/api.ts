@@ -22,7 +22,7 @@ export function useTransactions(query: Partial<ListTransactionsQuery>) {
 /** Оновлює все, що залежить від транзакцій; потрібне й іншим фічам, що створюють транзакції. */
 export function useInvalidateTransactionData() {
   const queryClient = useQueryClient();
-  // Транзакції змінюють і суми бюджету та доходів місяця, баланси рахунків і борги по картках.
+  // Транзакції змінюють і суми бюджету та прибутків місяця, баланси рахунків і борги по картках.
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),

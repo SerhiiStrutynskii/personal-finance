@@ -23,7 +23,7 @@ const chartConfig = {
   netWorth: { label: 'Чисті активи', color: 'var(--chart-3)' },
 } satisfies ChartConfig;
 
-/** Чисті активи на кінець кожного місяця й частка доходу, що йде на борги. */
+/** Чисті активи на кінець кожного місяця й частка прибутку, що йде на борги. */
 export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
   const { currency, plannedDebtLoad } = data;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
@@ -53,7 +53,7 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
             title="Платежі по боргах цього місяця"
             value={last ? money(last.debtPayments) : '—'}
             hint={
-              last && last.debtLoad !== null ? `${percentText(last.debtLoad)} доходу` : undefined
+              last && last.debtLoad !== null ? `${percentText(last.debtLoad)} прибутку` : undefined
             }
           />
           <Figure
@@ -62,9 +62,9 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
             hint={
               plannedDebtLoad.ratio === null
                 ? plannedDebtLoad.monthlyPayments > 0
-                  ? `${money(plannedDebtLoad.monthlyPayments)} на місяць; запланованого доходу немає`
+                  ? `${money(plannedDebtLoad.monthlyPayments)} на місяць; запланованого прибутку немає`
                   : 'Щомісячних платежів немає'
-                : `${money(plannedDebtLoad.monthlyPayments)} із ${money(plannedDebtLoad.plannedIncome)} запланованого доходу`
+                : `${money(plannedDebtLoad.monthlyPayments)} із ${money(plannedDebtLoad.plannedIncome)} запланованого прибутку`
             }
           />
         </CardContent>
@@ -108,7 +108,7 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
             {hasDebtPayments && (
               <>
                 <TableHead className="text-right">Платежі по боргах</TableHead>
-                <TableHead className="text-right">Частка доходу</TableHead>
+                <TableHead className="text-right">Частка прибутку</TableHead>
               </>
             )}
           </TableRow>

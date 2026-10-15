@@ -39,7 +39,7 @@ export function DashboardPage() {
   const data = dashboard.data;
   const usableAccounts = activeAccounts(accounts.data);
   const error = dashboard.error ?? accounts.error ?? categories.error;
-  // Видаток не може мати майбутню дату; для доходів меж немає.
+  // Видаток не може мати майбутню дату; для прибутків меж немає.
   const maxDate =
     entry.type === 'expense'
       ? getAllowedExpenseDateRange(new Date(), user.timeZone).maxDate
@@ -59,7 +59,7 @@ export function DashboardPage() {
               </Button>
               <Button variant="outline" onClick={open('income')}>
                 <Plus />
-                Дохід
+                Прибуток
               </Button>
               <AddTransferDialog accounts={usableAccounts} />
             </div>
@@ -141,7 +141,7 @@ function Figure({ title, value, hint }: { title: string; value: string; hint?: s
 function SetupSteps({ setup }: { setup: Dashboard['setup'] }) {
   const steps = [
     { done: setup.hasAccounts, to: '/accounts', text: 'Створіть рахунок' },
-    { done: setup.hasTransactions, to: '/expenses', text: 'Додайте перший видаток або дохід' },
+    { done: setup.hasTransactions, to: '/expenses', text: 'Додайте перший видаток або прибуток' },
     { done: setup.hasBudget, to: '/budget', text: 'Складіть бюджет на місяць' },
   ];
   return (
@@ -230,7 +230,7 @@ function MonthBlock({ data }: { data: Dashboard }) {
       <Card>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Figure title="Дохід" value={money(month.income)} />
+            <Figure title="Прибуток" value={money(month.income)} />
             <Figure title="Витрати" value={money(month.expenses)} />
             <Figure title="Різниця" value={signedMoney(month.net, currency)} />
           </div>
@@ -416,7 +416,7 @@ function RecentBlock({ data, timeZone }: { data: Dashboard; timeZone: string }) 
               </span>
               {item.description ||
                 item.categoryName ||
-                (item.type === 'income' ? 'Дохід' : 'Видаток')}
+                (item.type === 'income' ? 'Прибуток' : 'Видаток')}
               <span className="text-muted-foreground">
                 {item.description && item.categoryName ? ` · ${item.categoryName}` : ''} ·{' '}
                 {item.accountName}

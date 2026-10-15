@@ -200,7 +200,7 @@ const incomeInPeriod = (
     lt(transactions.occurredAt, period.end),
   );
 
-/** Отримані за період доходи: окремо прив'язані до надходжень і разові. */
+/** Отримані за період прибутки: окремо прив'язані до надходжень і разові. */
 export async function incomeTotals(
   db: DbOrTx,
   householdId: string,
@@ -223,7 +223,7 @@ export async function incomeTotals(
   return row ?? { receivedRecurring: 0, oneTimeTotal: 0 };
 }
 
-/** Разові доходи за період: доходи без прив'язки до надходження. */
+/** Разові прибутки за період: прибутки без прив'язки до надходження. */
 export function listOneTimeIncomes(
   db: DbOrTx,
   householdId: string,

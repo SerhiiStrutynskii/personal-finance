@@ -176,7 +176,7 @@ function instantForDate(date: string, timeZone: string, now: Date): Date {
   return startOfLocalDay(year, month, day, timeZone);
 }
 
-/** Позначає надходження отриманим: створює прив'язану до нього транзакцію доходу. */
+/** Позначає надходження отриманим: створює прив'язану до нього транзакцію прибутку. */
 export async function receiveOccurrence(
   db: Db,
   auth: AuthContext,
@@ -188,7 +188,7 @@ export async function receiveOccurrence(
   if (!occurrence) throw occurrenceNotFound();
 
   const accountId = input.accountId ?? occurrence.accountId;
-  if (!accountId) throw badRequest('Вкажіть рахунок, на який надійшов дохід');
+  if (!accountId) throw badRequest('Вкажіть рахунок, на який надійшов прибуток');
   const timeZone = await timeZoneOf(db, auth);
   const date = input.date ?? localDateKey(now, timeZone);
 
@@ -210,7 +210,7 @@ export async function receiveOccurrence(
   return transaction;
 }
 
-/** Разовий дохід — звичайна транзакція доходу без прив'язки до надходження. */
+/** Разовий прибуток — звичайна транзакція прибутку без прив'язки до надходження. */
 export async function createOneTimeIncome(
   db: Db,
   auth: AuthContext,

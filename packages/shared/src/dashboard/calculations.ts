@@ -1,5 +1,5 @@
 // Списки головної сторінки. Нових розрахунків тут немає: елементи складаються зі статусів,
-// які вже порахували борги, доходи, бюджет і цілі.
+// які вже порахували борги, прибутки, бюджет і цілі.
 import { getPlanState, type PlanState } from '../budget/calculations.ts';
 import type { PaymentStatus } from '../debts/calculations.ts';
 import type { DateString } from '../incomes/recurrence.ts';
@@ -103,7 +103,7 @@ export function buildMonthPlan(plannedIncome: number, plannedExpenses: number | 
   };
 }
 
-/** Список «Потребує уваги» з готових статусів боргів, доходів, бюджету й цілей. */
+/** Список «Потребує уваги» з готових статусів боргів, прибутків, бюджету й цілей. */
 export function buildAttention(input: {
   debts: readonly DashboardDebt[];
   occurrences: readonly DashboardOccurrence[];

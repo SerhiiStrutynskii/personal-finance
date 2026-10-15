@@ -30,8 +30,8 @@ const oneTime = ({ actor, card }: Setup, override: object = {}) =>
     ...override,
   });
 
-describe('разові доходи', () => {
-  it('створює дохід без привʼязки до надходження, одразу отриманий', async () => {
+describe('разові прибутки', () => {
+  it('створює прибуток без привʼязки до надходження, одразу отриманий', async () => {
     const ctx = await setup();
     const res = await oneTime(ctx, { name: '  Продаж велосипеда ', categoryId: ctx.bonus.id });
 
@@ -68,7 +68,7 @@ describe('разові доходи', () => {
     });
   });
 
-  it('разові й періодичні доходи складаються в підсумку окремо', async () => {
+  it('разові й періодичні прибутки складаються в підсумку окремо', async () => {
     const ctx = await setup();
     await ctx.actor.post('/api/income-sources', {
       name: 'Зарплата',
@@ -106,7 +106,7 @@ describe('разові доходи', () => {
         type: 'income',
         accountId: ctx.card.id,
         amountMinor,
-        description: 'Дохід',
+        description: 'Прибуток',
         occurredAt,
       });
     // 31.10.2026 23:30 за Києвом = 21:30 UTC; 1.11 00:00 = 22:00 UTC
@@ -121,7 +121,7 @@ describe('разові доходи', () => {
     expect(november.oneTime[0].date).toBe('2026-11-01');
   });
 
-  it('у списку разових немає доходів, привʼязаних до надходжень, витрат, переказів і чужих доходів', async () => {
+  it('у списку разових немає прибутків, привʼязаних до надходжень, витрат, переказів і чужих прибутків', async () => {
     const ctx = await setup();
     const stranger = await setup();
     await oneTime(stranger);
@@ -173,7 +173,7 @@ describe('разові доходи', () => {
     expect((await ctx.actor.get('/api/incomes?month=2020-03')).body.oneTime).toEqual([]);
   });
 
-  it('разовий дохід редагується й видаляється як звичайна транзакція', async () => {
+  it('разовий прибуток редагується й видаляється як звичайна транзакція', async () => {
     const ctx = await setup();
     const { body: created } = await oneTime(ctx);
 

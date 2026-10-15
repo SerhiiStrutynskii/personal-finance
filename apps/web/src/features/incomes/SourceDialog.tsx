@@ -30,7 +30,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   source: IncomeSource | undefined;
-  /** Рахунки у валюті доходів. */
+  /** Рахунки у валюті прибутків. */
   accounts: readonly Account[];
   currency: string;
   today: string;
@@ -38,17 +38,17 @@ interface Props {
 
 const FREQUENCIES = Object.keys(FREQUENCY_LABELS) as Frequency[];
 
-/** Вікно створення або зміни джерела періодичного доходу з прев'ю найближчих дат. */
+/** Вікно створення або зміни джерела періодичного прибутку з прев'ю найближчих дат. */
 export function SourceDialog({ open, onOpenChange, source, ...form }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{source ? 'Джерело доходу' : 'Нове джерело доходу'}</DialogTitle>
+          <DialogTitle>{source ? 'Джерело прибутку' : 'Нове джерело прибутку'}</DialogTitle>
           <DialogDescription>
             {source
               ? 'Зміни суми чи графіка стосуються лише майбутніх неотриманих надходжень.'
-              : 'Регулярний дохід: зарплата, аванс, оренда, пенсія. Аванс і зарплата — два окремі джерела.'}
+              : 'Регулярний прибуток: зарплата, аванс, оренда, пенсія. Аванс і зарплата — два окремі джерела.'}
           </DialogDescription>
         </DialogHeader>
         <SourceForm source={source} {...form} onDone={() => onOpenChange(false)} />

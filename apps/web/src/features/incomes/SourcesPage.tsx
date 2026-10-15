@@ -46,11 +46,11 @@ export function SourcesPage() {
       <Button variant="ghost" size="sm" asChild>
         <Link to="/incomes">
           <ArrowLeft />
-          До доходів
+          До прибутків
         </Link>
       </Button>
       <PageHeader
-        title="Джерела доходу"
+        title="Джерела прибутку"
         action={
           incomeAccounts.length > 0 && (
             <Button onClick={() => setDialog({ open: true })}>Додати джерело</Button>
@@ -69,7 +69,7 @@ export function SourcesPage() {
         </Muted>
       )}
       {sources.isPending && <Muted>Завантаження…</Muted>}
-      {sources.data?.length === 0 && <Muted>Джерел доходу ще немає.</Muted>}
+      {sources.data?.length === 0 && <Muted>Джерел прибутку ще немає.</Muted>}
 
       <ul className="space-y-2">
         {sources.data?.map((source) => (
@@ -144,8 +144,8 @@ export function SourcesPage() {
         }
         description={
           confirmation.kind === 'deactivate'
-            ? 'Майбутні неотримані надходження зникнуть. Історія й отримані доходи лишаться.'
-            : 'Джерело з отриманими доходами видалити не можна — лише деактивувати.'
+            ? 'Майбутні неотримані надходження зникнуть. Історія й отримані прибутки лишаться.'
+            : 'Джерело з отриманими прибутками видалити не можна — лише деактивувати.'
         }
         label={confirmation.kind === 'deactivate' ? 'Деактивувати' : 'Видалити'}
         onConfirm={() => {

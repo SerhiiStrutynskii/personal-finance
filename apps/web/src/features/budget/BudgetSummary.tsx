@@ -27,7 +27,7 @@ export function BudgetSummary({ budget }: { budget: BudgetView }) {
       <Card data-testid="budget-summary">
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Figure
-            title="Доходи"
+            title="Прибутки"
             actual={money(summary.receivedIncomeTotal)}
             planned={money(summary.plannedIncomeTotal)}
           />

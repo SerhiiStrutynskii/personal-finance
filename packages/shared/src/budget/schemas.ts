@@ -62,10 +62,10 @@ export const budgetViewSchema = z.object({
     spentTotal: z.number().int(),
     plannedBalance: z.number().int(),
     actualBalance: z.number().int(),
-    /** balanced — заплановані витрати не більші за заплановані доходи. */
+    /** balanced — заплановані витрати не більші за заплановані прибутки. */
     planState: planStateSchema,
   }),
-  /** Доходи місяця з фічі доходів — лише для перегляду. */
+  /** Прибутки місяця з фічі прибутків — лише для перегляду. */
   incomes: z.object({
     occurrences: z.array(
       z.object({

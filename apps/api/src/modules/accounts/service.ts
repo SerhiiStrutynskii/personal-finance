@@ -42,7 +42,7 @@ export async function getAccount(db: Db, auth: AuthContext, id: string): Promise
 
 /**
  * Створює рахунок. Початковий залишок записується службовою транзакцією balance_adjustment
- * з поточним моментом: вона змінює баланс, але не є ні доходом, ні витратою.
+ * з поточним моментом: вона змінює баланс, але не є ні прибутком, ні витратою.
  */
 export async function createAccount(
   db: Db,
@@ -133,7 +133,7 @@ export async function deleteAccount(db: Db, auth: AuthContext, id: string): Prom
   } catch (error) {
     if (isForeignKeyViolation(error)) {
       throw conflict(
-        'Рахунок використовується в транзакціях, джерелах доходу, боргах або цілях, тому його не можна видалити',
+        'Рахунок використовується в транзакціях, джерелах прибутку, боргах або цілях, тому його не можна видалити',
       );
     }
     throw error;

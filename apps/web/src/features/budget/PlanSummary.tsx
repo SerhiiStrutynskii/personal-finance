@@ -22,7 +22,7 @@ function Figure({ title, value }: { title: string; value: string }) {
   );
 }
 
-/** План місяця: очікувані доходи, очікувані витрати й чи сходиться бюджет. */
+/** План місяця: очікувані прибутки, очікувані витрати й чи сходиться бюджет. */
 export function PlanSummary({ plannedIncome, plannedExpenses, state, currency }: Props) {
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
   const balance = plannedExpenses === null ? null : plannedIncome - plannedExpenses;
@@ -31,7 +31,7 @@ export function PlanSummary({ plannedIncome, plannedExpenses, state, currency }:
     <Card data-testid="month-plan" data-state={state ?? 'none'}>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Figure title="Очікувані доходи" value={money(plannedIncome)} />
+          <Figure title="Очікувані прибутки" value={money(plannedIncome)} />
           <Figure
             title="Очікувані витрати"
             value={plannedExpenses === null ? '—' : money(plannedExpenses)}
@@ -45,7 +45,7 @@ export function PlanSummary({ plannedIncome, plannedExpenses, state, currency }:
             <span>
               {balance > 0
                 ? `Бюджет сходиться: після запланованих витрат лишається ${money(balance)}.`
-                : 'Бюджет сходиться: заплановані витрати дорівнюють доходам.'}
+                : 'Бюджет сходиться: заплановані витрати дорівнюють прибуткам.'}
             </span>
           </p>
         )}
@@ -53,7 +53,7 @@ export function PlanSummary({ plannedIncome, plannedExpenses, state, currency }:
           <p className="flex items-start gap-1.5 text-sm font-medium text-status-over">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
             <span>
-              Бюджет не сходиться: заплановані витрати більші за доходи на {money(-balance)}.
+              Бюджет не сходиться: заплановані витрати більші за прибутки на {money(-balance)}.
             </span>
           </p>
         )}

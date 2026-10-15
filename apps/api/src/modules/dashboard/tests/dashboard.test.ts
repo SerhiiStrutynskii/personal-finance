@@ -166,7 +166,7 @@ describe('головна: гроші зараз', () => {
 });
 
 describe('головна: цей місяць', () => {
-  it('дохід, витрати й різниця збігаються з доходами та аналітикою; без бюджету лімітів немає', async () => {
+  it('прибуток, витрати й різниця збігаються з прибутками та аналітикою; без бюджету лімітів немає', async () => {
     const { actor, income, expense } = await setup();
     await income(600_000, '2026-10-02T10:00:00Z');
     await expense(120_000, '2026-10-05T10:00:00Z');
@@ -214,7 +214,7 @@ describe('головна: план місяця й платежі по борг�
       startDate: '2026-01-01',
     });
 
-  it('без бюджету є лише очікувані доходи', async () => {
+  it('без бюджету є лише очікувані прибутки', async () => {
     const { actor, card } = await setup();
     await salary(actor, card.id, 4_000_000);
     expect((await dashboardOf(actor)).plan).toEqual({
@@ -225,7 +225,7 @@ describe('головна: план місяця й платежі по борг�
     });
   });
 
-  it('бюджет сходиться, поки ліміти не більші за очікувані доходи; збігається з бюджетом', async () => {
+  it('бюджет сходиться, поки ліміти не більші за очікувані прибутки; збігається з бюджетом', async () => {
     const { actor, card, category } = await setup();
     await salary(actor, card.id, 4_000_000);
     const food = await category('Продукти');
@@ -342,7 +342,7 @@ describe('головна: потребує уваги й найближчі по
     expect(paid.upcoming).toEqual([]);
   });
 
-  it('дохід, що не надійшов, і очікуване надходження', async () => {
+  it('прибуток, що не надійшов, і очікуване надходження', async () => {
     const { actor, card } = await setup();
     const source = (name: string, dayOfMonth: number) =>
       actor.post('/api/income-sources', {

@@ -44,7 +44,7 @@ function accountLabel(account: Account): string {
   return `${account.name} (кредитка, доступно ${money})`;
 }
 
-/** Поля витрати або доходу для створення чи редагування запису. */
+/** Поля витрати або прибутку для створення чи редагування запису. */
 export function TransactionForm({
   type,
   original,

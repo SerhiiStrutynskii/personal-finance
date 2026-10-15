@@ -1,6 +1,6 @@
 import type { DateString } from './recurrence.ts';
 
-/** Збережений стан надходження: skipped — користувач позначив, що цього разу доходу не буде. */
+/** Збережений стан надходження: skipped — користувач позначив, що цього разу прибутку не буде. */
 export type OccurrenceStoredStatus = 'expected' | 'skipped';
 
 /** Стан отримання, який показується індикатором. */
@@ -37,7 +37,7 @@ export interface OccurrenceForSummary {
 export interface IncomeSummary {
   /** Сума запланованих надходжень періоду, крім пропущених. */
   plannedTotal: number;
-  /** Усі доходи з датою в періоді: періодичні й разові. */
+  /** Усі прибутки з датою в періоді: періодичні й разові. */
   receivedTotal: number;
   receivedRecurring: number;
   oneTimeTotal: number;
@@ -47,7 +47,7 @@ export interface IncomeSummary {
 }
 
 /**
- * Підсумок доходів за період. Надходження належать до періоду за plannedDate, а фактичні суми
+ * Підсумок прибутків за період. Надходження належать до періоду за plannedDate, а фактичні суми
  * (`receivedRecurring`, `oneTimeTotal`) — за датою транзакцій, тому передаються окремо:
  * зарплата за жовтень, що прийшла 1 листопада, отримана в жовтневому надходженні,
  * але гроші рахуються в листопаді.

@@ -28,7 +28,7 @@ export function useIncomeSources() {
   });
 }
 
-/** Будь-яка зміна доходів оновлює доходи місяця, джерела, бюджет і списки транзакцій. */
+/** Будь-яка зміна прибутків оновлює прибутки місяця, джерела, бюджет і списки транзакцій. */
 function useIncomeMutation<TInput, TResult>(request: (input: TInput) => Promise<TResult>) {
   const queryClient = useQueryClient();
   return useMutation({

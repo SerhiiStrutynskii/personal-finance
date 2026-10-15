@@ -244,7 +244,7 @@ describe('переказ', () => {
   });
 });
 
-describe('дохід і надходження', () => {
+describe('прибуток і надходження', () => {
   const original: Transaction = {
     id: id(9),
     type: 'income',
@@ -261,7 +261,7 @@ describe('дохід і надходження', () => {
     updatedAt: '2026-03-05T08:00:00.000Z',
   };
 
-  it('редагування доходу зберігає його звʼязок із надходженням', () => {
+  it('редагування прибутку зберігає його звʼязок із надходженням', () => {
     const ctx = { ...context, original };
     expect(toTransactionInput('income', initialValues(ctx), ctx)).toMatchObject({
       ok: true,
@@ -269,7 +269,7 @@ describe('дохід і надходження', () => {
     });
   });
 
-  it('новий дохід не привʼязаний до надходження', () => {
+  it('новий прибуток не привʼязаний до надходження', () => {
     expect(toTransactionInput('income', values(), context)).toMatchObject({
       ok: true,
       input: { type: 'income', occurrenceId: null },

@@ -86,7 +86,7 @@ export function AddCategoryDialog({ fixedKind, trigger, defaultParent, onCreated
             <DialogDescription>
               {fixedKind || defaultParent
                 ? `Тип категорії: ${CATEGORY_KIND_LABELS[kind].toLowerCase()}.`
-                : 'Категорія витрат доступна лише для витрат, категорія доходів — лише для доходів.'}
+                : 'Категорія витрат доступна лише для витрат, категорія прибутків — лише для прибутків.'}
             </DialogDescription>
           </DialogHeader>
           <Field label="Назва" error={nameError}>

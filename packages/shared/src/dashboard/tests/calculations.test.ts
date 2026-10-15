@@ -157,7 +157,7 @@ describe('buildAttention', () => {
     expect(item).toMatchObject({ kind: 'goal_behind', amount: null });
   });
 
-  it('частково отриманий дохід не є простроченим', () => {
+  it('частково отриманий прибуток не є простроченим', () => {
     const items = buildAttention({
       ...nothing,
       occurrences: [
@@ -294,13 +294,13 @@ describe('buildMonthPlan', () => {
     });
   });
 
-  it('витрати не більші за доходи — бюджет сходиться', () => {
+  it('витрати не більші за прибутки — бюджет сходиться', () => {
     expect(buildMonthPlan(50_000, 30_000)).toMatchObject({ balance: 20_000, state: 'balanced' });
     expect(buildMonthPlan(50_000, 50_000)).toMatchObject({ balance: 0, state: 'balanced' });
     expect(buildMonthPlan(0, 0)).toMatchObject({ balance: 0, state: 'balanced' });
   });
 
-  it('витрати більші за доходи — дефіцит', () => {
+  it('витрати більші за прибутки — дефіцит', () => {
     expect(buildMonthPlan(50_000, 50_001)).toMatchObject({ balance: -1, state: 'deficit' });
   });
 });

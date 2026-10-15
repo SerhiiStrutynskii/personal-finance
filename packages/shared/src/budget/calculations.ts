@@ -50,7 +50,7 @@ export interface CategorySpending {
 
 export interface BudgetFacts {
   spending: readonly CategorySpending[];
-  /** Усі доходи з датою в періоді. */
+  /** Усі прибутки з датою в періоді. */
   receivedIncome: number;
 }
 
@@ -84,7 +84,7 @@ export interface UnplannedExpense {
   status: CategoryStatus;
 }
 
-/** Чи сходиться план місяця: заплановані витрати не більші за заплановані доходи. */
+/** Чи сходиться план місяця: заплановані витрати не більші за заплановані прибутки. */
 export type PlanState = 'balanced' | 'deficit';
 
 export function getPlanState(plannedIncome: number, plannedExpenses: number): PlanState {
@@ -110,7 +110,7 @@ export interface BudgetCalculation {
 
 export interface BudgetCalculationInput extends BudgetFacts {
   expenseLines: readonly PlannedExpenseLine[];
-  /** Запланований дохід місяця: сума очікуваних надходжень (див. розрахунки доходів). */
+  /** Запланований прибуток місяця: сума очікуваних надходжень (див. розрахунки прибутків). */
   plannedIncome: number;
   now: Date;
   periodEnd: Date;
@@ -213,7 +213,7 @@ export interface BudgetTransaction {
 export const UNCATEGORIZED_NAME = 'Без категорії';
 
 /**
- * Зводить транзакції до фактів бюджету: витрати по категоріях і суму доходів за період
+ * Зводить транзакції до фактів бюджету: витрати по категоріях і суму прибутків за період
  * [start, end) у валюті бюджету. Перекази не враховуються. Бекенд робить те саме одним
  * SQL-запитом; ця функція — еталон правил відбору.
  */

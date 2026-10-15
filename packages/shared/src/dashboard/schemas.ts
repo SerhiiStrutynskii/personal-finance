@@ -54,12 +54,12 @@ export const dashboardSchema = z.object({
     daysElapsed: z.number().int(),
     daysInMonth: z.number().int(),
   }),
-  /** План місяця: очікувані доходи проти суми лімітів бюджету. */
+  /** План місяця: очікувані прибутки проти суми лімітів бюджету. */
   plan: z.object({
     plannedIncome: nonNegativeSchema,
     /** Сума лімітів; null, якщо бюджету на місяць немає. */
     plannedExpenses: nonNegativeSchema.nullable(),
-    /** Доходи мінус витрати; null без бюджету. */
+    /** Прибутки мінус витрати; null без бюджету. */
     balance: amountMinorSchema.nullable(),
     state: planStateSchema.nullable(),
   }),
@@ -89,7 +89,7 @@ export const dashboardSchema = z.object({
   ),
   /** Не більше трьох активних цілей. */
   goals: z.array(goalSchema),
-  /** Останні витрати, доходи й платежі по боргах. */
+  /** Останні витрати, прибутки й платежі по боргах. */
   recent: z.array(
     z.object({
       id: idSchema,

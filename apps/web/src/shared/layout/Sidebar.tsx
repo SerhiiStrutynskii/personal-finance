@@ -21,7 +21,7 @@ import { SidebarItem } from './SidebarItem.tsx';
 const navItems: ISidebarItem[] = [
   { title: 'Головна', icon: Home, route: '/', hasDropdown: false },
   { title: 'Витрати', icon: HandCoins, route: '/expenses', hasDropdown: false },
-  { title: 'Доходи', icon: TrendingUp, route: '/incomes', hasDropdown: false },
+  { title: 'Прибутки', icon: TrendingUp, route: '/incomes', hasDropdown: false },
   { title: 'Рахунки', icon: CreditCard, route: '/accounts', hasDropdown: false },
   { title: 'Категорії', icon: Tags, route: '/categories', hasDropdown: false },
   { title: 'Бюджет', icon: Calculator, route: '/budget', hasDropdown: false },

@@ -184,7 +184,7 @@ describe('створення й читання бюджету', () => {
     expect((await actor.get('/api/budgets')).status).toBe(400);
   });
 
-  it('статусу бюджету, статей доходу й ендпоінтів для них немає', async () => {
+  it('статусу бюджету, статей прибутку й ендпоінтів для них немає', async () => {
     const actor = await createActor();
     const { body: budget } = await createBudget(actor, CURRENT);
 
@@ -302,7 +302,7 @@ describe('ліміти', () => {
       actor.post(base, { categoryId: f.food.id, plannedAmount: 100.5 }),
       actor.post(base, { categoryId: f.food.id, plannedAmount: '100' }),
       actor.post(base, { categoryId: f.food.id }),
-      // категорія доходів, чужа категорія, неіснуюча категорія
+      // категорія прибутків, чужа категорія, неіснуюча категорія
       actor.post(base, { categoryId: f.salaryCategory.id, plannedAmount: 100 }),
       actor.post(base, { categoryId: foreign.food.id, plannedAmount: 100 }),
       actor.post(base, { categoryId: MISSING_ID, plannedAmount: 100 }),
@@ -499,7 +499,7 @@ describe('витрати в бюджеті', () => {
   });
 });
 
-describe('доходи в бюджеті', () => {
+describe('прибутки в бюджеті', () => {
   it('збігаються з GET /incomes за той самий місяць', async () => {
     const actor = await createActor();
     const f = await createFixtures(actor);
@@ -598,7 +598,7 @@ describe('доходи в бюджеті', () => {
     expect(view.incomes.oneTimeTotal).toBe(750000);
   });
 
-  it('пропущене надходження зменшує запланований дохід бюджету', async () => {
+  it('пропущене надходження зменшує запланований прибуток бюджету', async () => {
     const actor = await createActor();
     const f = await createFixtures(actor);
     await createBudget(actor, CURRENT);
@@ -622,7 +622,7 @@ describe('доходи в бюджеті', () => {
 });
 
 describe('копіювання з попереднього місяця', () => {
-  it('переносить лише ліміти: без видатків і доходів', async () => {
+  it('переносить лише ліміти: без видатків і прибутків', async () => {
     const actor = await createActor();
     const f = await createFixtures(actor);
     setNow(DURING_PAST);
@@ -698,7 +698,7 @@ describe('ізоляція домогосподарств', () => {
     expect((await getBudget(owner, CURRENT)).expenseLines[0].planned).toBe(1000);
   });
 
-  it('чужі транзакції й доходи не потрапляють у розрахунки', async () => {
+  it('чужі транзакції й прибутки не потрапляють у розрахунки', async () => {
     const owner = await createActor();
     const stranger = await createActor();
     const strangerData = await createFixtures(stranger);

@@ -27,7 +27,7 @@ import { getOverview } from '../debts/service.ts';
 import { getIncomes } from '../incomes/occurrences.service.ts';
 import * as repo from './repo.ts';
 
-// Аналітика, як і бюджет, доходи й борги, рахується в одній валюті: суми різних валют не складаються.
+// Аналітика, як і бюджет, прибутки й борги, рахується в одній валюті: суми різних валют не складаються.
 const CURRENCY = DEFAULT_CURRENCY;
 
 /** Часовий пояс, сьогоднішня дата й запитаний місяць; майбутній місяць не аналізується. */

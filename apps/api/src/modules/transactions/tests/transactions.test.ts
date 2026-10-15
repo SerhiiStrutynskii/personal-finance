@@ -189,7 +189,7 @@ describe('перекази', () => {
     ).toBe(400);
   });
 
-  it('переказ не потрапляє до списку витрат чи доходів і видно на обох рахунках', async () => {
+  it('переказ не потрапляє до списку витрат чи прибутків і видно на обох рахунках', async () => {
     const actor = await createActor();
     const { card, cash } = await createFixtures(actor);
     await actor.post('/api/transactions', { ...base, accountId: card.id, toAccountId: cash.id });
@@ -492,7 +492,7 @@ describe('обмеження дати видатку', () => {
     expect((await move('2026-03-20T10:00:00Z')).status).toBe(200);
   });
 
-  it('дохід не можна перетворити на видаток із майбутньою датою', async () => {
+  it('прибуток не можна перетворити на видаток із майбутньою датою', async () => {
     const actor = await createActor();
     const { card } = await createFixtures(actor);
     const { body: income } = await actor.post('/api/transactions', {
@@ -513,7 +513,7 @@ describe('обмеження дати видатку', () => {
     expect((await asExpense('2026-01-10T10:00:00Z')).status).toBe(200);
   });
 
-  it('доходів і переказів обмеження не стосується', async () => {
+  it('прибутків і переказів обмеження не стосується', async () => {
     const actor = await createActor();
     const { card, cash } = await createFixtures(actor);
     const base = { accountId: card.id, amountMinor: 100 };

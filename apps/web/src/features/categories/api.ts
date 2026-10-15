@@ -6,7 +6,7 @@ const KEY = ['categories'];
 
 export const CATEGORY_KIND_LABELS: Record<CategoryKind, string> = {
   expense: 'Витрати',
-  income: 'Доходи',
+  income: 'Прибутки',
 };
 export const CATEGORY_KINDS = Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[];
 

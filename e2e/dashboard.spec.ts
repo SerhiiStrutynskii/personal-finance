@@ -33,10 +33,10 @@ test('головна: кроки для нового користувача, в�
   await limitDialog.getByLabel('Ліміт, UAH').fill('100');
   await limitDialog.getByRole('button', { name: 'Зберегти' }).click();
   await expect(limitDialog).toBeHidden();
-  // Доходів не заплановано, тож ліміт 100 грн уже більший за них.
+  // Прибутків не заплановано, тож ліміт 100 грн уже більший за них.
   await expect(page.getByTestId('month-plan')).toHaveAttribute('data-state', 'deficit');
   await expect(page.getByTestId('month-plan')).toContainText(
-    'заплановані витрати більші за доходи на 100,00',
+    'заплановані витрати більші за прибутки на 100,00',
   );
 
   // Видаток 150 грн із головної — тією самою модалкою, що й у розділі витрат.

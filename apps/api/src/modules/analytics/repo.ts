@@ -4,7 +4,7 @@ import { debtEntries, debts, transactions } from '../../db/schema.ts';
 
 const num = (value: string | number | null | undefined) => Number(value ?? 0);
 
-/** Зміна суми балансів рахунків: доходи й службові зміни додаються, витрати й платежі віднімаються. */
+/** Зміна суми балансів рахунків: прибутки й службові зміни додаються, витрати й платежі віднімаються. */
 const accountsDelta = sql`
   coalesce(sum(CASE
     WHEN t.type IN ('income', 'balance_adjustment') THEN t.amount_minor
@@ -20,7 +20,7 @@ export interface MonthFactsRow {
 }
 
 /**
- * Доходи, витрати, платежі по боргах і зміна балансів рахунків по місяцях у [start, end)
+ * Прибутки, витрати, платежі по боргах і зміна балансів рахунків по місяцях у [start, end)
  * одним запитом. Місяць визначається в часовому поясі домогосподарства.
  */
 export async function monthlyFacts(

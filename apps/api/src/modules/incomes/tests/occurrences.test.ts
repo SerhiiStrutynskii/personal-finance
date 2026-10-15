@@ -132,7 +132,7 @@ describe('лінива генерація надходжень', () => {
   });
 });
 
-describe('отримання доходу', () => {
+describe('отримання прибутку', () => {
   it('receive двома частинами: partial, потім received', async () => {
     const { actor, card } = await setup();
     await createSource(actor, card.id);

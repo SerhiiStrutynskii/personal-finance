@@ -177,7 +177,7 @@ export function toTransactionInput(
           type,
           categoryId: values.categoryId || null,
           ...(type === 'income' && {
-            // Редагування доходу не розриває його зв'язок із надходженням.
+            // Редагування прибутку не розриває його зв'язок із надходженням.
             occurrenceId: context.original?.occurrenceId ?? null,
           }),
         };

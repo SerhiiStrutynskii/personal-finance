@@ -47,7 +47,7 @@ export function TransactionsPage({ type }: { type: EntryType }) {
   const usableAccounts = activeAccounts(accounts.data);
   const hasAccounts = usableAccounts.length > 0;
   const entryCategories = (categories.data ?? []).filter((category) => category.kind === type);
-  // Видаток не може мати майбутню дату; для доходів меж немає.
+  // Видаток не може мати майбутню дату; для прибутків меж немає.
   const expenseRange =
     type === 'expense' ? getAllowedExpenseDateRange(new Date(), user.timeZone) : undefined;
 

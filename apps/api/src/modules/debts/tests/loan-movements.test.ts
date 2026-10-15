@@ -443,7 +443,7 @@ describe('записи боргу лише для позик і лише сво�
     expect(await balanceOfAccount(actor, account.id)).toBe(2_000_000);
     const stored = await db.execute(sql`SELECT 1 FROM debt_entries`);
     expect(stored.rows).toEqual([]);
-    // дохід, яким поповнювали рахунок, лишився
+    // прибуток, яким поповнювали рахунок, лишився
     expect((await actor.get('/api/transactions')).body.total).toBe(1);
   });
 

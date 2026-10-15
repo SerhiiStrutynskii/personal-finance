@@ -36,7 +36,7 @@ export async function createAccount(actor: Actor, name = 'Дебетова', ove
   return body as { id: string };
 }
 
-/** Поповнює рахунок доходом, щоб на ньому були кошти для платежів. */
+/** Поповнює рахунок прибутком, щоб на ньому були кошти для платежів. */
 export async function fund(actor: Actor, accountId: string, amountMinor: number) {
   await actor.post('/api/transactions', {
     type: 'income',

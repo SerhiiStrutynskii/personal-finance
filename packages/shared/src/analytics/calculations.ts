@@ -137,12 +137,12 @@ export function breakdownByCategory(
   };
 }
 
-/** Частка доходу, що лишилася після витрат; null без доходу; від'ємна, якщо витрачено більше. */
+/** Частка прибутку, що лишилася після витрат; null без прибутку; від'ємна, якщо витрачено більше. */
 export function savingsRate(income: number, expenses: number): number | null {
   return income > 0 ? (income - expenses) / income : null;
 }
 
-/** Частка доходу, що пішла на борги; null без доходу. */
+/** Частка прибутку, що пішла на борги; null без прибутку. */
 export function debtLoad(debtPayments: number, income: number): number | null {
   return income > 0 ? debtPayments / income : null;
 }

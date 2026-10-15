@@ -22,21 +22,21 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currency: string;
-  /** Рахунки у валюті доходів. */
+  /** Рахунки у валюті прибутків. */
   accounts: readonly Account[];
-  /** Категорії доходів. */
+  /** Категорії прибутків. */
   categories: readonly Category[];
   defaultDate: string;
 }
 
-/** Вікно нового разового доходу: бонус, продаж речі, подарунок, повернення боргу. */
+/** Вікно нового разового прибутку: бонус, продаж речі, подарунок, повернення боргу. */
 export function OneTimeDialog({ open, onOpenChange, ...form }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Разовий дохід</DialogTitle>
-          <DialogDescription>Разовий дохід одразу вважається отриманим.</DialogDescription>
+          <DialogTitle>Разовий прибуток</DialogTitle>
+          <DialogDescription>Разовий прибуток одразу вважається отриманим.</DialogDescription>
         </DialogHeader>
         <OneTimeForm {...form} onDone={() => onOpenChange(false)} />
       </DialogContent>

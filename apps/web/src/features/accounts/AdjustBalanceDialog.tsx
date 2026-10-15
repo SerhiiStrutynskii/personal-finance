@@ -35,7 +35,7 @@ export function AdjustBalanceDialog({ account }: { account: Account }) {
           <DialogTitle>{`Змінити баланс: ${account.name}`}</DialogTitle>
           <DialogDescription>
             Вкажіть, скільки грошей на рахунку зараз. Застосунок запише різницю, не змінюючи минулі
-            записи; це не дохід і не витрата, тож на бюджет коригування не впливає.
+            записи; це не прибуток і не витрата, тож на бюджет коригування не впливає.
           </DialogDescription>
         </DialogHeader>
         <AdjustBalanceForm account={account} onDone={() => setOpen(false)} />

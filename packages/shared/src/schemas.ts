@@ -136,14 +136,14 @@ export const transactionInputSchema = z.discriminatedUnion('type', [
     type: z.literal('expense'),
     ...transactionBase,
     categoryId: idSchema.nullable().default(null),
-    // Надходження є лише в доходів: будь-яке значення, крім null, — помилка.
+    // Надходження є лише в прибутків: будь-яке значення, крім null, — помилка.
     occurrenceId: z.null().optional(),
   }),
   z.object({
     type: z.literal('income'),
     ...transactionBase,
     categoryId: idSchema.nullable().default(null),
-    /** Надходження періодичного доходу, яке оплачує ця транзакція. */
+    /** Надходження періодичного прибутку, яке оплачує ця транзакція. */
     occurrenceId: idSchema.nullable().default(null),
   }),
   z

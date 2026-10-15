@@ -21,19 +21,19 @@ import { Section } from './parts.tsx';
 import { signedMoney } from './signedMoney.ts';
 
 const chartConfig = {
-  income: { label: 'Дохід', color: 'var(--status-surplus)' },
+  income: { label: 'Прибуток', color: 'var(--status-surplus)' },
   expenses: { label: 'Витрати', color: 'var(--chart-3)' },
 } satisfies ChartConfig;
 
-/** Доходи й витрати по місяцях: стовпчики й таблиця з різницею та нормою заощаджень. */
+/** Прибутки й витрати по місяцях: стовпчики й таблиця з різницею та нормою заощаджень. */
 export function TrendSection({ data }: { data: AnalyticsTrend }) {
   const { currency } = data;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
 
   return (
     <Section
-      title="Доходи й витрати"
-      description="Норма заощаджень — частка доходу, що лишилася після витрат."
+      title="Прибутки й витрати"
+      description="Норма заощаджень — частка прибутку, що лишилася після витрат."
       testId="analytics-trend"
     >
       <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
@@ -70,7 +70,7 @@ export function TrendSection({ data }: { data: AnalyticsTrend }) {
         <TableHeader>
           <TableRow>
             <TableHead>Місяць</TableHead>
-            <TableHead className="text-right">Дохід</TableHead>
+            <TableHead className="text-right">Прибуток</TableHead>
             <TableHead className="text-right">Витрати</TableHead>
             <TableHead className="text-right">Різниця</TableHead>
             <TableHead className="text-right">Норма заощаджень</TableHead>

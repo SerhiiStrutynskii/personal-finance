@@ -4,7 +4,7 @@ import type { Db } from '../../db/client.ts';
 import { getAuth } from '../../http/auth.ts';
 import * as service from './service.ts';
 
-// Аналітика лише читає: усе рахується з транзакцій, бюджетів, доходів і боргів.
+// Аналітика лише читає: усе рахується з транзакцій, бюджетів, прибутків і боргів.
 export function analyticsRouter(db: Db, now: () => Date): Router {
   const router = Router();
 

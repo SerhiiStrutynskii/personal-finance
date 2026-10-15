@@ -28,7 +28,7 @@ const RECENT_TYPES = new Set(['expense', 'income', 'debt_payment']);
 
 /**
  * Зведення поточного місяця. Нічого не рахує саме: числа й статуси беруться із сервісів
- * рахунків, аналітики, доходів, боргів і цілей.
+ * рахунків, аналітики, прибутків, боргів і цілей.
  */
 export async function getDashboard(db: Db, auth: AuthContext, now: Date): Promise<Dashboard> {
   const analytics = await getMonthAnalytics(db, auth, undefined, now);

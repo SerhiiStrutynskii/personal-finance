@@ -64,7 +64,7 @@ async function buildView(
   now: Date,
 ): Promise<BudgetView> {
   const month = localMonthKey(budget.periodStart, timeZone);
-  // Запланований і фактичний дохід місяця бюджет бере з фічі доходів.
+  // Запланований і фактичний прибуток місяця бюджет бере з фічі прибутків.
   const [expenseLines, spending, incomes] = await Promise.all([
     repo.listExpenseLines(db, budget.id),
     loadSpending(db, budget),

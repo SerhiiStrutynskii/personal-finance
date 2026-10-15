@@ -173,7 +173,7 @@ describe('аналітика місяця: витрати за категорі�
     expect(body.change).toBe(-8_000);
   });
 
-  it('перекази, доходи, службові зміни балансу й інша валюта у витрати не входять', async () => {
+  it('перекази, прибутки, службові зміни балансу й інша валюта у витрати не входять', async () => {
     const { actor, card, cash, usd, food, expense, income } = await setup();
     await expense(1_000, '2026-10-05T10:00:00Z', food.id);
     await income(500_000, '2026-10-01T10:00:00Z');
@@ -423,7 +423,7 @@ describe('динаміка по місяцях', () => {
     }
   });
 
-  it('дохід, витрати, різниця й норма заощаджень', async () => {
+  it('прибуток, витрати, різниця й норма заощаджень', async () => {
     const { actor, expense, income } = await setup();
     await income(600_000, '2026-09-05T10:00:00Z');
     await expense(510_000, '2026-09-10T10:00:00Z');
@@ -533,7 +533,7 @@ describe('динаміка по місяцях', () => {
     });
   });
 
-  it('боргове навантаження: платіж по позиці й переказ на кредитку від доходу місяця', async () => {
+  it('боргове навантаження: платіж по позиці й переказ на кредитку від прибутку місяця', async () => {
     const { actor, card, cash, income } = await setup();
     await income(1_000_000, '2026-10-02T10:00:00Z');
     const { body: loan } = await actor.post('/api/debts', loanInput());
@@ -559,7 +559,7 @@ describe('динаміка по місяцях', () => {
 
     const body = await trendOf(actor);
     expect(body.points.at(-1)).toMatchObject({ debtPayments: 150_000, debtLoad: 0.15 });
-    // планове: 100 000 + 50 000 щомісячних платежів, запланованого доходу немає
+    // планове: 100 000 + 50 000 щомісячних платежів, запланованого прибутку немає
     expect(body.plannedDebtLoad).toEqual({
       monthlyPayments: 150_000,
       plannedIncome: 0,
@@ -567,7 +567,7 @@ describe('динаміка по місяцях', () => {
     });
   });
 
-  it('планове навантаження від запланованого доходу місяця', async () => {
+  it('планове навантаження від запланованого прибутку місяця', async () => {
     const { actor, card } = await setup();
     await actor.post('/api/debts', loanInput());
     await actor.post('/api/income-sources', {

@@ -23,7 +23,7 @@ export const ATTENTION_VIEW: Record<
     link: (item) => `/debts/${item.id}`,
   },
   income_overdue: {
-    label: 'Не надійшов дохід',
+    label: 'Не надійшов прибуток',
     icon: CircleAlert,
     urgent: true,
     link: () => '/incomes',
@@ -60,5 +60,5 @@ export const UPCOMING_VIEW = {
     icon: TrendingDown,
     link: (id: string) => `/debts/${id}`,
   },
-  income: { label: 'Очікуваний дохід', icon: CircleDashed, link: () => '/incomes' },
+  income: { label: 'Очікуваний прибуток', icon: CircleDashed, link: () => '/incomes' },
 } as const;

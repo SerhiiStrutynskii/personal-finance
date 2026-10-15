@@ -163,7 +163,7 @@ export const transactions = pgTable(
     currency: char({ length: 3 }).notNull().default('UAH'),
     description: text().notNull().default(''),
     occurredAt: instant().notNull(),
-    // Надходження періодичного доходу, яке ця транзакція оплачує; тільки для доходів.
+    // Надходження періодичного прибутку, яке ця транзакція оплачує; тільки для прибутків.
     occurrenceId: uuid('occurrence_id').references(() => incomeOccurrences.id, {
       onDelete: 'set null',
     }),
@@ -255,7 +255,7 @@ export const incomeSources = pgTable(
     householdId: uuid('household_id')
       .notNull()
       .references(() => households.id, { onDelete: 'cascade' }),
-    // Рахунок, на який зазвичай надходить дохід.
+    // Рахунок, на який зазвичай надходить прибуток.
     accountId: uuid('account_id').references(() => accounts.id),
     name: text().notNull(),
     currency: char({ length: 3 }).notNull().default('UAH'),

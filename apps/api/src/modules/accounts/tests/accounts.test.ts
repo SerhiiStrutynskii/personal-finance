@@ -102,7 +102,7 @@ describe('accounts', () => {
     expect((await actor.get('/api/accounts')).body.items).toEqual([]);
   });
 
-  it('початковий залишок не є ні доходом, ні витратою бюджету', async () => {
+  it('початковий залишок не є ні прибутком, ні витратою бюджету', async () => {
     setNow('2026-03-15T12:00:00Z');
     const actor = await createActor();
     await actor.post('/api/accounts', { name: 'Картка', type: 'card', openingBalance: 500_000 });
@@ -192,7 +192,7 @@ describe('баланс рахунку', () => {
     return { actor, card, cash, balances };
   }
 
-  it('доходи додаються, витрати віднімаються, переказ переносить суму між рахунками', async () => {
+  it('прибутки додаються, витрати віднімаються, переказ переносить суму між рахунками', async () => {
     const { actor, card, cash, balances } = await setup();
     const post = (body: object) =>
       actor.post('/api/transactions', { accountId: card.id, occurredAt: at, ...body });
@@ -368,7 +368,7 @@ describe('коригування балансу', () => {
     expect((await actor.get('/api/transactions')).body.items[0].amountMinor).toBe(-105_000);
   });
 
-  it('коригування не є ні доходом, ні витратою бюджету', async () => {
+  it('коригування не є ні прибутком, ні витратою бюджету', async () => {
     const { actor, adjust } = await setup();
     await adjust({ actualBalance: 10_000 });
     await adjust({ actualBalance: 500_000 });

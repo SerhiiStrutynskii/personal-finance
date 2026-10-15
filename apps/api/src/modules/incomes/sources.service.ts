@@ -13,7 +13,7 @@ import {
   type UpdateIncomeSourceInput,
 } from './schema.ts';
 
-const sourceNotFound = () => notFound('Джерело доходу');
+const sourceNotFound = () => notFound('Джерело прибутку');
 
 export const toSourceDto = (row: repo.SourceRow): IncomeSource => ({
   id: row.id,
@@ -30,12 +30,12 @@ export const toSourceDto = (row: repo.SourceRow): IncomeSource => ({
   isActive: row.isActive,
 });
 
-/** Рахунок джерела має належати домогосподарству й бути в його валюті: мультивалютних доходів немає. */
+/** Рахунок джерела має належати домогосподарству й бути в його валюті: мультивалютних прибутків немає. */
 async function resolveAccountCurrency(db: DbOrTx, auth: AuthContext, accountId: string) {
   const account = await findAccount(db as Db, auth.householdId, accountId);
   if (!account) throw badRequest('Рахунок не знайдено');
   if (account.currency !== DEFAULT_CURRENCY) {
-    throw badRequest(`Доходи підтримуються лише у валюті ${DEFAULT_CURRENCY}`);
+    throw badRequest(`Прибутки підтримуються лише у валюті ${DEFAULT_CURRENCY}`);
   }
   return account.currency;
 }
@@ -103,7 +103,7 @@ export async function updateSource(
   return toSourceDto(row);
 }
 
-/** Деактивоване джерело не дає нових надходжень; історія й отримані доходи лишаються. */
+/** Деактивоване джерело не дає нових надходжень; історія й отримані прибутки лишаються. */
 export async function deactivateSource(
   db: Db,
   auth: AuthContext,
@@ -127,7 +127,7 @@ export async function deleteSource(db: Db, auth: AuthContext, id: string): Promi
   const existing = await repo.findSource(db, auth.householdId, id);
   if (!existing) throw sourceNotFound();
   if (await repo.sourceHasTransactions(db, existing.id)) {
-    throw conflict('До джерела привʼязані отримані доходи: його можна лише деактивувати');
+    throw conflict('До джерела привʼязані отримані прибутки: його можна лише деактивувати');
   }
   await repo.deleteSource(db, auth.householdId, id);
 }

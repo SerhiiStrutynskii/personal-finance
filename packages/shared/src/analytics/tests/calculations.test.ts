@@ -172,11 +172,11 @@ describe('savingsRate і debtLoad', () => {
     expect(savingsRate(1000, 1000)).toBe(0);
   });
 
-  it('витрати більші за дохід — від’ємна норма', () => {
+  it('витрати більші за прибуток — від’ємна норма', () => {
     expect(savingsRate(1000, 1500)).toBe(-0.5);
   });
 
-  it('без доходу норми немає', () => {
+  it('без прибутку норми немає', () => {
     expect(savingsRate(0, 0)).toBeNull();
     expect(savingsRate(0, 500)).toBeNull();
     expect(debtLoad(500, 0)).toBeNull();
@@ -260,7 +260,7 @@ describe('buildTrend', () => {
     ...override,
   });
 
-  it('дохід, витрати, різниця, норма й накопичені чисті активи', () => {
+  it('прибуток, витрати, різниця, норма й накопичені чисті активи', () => {
     const points = buildTrend({
       months,
       facts: [facts('2026-08', 1000, 600), facts('2026-10', 2000, 2500)],

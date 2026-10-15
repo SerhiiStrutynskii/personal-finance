@@ -11,7 +11,7 @@ export const incomeFrequencySchema = z.enum(['monthly', 'weekly', 'biweekly', 'e
 
 const sourceFields = {
   name: z.string().trim().min(1).max(100),
-  /** Рахунок, на який зазвичай надходить дохід; від нього береться валюта джерела. */
+  /** Рахунок, на який зазвичай надходить прибуток; від нього береться валюта джерела. */
   accountId: idSchema,
   /** Типова сума одного надходження. */
   plannedAmount: positiveAmountMinorSchema,
@@ -24,7 +24,7 @@ const sourceFields = {
 };
 
 /**
- * Джерело періодичного доходу. Кожна частота вимагає свої поля правила;
+ * Джерело періодичного прибутку. Кожна частота вимагає свої поля правила;
  * поля, що до неї не стосуються, відкидаються.
  */
 export const incomeSourceInputSchema = z
@@ -122,7 +122,7 @@ export type OneTimeIncomeInput = z.infer<typeof oneTimeIncomeSchema>;
 
 export const incomesQuerySchema = z.object({ month: monthSchema });
 
-/** Доходи місяця: підсумок, регулярні надходження й разові доходи. Статуси рахує бекенд. */
+/** Прибутки місяця: підсумок, регулярні надходження й разові прибутки. Статуси рахує бекенд. */
 export const incomesViewSchema = z.object({
   month: monthSchema,
   currency: currencySchema,

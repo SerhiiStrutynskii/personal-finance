@@ -75,7 +75,7 @@ describe('summarizeTransactions', () => {
     ...override,
   });
 
-  it('перекази не впливають ні на витрати, ні на доходи', () => {
+  it('перекази не впливають ні на витрати, ні на прибутки', () => {
     const facts = summarizeTransactions(
       [
         tx({ amountMinor: 300 }),
@@ -135,7 +135,7 @@ describe('summarizeTransactions', () => {
     expect(facts.spending).toEqual([{ categoryId: 'food', categoryName: 'Продукти', spent: 110 }]);
   });
 
-  it('групує витрати за категоріями, окремо рахує витрати без категорії, сумує доходи', () => {
+  it('групує витрати за категоріями, окремо рахує витрати без категорії, сумує прибутки', () => {
     const facts = summarizeTransactions(
       [
         tx({ amountMinor: 100 }),
@@ -311,7 +311,7 @@ describe('calculateBudget', () => {
     ]);
   });
 
-  it('рахує підсумки й баланси; доходи беруться готовими з розрахунку доходів', () => {
+  it('рахує підсумки й баланси; прибутки беруться готовими з розрахунку прибутків', () => {
     expect(calculateBudget({ ...input, now: during }).summary).toEqual({
       plannedIncomeTotal: 6000000,
       receivedIncomeTotal: 4550000,
@@ -361,11 +361,11 @@ describe('calculateBudget', () => {
 });
 
 describe('getPlanState', () => {
-  it('витрати менші за доходи — бюджет сходиться', () => {
+  it('витрати менші за прибутки — бюджет сходиться', () => {
     expect(getPlanState(1000, 999)).toBe('balanced');
   });
 
-  it('витрати рівно дорівнюють доходам — ще сходиться', () => {
+  it('витрати рівно дорівнюють прибуткам — ще сходиться', () => {
     expect(getPlanState(1000, 1000)).toBe('balanced');
     expect(getPlanState(0, 0)).toBe('balanced');
   });

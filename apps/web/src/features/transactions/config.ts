@@ -23,11 +23,11 @@ export const ENTRY_CONFIG: Record<
   },
   income: {
     path: '/incomes',
-    title: 'Доходи',
-    addTitle: 'Новий дохід',
+    title: 'Прибутки',
+    addTitle: 'Новий прибуток',
     addDescription: 'Сума зарахується на обраний рахунок.',
-    editTitle: 'Редагування доходу',
-    editDescription: 'Зміни замінять поточний запис про дохід.',
-    empty: 'За цей місяць доходів немає',
+    editTitle: 'Редагування прибутку',
+    editDescription: 'Зміни замінять поточний запис про прибуток.',
+    empty: 'За цей місяць прибутків немає',
   },
 };

@@ -55,12 +55,12 @@ export function IncomesPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <PageHeader
-        title="Доходи"
+        title="Прибутки"
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <MonthSwitcher month={month} onChange={setMonth} />
             <Button variant="outline" asChild>
-              <Link to="/incomes/sources">Джерела доходу</Link>
+              <Link to="/incomes/sources">Джерела прибутку</Link>
             </Button>
           </div>
         }
@@ -82,7 +82,7 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
   const categories = useCategories();
   const updateOccurrence = useUpdateOccurrence();
   const removeTransaction = useDeleteTransaction();
-  // Повні записи разових доходів потрібні для вікна редагування.
+  // Повні записи разових прибутків потрібні для вікна редагування.
   const period = budgetPeriod(month, user.timeZone);
   const transactions = useTransactions({
     type: 'income',
@@ -132,7 +132,7 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
       <ErrorText>{error && errorMessage(error)}</ErrorText>
       {accounts.data && !canAdd && (
         <Muted>
-          Щоб записувати доходи, спершу{' '}
+          Щоб записувати прибутки, спершу{' '}
           <Link className="underline" to="/accounts">
             створіть рахунок
           </Link>{' '}
@@ -159,9 +159,9 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
         />
         {incomes.occurrences.length === 0 && (
           <Muted>
-            Регулярні доходи задаються на сторінці{' '}
+            Регулярні прибутки задаються на сторінці{' '}
             <Link className="underline" to="/incomes/sources">
-              «Джерела доходу»
+              «Джерела прибутку»
             </Link>
             .
           </Muted>
@@ -170,16 +170,16 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="font-heading text-lg font-semibold">Разові доходи</h2>
+          <h2 className="font-heading text-lg font-semibold">Разові прибутки</h2>
           {canAdd && (
             <Button variant="outline" onClick={() => setOneTimeOpen(true)}>
               <Plus />
-              разовий дохід
+              разовий прибуток
             </Button>
           )}
         </div>
         {incomes.oneTime.length === 0 ? (
-          <Muted>Разових доходів цього місяця немає.</Muted>
+          <Muted>Разових прибутків цього місяця немає.</Muted>
         ) : (
           <Table>
             <TableHeader>
@@ -259,7 +259,7 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
       <ConfirmDialog
         open={deletion.open}
         onOpenChange={(open) => setDeletion({ ...deletion, open })}
-        title={`Видалити дохід «${deletion.name ?? ''}»?`}
+        title={`Видалити прибуток «${deletion.name ?? ''}»?`}
         onConfirm={() => deletion.id && removeTransaction.mutate(deletion.id)}
       />
     </>

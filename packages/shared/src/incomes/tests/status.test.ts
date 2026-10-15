@@ -87,7 +87,7 @@ describe('summarizeIncomes', () => {
     expect(summary.counts.skipped).toBe(1);
   });
 
-  it('без надходжень — лише разові доходи', () => {
+  it('без надходжень — лише разові прибутки', () => {
     expect(summarizeIncomes([], { receivedRecurring: 0, oneTimeTotal: 750000 })).toEqual({
       plannedTotal: 0,
       receivedTotal: 750000,

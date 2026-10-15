@@ -7,8 +7,8 @@ import { OccurrenceStatusLabel } from '../incomes/OccurrenceStatusLabel.tsx';
 import { OCCURRENCE_ROW_CLASS } from '../incomes/occurrenceStyles.ts';
 
 /**
- * Доходи місяця в бюджеті — лише перегляд: надходження з індикаторами статусу й сума разових.
- * Додаються, отримуються й редагуються доходи на сторінці «Доходи».
+ * Прибутки місяця в бюджеті — лише перегляд: надходження з індикаторами статусу й сума разових.
+ * Додаються, отримуються й редагуються прибутки на сторінці «Прибутки».
  */
 export function IncomeSection({ budget }: { budget: BudgetView }) {
   const { incomes, currency } = budget;
@@ -17,9 +17,9 @@ export function IncomeSection({ budget }: { budget: BudgetView }) {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="font-heading text-lg font-semibold">Доходи</h2>
+        <h2 className="font-heading text-lg font-semibold">Прибутки</h2>
         <Button variant="outline" asChild>
-          <Link to={`/incomes?month=${budget.month}`}>Перейти до доходів</Link>
+          <Link to={`/incomes?month=${budget.month}`}>Перейти до прибутків</Link>
         </Button>
       </div>
 
@@ -52,7 +52,7 @@ export function IncomeSection({ budget }: { budget: BudgetView }) {
       )}
 
       <p className="text-sm" data-testid="budget-one-time-income">
-        <span className="text-muted-foreground">Разові доходи: </span>
+        <span className="text-muted-foreground">Разові прибутки: </span>
         <span className="font-medium tabular-nums">{money(incomes.oneTimeTotal)}</span>
       </p>
     </section>

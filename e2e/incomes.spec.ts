@@ -6,8 +6,8 @@ test('джерело «Зарплата» дає очікуване надход
   await addAccount(page, 'Картка');
 
   // Джерело «Зарплата»: 45 000 грн щомісяця 5-го.
-  await page.getByRole('link', { name: 'Доходи' }).click();
-  await page.getByRole('link', { name: 'Джерела доходу', exact: true }).click();
+  await page.getByRole('link', { name: 'Прибутки' }).click();
+  await page.getByRole('link', { name: 'Джерела прибутку', exact: true }).click();
   await page.getByRole('button', { name: 'Додати джерело' }).click();
   const sourceDialog = page.getByRole('dialog');
   await sourceDialog.getByLabel('Назва').fill('Зарплата');
@@ -22,7 +22,7 @@ test('джерело «Зарплата» дає очікуване надход
   await expect(page.getByTestId('income-source')).toContainText('Щомісяця 5-го');
 
   // У наступному місяці 5-те число ще попереду, тож надходження очікується.
-  await page.getByRole('link', { name: 'До доходів' }).click();
+  await page.getByRole('link', { name: 'До прибутків' }).click();
   await page.getByRole('button', { name: 'Наступний місяць' }).click();
   const occurrence = page.getByTestId('income-occurrence').filter({ hasText: 'Зарплата' });
   await expect(occurrence).toHaveAttribute('data-status', 'pending');

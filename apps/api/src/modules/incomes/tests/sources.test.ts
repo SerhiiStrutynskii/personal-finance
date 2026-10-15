@@ -25,7 +25,7 @@ const salary = (accountId: string, override: object = {}) => ({
   ...override,
 });
 
-describe('джерела доходу', () => {
+describe('джерела прибутку', () => {
   it('створює джерело з валютою рахунку й відкидає зайві поля правила', async () => {
     const actor = await createActor();
     const { card } = await createAccounts(actor);
@@ -138,7 +138,7 @@ describe('джерела доходу', () => {
     expect((await patch({ plannedAmount: -1 })).status).toBe(400);
   });
 
-  it('деактивує й видаляє джерело без отриманих доходів', async () => {
+  it('деактивує й видаляє джерело без отриманих прибутків', async () => {
     const actor = await createActor();
     const { card } = await createAccounts(actor);
     const { body: source } = await actor.post('/api/income-sources', salary(card.id));

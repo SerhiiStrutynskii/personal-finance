@@ -77,7 +77,7 @@ export function AddTransferDialog({ accounts }: { accounts: Account[] }) {
           <DialogHeader>
             <DialogTitle>Новий переказ</DialogTitle>
             <DialogDescription>
-              Переказ між власними рахунками не є ні витратою, ні доходом.
+              Переказ між власними рахунками не є ні витратою, ні прибутком.
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">

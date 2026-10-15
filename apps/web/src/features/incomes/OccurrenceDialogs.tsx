@@ -68,7 +68,7 @@ function Actions({ pending, label = 'Зберегти' }: { pending: boolean; la
   );
 }
 
-/** Нуль для суми надходження не підходить: дохід має бути більшим за нуль. */
+/** Нуль для суми надходження не підходить: прибуток має бути більшим за нуль. */
 function parsePositive(text: string, currency: string): number | string {
   const amount = parsePlannedAmount(text, currency);
   return amount === 0 ? 'Сума має бути більшою за нуль' : amount;
@@ -87,7 +87,7 @@ export function ReceiveDialog({
       open={props.open}
       onOpenChange={props.onOpenChange}
       title={occurrence ? `Отримано: ${occurrence.name}` : 'Отримано'}
-      description="Запишіть, скільки й коли надійшло. Якщо дохід прийшов частинами, додайте кожну окремо."
+      description="Запишіть, скільки й коли надійшло. Якщо прибуток прийшов частинами, додайте кожну окремо."
     >
       {occurrence && (
         <ReceiveForm
@@ -247,7 +247,7 @@ export function PaymentsDialog({ timeZone, ...props }: DialogProps & { timeZone:
       open={props.open}
       onOpenChange={props.onOpenChange}
       title={occurrence ? `Платежі: ${occurrence.name}` : 'Платежі'}
-      description="Фактичні надходження за цим доходом. Помилковий запис можна видалити."
+      description="Фактичні надходження за цим прибутком. Помилковий запис можна видалити."
     >
       {occurrence && (
         <Payments occurrenceId={occurrence.id} currency={props.currency} timeZone={timeZone} />

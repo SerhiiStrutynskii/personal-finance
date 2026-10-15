@@ -14,7 +14,7 @@ async function addExpense(page: Page, amount: string, category: string) {
   await expect(dialog).toBeHidden();
 }
 
-test('аналітика показує витрати за категоріями, дохід, витрати й різницю місяця', async ({
+test('аналітика показує витрати за категоріями, прибуток, витрати й різницю місяця', async ({
   page,
 }) => {
   await register(page);
@@ -28,11 +28,11 @@ test('аналітика показує витрати за категоріям
   await expect(page.getByTestId('analytics-overspending')).toContainText('немає бюджету');
   await expect(page.getByRole('button', { name: 'Наступний місяць' })).toBeDisabled();
 
-  // Видатки у двох категоріях і разовий дохід.
+  // Видатки у двох категоріях і разовий прибуток.
   await addExpense(page, '300', 'Продукти');
   await addExpense(page, '100', 'Транспорт');
-  await page.getByRole('link', { name: 'Доходи', exact: true }).click();
-  await page.getByRole('button', { name: /разовий дохід/i }).click();
+  await page.getByRole('link', { name: 'Прибутки', exact: true }).click();
+  await page.getByRole('button', { name: /разовий прибуток/i }).click();
   const incomeDialog = page.getByRole('dialog');
   await incomeDialog.getByLabel('Назва').fill('Бонус');
   await incomeDialog.getByLabel('Сума, UAH').fill('900');
@@ -62,7 +62,7 @@ test('аналітика показує витрати за категоріям
   // графік намальовано: по стовпчику на категорію
   await expect(categories.locator('.recharts-bar-rectangle')).toHaveCount(2);
 
-  // Динаміка: шість місяців, в останньому — дохід, витрати, різниця й норма заощаджень.
+  // Динаміка: шість місяців, в останньому — прибуток, витрати, різниця й норма заощаджень.
   const trend = page.getByTestId('analytics-trend');
   await expect(trend.getByTestId('trend-row')).toHaveCount(6);
   const thisMonth = trend.getByTestId('trend-row').last();
