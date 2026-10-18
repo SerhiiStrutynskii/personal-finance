@@ -30,7 +30,7 @@ test('баланс рахунку змінюється коригуванням 
   await create.getByRole('button', { name: 'Додати' }).click();
   await expect(create).toBeHidden();
 
-  await page.getByRole('button', { name: 'Змінити баланс' }).click();
+  await page.getByRole('button', { name: 'Змінити баланс «Готівка»' }).click();
   const dialog = page.getByRole('dialog');
   const balance = dialog.getByLabel('Фактичний баланс, UAH');
   await expect(balance).toHaveValue('500,00');

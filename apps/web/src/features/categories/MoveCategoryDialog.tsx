@@ -1,4 +1,5 @@
 import type { Category } from '@hf/shared';
+import { FolderInput } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -22,7 +23,7 @@ interface Props {
   categories: readonly Category[];
 }
 
-/** Кнопка «Перенести»: категорія стає підкатегорією іншої або окремою; історія лишається. */
+/** Кнопка-іконка «Перенести»: категорія стає підкатегорією іншої або окремою; історія лишається. */
 export function MoveCategoryDialog({ category, categories }: Props) {
   const update = useUpdateCategory();
   const [open, setOpen] = useState(false);
@@ -52,7 +53,14 @@ export function MoveCategoryDialog({ category, categories }: Props) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost">Перенести</Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Перенести «${category.name}»`}
+          title={`Перенести «${category.name}»`}
+        >
+          <FolderInput />
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <form className="grid gap-4" onSubmit={handleSubmit} noValidate>

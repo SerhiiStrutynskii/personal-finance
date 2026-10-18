@@ -1,4 +1,5 @@
 import { formatMoney, type Account } from '@hf/shared';
+import { Pencil } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -18,15 +19,20 @@ import { plannedAmountText } from '../budget/plannedAmount.ts';
 import { useAdjustAccountBalance } from './api.ts';
 import { parseActualBalance } from './openingBalance.ts';
 
-/** Кнопка «Змінити баланс»: фактичний баланс на зараз, різниця записується коригуванням. */
+/** Кнопка-іконка «Змінити баланс»: фактичний баланс на зараз, різниця записується коригуванням. */
 export function AdjustBalanceDialog({ account }: { account: Account }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          Змінити баланс
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Змінити баланс «${account.name}»`}
+          title={`Змінити баланс «${account.name}»`}
+        >
+          <Pencil />
         </Button>
       </DialogTrigger>
       {/* Вміст монтується при кожному відкритті, тому форма починається з актуального балансу. */}
