@@ -1,5 +1,5 @@
 import type { Category, CategoryKind, CreateCategoryInput, UpdateCategoryInput } from '@hf/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
 
 const KEY = ['categories'];
@@ -18,33 +18,21 @@ export function useCategories() {
 }
 
 export function useCreateCategory() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateCategoryInput) => api.post<Category>('/api/categories', input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
   });
 }
 
-/** Перейменування чи перенесення категорії. Назви категорій є в бюджеті й аналітиці. */
+/** Перейменування чи перенесення категорії. */
 export function useUpdateCategory() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateCategoryInput }) =>
       api.patch<Category>(`/api/categories/${id}`, input),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: KEY }),
-        queryClient.invalidateQueries({ queryKey: ['budget'] }),
-        queryClient.invalidateQueries({ queryKey: ['analytics'] }),
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-      ]),
   });
 }
 
 export function useDeleteCategory() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/categories/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
   });
 }

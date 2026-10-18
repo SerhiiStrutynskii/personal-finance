@@ -6,10 +6,9 @@ import type {
   UpdateGoalInput,
   createGoalSchema,
 } from '@hf/shared';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import type { z } from 'zod';
 import { api } from '../../shared/api/index.ts';
-import { TRANSACTIONS_KEY } from '../transactions/api.ts';
 
 const GOALS_KEY = ['goals'];
 
@@ -40,36 +39,24 @@ export function usePayoffPlan(id: string, extra: number, strategy: PayoffStrateg
   });
 }
 
-/** Зміна цілей оновлює цілі, а поповнення — ще й баланси рахунків, перекази та аналітику. */
-function useGoalMutation<TInput, TResult>(request: (input: TInput) => Promise<TResult>) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: request,
-    onSuccess: () =>
-      Promise.all(
-        [GOALS_KEY, ['accounts'], ['analytics'], TRANSACTIONS_KEY].map((queryKey) =>
-          queryClient.invalidateQueries({ queryKey }),
-        ),
-      ),
-  });
-}
-
 export const useSaveGoal = () =>
-  useGoalMutation(
-    (
+  useMutation({
+    mutationFn: (
       request: { id: string; input: UpdateGoalInput } | { id?: undefined; input: CreateGoalBody },
     ) =>
       request.id
         ? api.patch<Goal>(`/api/goals/${request.id}`, request.input)
         : api.post<Goal>('/api/goals', request.input),
-  );
+  });
 
 export const useArchiveGoal = () =>
-  useGoalMutation((id: string) => api.post<Goal>(`/api/goals/${id}/archive`, {}));
+  useMutation({ mutationFn: (id: string) => api.post<Goal>(`/api/goals/${id}/archive`, {}) });
 
-export const useDeleteGoal = () => useGoalMutation((id: string) => api.delete(`/api/goals/${id}`));
+export const useDeleteGoal = () =>
+  useMutation({ mutationFn: (id: string) => api.delete(`/api/goals/${id}`) });
 
 export const useContribute = () =>
-  useGoalMutation(({ id, input }: { id: string; input: GoalContributionInput }) =>
-    api.post<Goal>(`/api/goals/${id}/contributions`, input),
-  );
+  useMutation({
+    mutationFn: ({ id, input }: { id: string; input: GoalContributionInput }) =>
+      api.post<Goal>(`/api/goals/${id}/contributions`, input),
+  });

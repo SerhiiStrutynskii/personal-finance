@@ -14,7 +14,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ME_KEY,
     queryFn: () => api.get<CurrentUser>('/api/auth/me'),
     enabled: hasSession,
-    staleTime: Infinity,
+    // Сесію не перечитує ні час, ні мутації; оновлюється лише явно.
+    staleTime: 'static',
     retry: false,
   });
 

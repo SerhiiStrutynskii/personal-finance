@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AccountsPage } from '../features/accounts/AccountsPage.tsx';
 import { AnonymousOnly, RequireAuth } from '../features/auth/AuthGate.tsx';
@@ -15,19 +15,12 @@ import { GoalsPage } from '../features/goals/GoalsPage.tsx';
 import { PayoffPlanPage } from '../features/goals/PayoffPlanPage.tsx';
 import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
-import { ApiError } from '../shared/api/index.ts';
 import { Layout } from '../shared/layout/Layout.tsx';
 import './app.css';
 import { NotFoundPage } from './pages.tsx';
+import { createQueryClient } from './queryClient.ts';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Відповідь API з помилкою повторювати немає сенсу; повторюємо лише збої мережі.
-      retry: (failureCount, error) => !(error instanceof ApiError) && failureCount < 2,
-    },
-  },
-});
+const queryClient = createQueryClient();
 
 export function App() {
   return (

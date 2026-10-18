@@ -50,7 +50,7 @@ function useRegistrationEnabled(): boolean | undefined {
     queryKey: ['auth-config'],
     queryFn: () =>
       api.get<{ registrationEnabled: boolean }>('/api/auth/config', undefined, { auth: false }),
-    staleTime: Infinity,
+    staleTime: 'static',
   });
   return config.data?.registrationEnabled;
 }
