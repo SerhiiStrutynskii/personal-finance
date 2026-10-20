@@ -1,4 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AccountsPage } from '../features/accounts/AccountsPage.tsx';
 import { AnonymousOnly, RequireAuth } from '../features/auth/AuthGate.tsx';
@@ -52,6 +53,8 @@ export function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      {/* Лише в режимі розробки: у production-збірці пакет підставляє порожній компонент. */}
+      <ReactQueryDevtools />
     </QueryClientProvider>
   );
 }
