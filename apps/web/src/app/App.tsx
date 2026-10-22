@@ -16,6 +16,7 @@ import { GoalsPage } from '../features/goals/GoalsPage.tsx';
 import { PayoffPlanPage } from '../features/goals/PayoffPlanPage.tsx';
 import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { ProductsPage } from '../features/shopping/ProductsPage.tsx';
+import { PrintListPage } from '../features/shopping/PrintListPage.tsx';
 import { ShoppingListPage } from '../features/shopping/ShoppingListPage.tsx';
 import { ShoppingListsPage } from '../features/shopping/ShoppingListsPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
@@ -37,6 +38,8 @@ export function App() {
               <Route path="/register" element={<RegisterPage />} />
             </Route>
             <Route element={<RequireAuth />}>
+              {/* Сторінка друку — без меню застосунку. */}
+              <Route path="shopping/:id/print" element={<PrintListPage />} />
               <Route element={<Layout />}>
                 <Route index element={<DashboardPage />} />
                 <Route path="expenses" element={<TransactionsPage type="expense" />} />

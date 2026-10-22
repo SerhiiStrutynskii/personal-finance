@@ -147,3 +147,17 @@
     @apply font-sans;
   }
 }
+
+/* Друк сторінки списку покупок: поля аркуша й білий фон замість фону застосунку. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body {
+    background: white;
+  }
+  /* Кнопка React Query Devtools є лише під час розробки, але й тоді не має потрапляти в PDF. */
+  .tsqd-parent-container {
+    display: none;
+  }
+}

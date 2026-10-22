@@ -125,3 +125,52 @@ test('список покупок: очікувані й фактичні цін
   await page.getByRole('button', { name: 'Заархівувати «Хліб»' }).click();
   await expect(page.getByTestId('product').filter({ hasText: 'Хліб' })).toBeHidden();
 });
+
+test('сторінка друку: усі рядки без меню, друк і PDF через діалог друку', async ({ page }) => {
+  await register(page);
+  await createList(page, 'Субота');
+  for (const [name, quantity, price] of [
+    ['Хліб', '2', '32'],
+    ['Молоко', '1', '42,5'],
+  ] as const) {
+    const form = await addItem(page, name, quantity);
+    await form.getByLabel(/^Ціна за/).fill(price);
+    await form.getByRole('button', { name: 'Додати' }).click();
+    await expect(page.getByTestId('shopping-item').filter({ hasText: name })).toBeVisible();
+  }
+  await page.getByRole('checkbox', { name: 'Куплено «Хліб»' }).check();
+  await expect(page.getByTestId('shopping-totals')).toContainText('Куплено (1 з 2)');
+
+  // Діалог друку браузера в тесті не відкривається: рахуємо виклики.
+  await page.evaluate(() => {
+    (window as unknown as { printCalls: number }).printCalls = 0;
+    window.print = () => {
+      (window as unknown as { printCalls: number }).printCalls += 1;
+    };
+  });
+  await page.getByRole('link', { name: 'Друк і PDF' }).click();
+  await expect(page.getByRole('heading', { name: 'Субота' })).toBeVisible();
+  await expect(page).toHaveTitle('Покупки — Субота');
+  await expect(page.getByRole('navigation')).toHaveCount(0);
+
+  const rows = page.getByTestId('print-item');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.filter({ hasText: 'Молоко' })).toContainText(/42,50\s\S+ \/ шт/);
+  await expect(page.getByTestId('print-totals')).toContainText(/Очікувано за весь список\s*106,50/);
+
+  await page.getByRole('button', { name: 'Друкувати' }).click();
+  await page.getByRole('button', { name: 'Завантажити PDF' }).click();
+  expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(
+    2,
+  );
+
+  // Куплене можна прибрати з аркуша.
+  await page.getByLabel('Лише некуплене').check();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByTestId('print-totals')).toContainText(/Очікувано за некуплене\s*42,50/);
+
+  // На папері лишається тільки список, без кнопок.
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.getByTestId('print-toolbar')).toBeHidden();
+  await expect(page.getByTestId('print-table')).toBeVisible();
+});

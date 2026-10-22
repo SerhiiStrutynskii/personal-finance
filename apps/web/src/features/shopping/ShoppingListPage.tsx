@@ -4,7 +4,7 @@ import {
   type ShoppingList,
   type ShoppingListItem,
 } from '@hf/shared';
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { ArrowLeft, Pencil, Printer } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -81,7 +81,13 @@ function ListContent({ list }: { list: ShoppingList }) {
         >
           <Pencil />
         </Button>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/shopping/${list.id}/print`}>
+              <Printer />
+              Друк і PDF
+            </Link>
+          </Button>
           <ConfirmButton
             title={`Видалити список «${list.name}»?`}
             description="Куплені в ньому продукти зникнуть з історії цін і аналітики."
