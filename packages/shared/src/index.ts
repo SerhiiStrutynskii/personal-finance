@@ -7,3 +7,4 @@ export * from './debts/index.ts';
 export * from './analytics/index.ts';
 export * from './goals/index.ts';
 export * from './dashboard/index.ts';
+export * from './shopping/index.ts';

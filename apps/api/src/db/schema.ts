@@ -516,3 +516,32 @@ export const goalDebts = pgTable(
   },
   (t) => [primaryKey({ columns: [t.goalId, t.debtId] }), index().on(t.debtId)],
 );
+
+export const PRODUCT_UNITS = ['pcs', 'kg', 'l', 'pack'] as const;
+
+// Довідник продуктів домогосподарства для списків покупок.
+export const products = pgTable(
+  'products',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    // Назва в нижньому регістрі для унікальності. Рахується в застосунку: у базі з collation C
+    // lower() не змінює кирилицю.
+    nameKey: text('name_key').notNull(),
+    unit: text({ enum: PRODUCT_UNITS }).notNull().default('pcs'),
+    // Остання відома ціна за одиницю в копійках; NULL — ціна ще невідома.
+    priceMinor: bigint('price_minor', { mode: 'number' }),
+    currency: char({ length: 3 }).notNull().default('UAH'),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    // «Молоко» і «молоко» — той самий продукт.
+    unique('products_household_name_unique').on(t.householdId, t.nameKey),
+    check('products_unit_valid', sql`${t.unit} IN ('pcs', 'kg', 'l', 'pack')`),
+    check('products_price_positive', sql`${t.priceMinor} > 0`),
+  ],
+);

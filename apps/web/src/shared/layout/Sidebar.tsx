@@ -1,6 +1,7 @@
 import {
   Calculator,
   ChartArea,
+  ShoppingCart,
   CreditCard,
   HandCoins,
   Home,
@@ -27,6 +28,8 @@ const navItems: ISidebarItem[] = [
   { title: 'Бюджет', icon: Calculator, route: '/budget', hasDropdown: false },
   { title: 'Борги', icon: Wallet, route: '/debts', hasDropdown: false },
   { title: 'Цілі', icon: Target, route: '/goals', hasDropdown: false },
+  // Поки є лише довідник продуктів; списки покупок з'являться на /shopping.
+  { title: 'Покупки', icon: ShoppingCart, route: '/shopping/products', hasDropdown: false },
   { title: 'Аналітика', icon: ChartArea, route: '/analytics', hasDropdown: false },
 ];
 
