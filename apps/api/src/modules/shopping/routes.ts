@@ -4,6 +4,7 @@ import {
   createShoppingListSchema,
   idParamsSchema,
   productsQuerySchema,
+  shoppingAnalyticsQuerySchema,
   shoppingListItemParamsSchema,
   updateProductSchema,
   updateShoppingListItemSchema,
@@ -12,6 +13,7 @@ import {
 import { Router } from 'express';
 import type { Db } from '../../db/client.ts';
 import { getAuth } from '../../http/auth.ts';
+import * as analytics from './analytics.service.ts';
 import * as lists from './lists.service.ts';
 import * as service from './service.ts';
 
@@ -31,6 +33,11 @@ export function productsRouter(db: Db): Router {
   router.get('/:id', async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
     res.json(await service.getProduct(db, getAuth(res), id));
+  });
+
+  router.get('/:id/prices', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    res.json(await analytics.getPriceHistory(db, getAuth(res), id));
   });
 
   router.patch('/:id', async (req, res) => {
@@ -94,6 +101,18 @@ export function shoppingListsRouter(db: Db, now: () => Date): Router {
   router.delete('/:id/items/:itemId', async (req, res) => {
     const { id, itemId } = shoppingListItemParamsSchema.parse(req.params);
     res.json(await lists.deleteItem(db, getAuth(res), id, itemId));
+  });
+
+  return router;
+}
+
+/** Аналітика покупок за списками; до аналітики витрат не входить. */
+export function shoppingRouter(db: Db, now: () => Date): Router {
+  const router = Router();
+
+  router.get('/analytics', async (req, res) => {
+    const { month } = shoppingAnalyticsQuerySchema.parse(req.query);
+    res.json(await analytics.getShoppingAnalytics(db, getAuth(res), month, now()));
   });
 
   return router;

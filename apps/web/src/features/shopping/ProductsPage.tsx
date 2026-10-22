@@ -1,5 +1,5 @@
 import type { Product } from '@hf/shared';
-import { Archive, ArchiveRestore, ArrowLeft, Pencil } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, ChartLine, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../shared/lib/utils.ts';
@@ -8,6 +8,7 @@ import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { useDeleteProduct, useProducts, useSaveProduct } from './api.ts';
+import { PriceHistoryDialog } from './PriceHistoryDialog.tsx';
 import { ProductDialog } from './ProductDialog.tsx';
 import { PRODUCT_UNIT_LABELS, formatUnitPrice } from './productForm.ts';
 
@@ -19,6 +20,7 @@ export function ProductsPage() {
   const archive = useSaveProduct();
   // Вміст вікна зберігається й після закриття, щоб не змінюватися під час анімації.
   const [dialog, setDialog] = useState<{ open: boolean; product?: Product }>({ open: false });
+  const [history, setHistory] = useState<Product>();
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -73,6 +75,15 @@ export function ProductsPage() {
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  aria-label={`Історія цін «${product.name}»`}
+                  title={`Історія цін «${product.name}»`}
+                  onClick={() => setHistory(product)}
+                >
+                  <ChartLine />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label={`Змінити «${product.name}»`}
                   title={`Змінити «${product.name}»`}
                   onClick={() => setDialog({ open: true, product })}
@@ -100,6 +111,7 @@ export function ProductsPage() {
         </ul>
       )}
 
+      <PriceHistoryDialog product={history} onClose={() => setHistory(undefined)} />
       <ProductDialog
         open={dialog.open}
         onOpenChange={(open) => setDialog({ ...dialog, open })}

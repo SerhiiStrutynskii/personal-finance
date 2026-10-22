@@ -174,3 +174,44 @@ test('сторінка друку: усі рядки без меню, друк �
   await expect(page.getByTestId('print-toolbar')).toBeHidden();
   await expect(page.getByTestId('print-table')).toBeVisible();
 });
+
+test('куплене за списками видно в аналітиці й в історії цін продукту', async ({ page }) => {
+  await register(page);
+  // Дві покупки хліба: за 32 і дорожче, за 35.
+  for (const [list, actual] of [
+    ['Перший', null],
+    ['Другий', '35'],
+  ] as const) {
+    await createList(page, list);
+    const form = await addItem(page, 'Хліб', '2');
+    if (list === 'Перший') await form.getByLabel(/^Ціна за/).fill('32');
+    await form.getByRole('button', { name: 'Додати' }).click();
+    const bread = page.getByTestId('shopping-item').filter({ hasText: 'Хліб' });
+    await bread.getByRole('checkbox', { name: 'Куплено «Хліб»' }).check();
+    await expect(bread.getByTestId('item-actual')).toContainText('64,00');
+    if (actual) {
+      const price = bread.getByLabel('Фактична ціна «Хліб» за шт');
+      await price.fill(actual);
+      await price.press('Enter');
+      await expect(bread.getByTestId('item-actual')).toContainText('70,00');
+    }
+  }
+
+  await page.getByRole('link', { name: 'Аналітика' }).click();
+  const section = page.getByTestId('analytics-shopping');
+  await expect(section).toContainText('Окремо від витрат');
+  await expect(section).toContainText(/Куплено за списками\s*134,00/);
+  await expect(section).toContainText(/Відхилення від очікуваних цін\s*\+6,00/);
+  const row = section.getByTestId('shopping-product-row');
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('4 шт');
+  await expect(row).toContainText(/33,50\s\S+ \/ шт/);
+  await expect(row).toContainText(/\+3,00\s\S+ \(9,4%\)/);
+
+  await row.getByRole('button', { name: 'Хліб' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'Історія цін «Хліб»' })).toBeVisible();
+  const points = dialog.getByTestId('price-point');
+  await expect(points).toHaveCount(2);
+  await expect(points.first()).toContainText(/Другий.*35,00/);
+});

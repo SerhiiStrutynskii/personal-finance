@@ -3,12 +3,14 @@ import type {
   CreateProductInput,
   CreateShoppingListInput,
   Product,
+  ProductPriceHistory,
+  ShoppingAnalytics,
   ShoppingList,
   ShoppingListSummary,
   UpdateProductInput,
   UpdateShoppingListItemInput,
 } from '@hf/shared';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
 
 /** Довідник продуктів; archived — разом з архівними. */
@@ -89,5 +91,24 @@ export function useDeleteShoppingListItem(listId: string) {
   return useMutation({
     mutationFn: (itemId: string) =>
       api.delete<ShoppingList>(`/api/shopping-lists/${listId}/items/${itemId}`),
+  });
+}
+
+// --- Аналітика покупок ---
+
+/** Історія фактичних цін продукту; запит іде лише для відкритого діалогу. */
+export function useProductPrices(productId: string | undefined) {
+  return useQuery({
+    queryKey: ['products', productId, 'prices'],
+    queryFn: () => api.get<ProductPriceHistory>(`/api/products/${productId}/prices`),
+    enabled: productId !== undefined,
+  });
+}
+
+export function useShoppingAnalytics(month: string) {
+  return useQuery({
+    queryKey: ['analytics', 'shopping', month],
+    queryFn: () => api.get<ShoppingAnalytics>('/api/shopping/analytics', { month }),
+    placeholderData: keepPreviousData,
   });
 }

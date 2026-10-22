@@ -8,7 +8,9 @@ import { useCurrentUser } from '../auth/authContext.ts';
 import { useMonthAnalytics, useTrendAnalytics } from './api.ts';
 import { CategoriesSection } from './CategoriesSection.tsx';
 import { NetWorthSection } from './NetWorthSection.tsx';
+import { useShoppingAnalytics } from '../shopping/api.ts';
 import { OverspendingSection } from './OverspendingSection.tsx';
+import { ShoppingSection } from './ShoppingSection.tsx';
 import { TrendSection } from './TrendSection.tsx';
 
 export function AnalyticsPage() {
@@ -19,7 +21,8 @@ export function AnalyticsPage() {
   const [length, setLength] = useState<TrendLength>(6);
   const monthData = useMonthAnalytics(month);
   const trend = useTrendAnalytics(month, length);
-  const error = monthData.error ?? trend.error;
+  const shopping = useShoppingAnalytics(month);
+  const error = monthData.error ?? trend.error ?? shopping.error;
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -51,6 +54,7 @@ export function AnalyticsPage() {
       {trend.data && <TrendSection data={trend.data} />}
       {monthData.data && <OverspendingSection data={monthData.data} />}
       {trend.data && <NetWorthSection data={trend.data} />}
+      {shopping.data && <ShoppingSection data={shopping.data} />}
     </div>
   );
 }

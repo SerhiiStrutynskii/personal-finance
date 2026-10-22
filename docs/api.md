@@ -727,13 +727,14 @@ projection, interestSaved }` — розбивка платежу на сього
 Назва унікальна в домогосподарстві без урахування регістру (`409`). Список відсортовано за назвою за
 українським алфавітом.
 
-| Метод  | Шлях                | Тіло                                    | Відповідь                              |
-| ------ | ------------------- | --------------------------------------- | -------------------------------------- |
-| GET    | `/api/products`     | —                                       | `200 { items: Product[] }`             |
-| POST   | `/api/products`     | `{ name, unit?, price? }`               | `201 Product`; `409` для дубліката     |
-| GET    | `/api/products/:id` | —                                       | `200 Product`                          |
-| PATCH  | `/api/products/:id` | `{ name?, unit?, price?, isArchived? }` | `200 Product`; `409` для дубліката     |
-| DELETE | `/api/products/:id` | —                                       | `204`; `409`, якщо продукт є в списках |
+| Метод  | Шлях                       | Тіло                                    | Відповідь                              |
+| ------ | -------------------------- | --------------------------------------- | -------------------------------------- |
+| GET    | `/api/products`            | —                                       | `200 { items: Product[] }`             |
+| POST   | `/api/products`            | `{ name, unit?, price? }`               | `201 Product`; `409` для дубліката     |
+| GET    | `/api/products/:id`        | —                                       | `200 Product`                          |
+| PATCH  | `/api/products/:id`        | `{ name?, unit?, price?, isArchived? }` | `200 Product`; `409` для дубліката     |
+| DELETE | `/api/products/:id`        | —                                       | `204`; `409`, якщо продукт є в списках |
+| GET    | `/api/products/:id/prices` | —                                       | `200 ProductPriceHistory`              |
 
 За замовчуванням `unit` — `pcs`, `price` — `null`; `price: null` у `PATCH` стирає ціну. `GET` без
 параметрів не повертає архівних продуктів; `?archived=true` — повертає всі. Продукт зі списків не
@@ -813,6 +814,50 @@ projection, interestSaved }` — розбивка платежу на сього
 `totals`: `expected` — очікувана сума списку, `actual` — фактична сума куплених, `remaining` —
 очікувана сума некуплених, `deviation` — фактична мінус очікувана сума куплених рядків з обома цінами,
 `unpricedCount` — рядки без очікуваної ціни.
+
+### Аналітика покупок
+
+Окремо від аналітики витрат: списки не створюють транзакцій. Правила — у `docs/domain.md`.
+
+| Метод | Шлях                                    | Відповідь                 |
+| ----- | --------------------------------------- | ------------------------- |
+| GET   | `/api/shopping/analytics?month=YYYY-MM` | `200 ShoppingAnalytics`   |
+| GET   | `/api/products/:id/prices`              | `200 ProductPriceHistory` |
+
+`month` за замовчуванням поточний; майбутній місяць — `400`.
+
+```json
+{
+  "month": "2026-10",
+  "currency": "UAH",
+  "spent": 13400,
+  "previousSpent": 0,
+  "change": 13400,
+  "expectedOfPriced": 12800,
+  "deviation": 600,
+  "purchaseCount": 2,
+  "unpricedCount": 0,
+  "products": [
+    {
+      "productId": "…",
+      "name": "Хліб",
+      "unit": "pcs",
+      "quantityMilli": 4000,
+      "spent": 13400,
+      "averageUnitPrice": 3350,
+      "lastUnitPrice": 3500,
+      "previousUnitPrice": 3200,
+      "purchaseCount": 2
+    }
+  ]
+}
+```
+
+`products` — за спаданням `spent`; `previousUnitPrice` — ціна попередньої покупки продукту або `null`
+для першої. `expectedOfPriced` і `deviation` — по покупках з обома цінами.
+
+`ProductPriceHistory` — `{ product: Product, points: [{ boughtAt, unitPrice, quantityMilli, listId,
+listName }] }`, покупки з фактичною ціною від найдавнішої. Чужий продукт — `404`.
 
 ## Аналітика
 

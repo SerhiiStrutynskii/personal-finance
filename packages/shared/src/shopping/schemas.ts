@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { monthSchema } from '../budget/month.ts';
 import { currencySchema, positiveAmountMinorSchema } from '../money.ts';
 import { idSchema } from '../schemas.ts';
 import { MAX_QUANTITY_MILLI } from './calculations.ts';
@@ -136,3 +137,51 @@ export const shoppingListSchema = shoppingListSummarySchema.extend({
   items: z.array(shoppingListItemSchema),
 });
 export type ShoppingList = z.infer<typeof shoppingListSchema>;
+
+// --- Аналітика покупок ---
+
+export const shoppingAnalyticsQuerySchema = z.object({ month: monthSchema.optional() });
+
+const amountSchema = z.number().int();
+
+export const shoppingAnalyticsSchema = z.object({
+  month: monthSchema,
+  currency: currencySchema,
+  /** Фактична сума покупок місяця за списками; до витрат не додається. */
+  spent: amountSchema,
+  previousSpent: amountSchema,
+  change: amountSchema,
+  expectedOfPriced: amountSchema,
+  deviation: amountSchema,
+  purchaseCount: amountSchema,
+  unpricedCount: amountSchema,
+  products: z.array(
+    z.object({
+      productId: idSchema,
+      name: z.string(),
+      unit: productUnitSchema,
+      quantityMilli: amountSchema,
+      spent: amountSchema,
+      averageUnitPrice: amountSchema,
+      lastUnitPrice: amountSchema,
+      previousUnitPrice: amountSchema.nullable(),
+      purchaseCount: amountSchema,
+    }),
+  ),
+});
+export type ShoppingAnalytics = z.infer<typeof shoppingAnalyticsSchema>;
+
+export const productPriceHistorySchema = z.object({
+  product: productSchema,
+  /** Покупки з фактичною ціною від найдавнішої. */
+  points: z.array(
+    z.object({
+      boughtAt: z.iso.datetime({ offset: true }),
+      unitPrice: amountSchema,
+      quantityMilli: amountSchema,
+      listId: idSchema,
+      listName: z.string(),
+    }),
+  ),
+});
+export type ProductPriceHistory = z.infer<typeof productPriceHistorySchema>;
