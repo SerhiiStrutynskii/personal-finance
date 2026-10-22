@@ -535,6 +535,8 @@ export const products = pgTable(
     // Остання відома ціна за одиницю в копійках; NULL — ціна ще невідома.
     priceMinor: bigint('price_minor', { mode: 'number' }),
     currency: char({ length: 3 }).notNull().default('UAH'),
+    // Продукт з історії покупок не видаляється, а ховається з довідника.
+    isArchived: boolean('is_archived').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: instant().notNull().defaultNow(),
   },
@@ -543,5 +545,58 @@ export const products = pgTable(
     unique('products_household_name_unique').on(t.householdId, t.nameKey),
     check('products_unit_valid', sql`${t.unit} IN ('pcs', 'kg', 'l', 'pack')`),
     check('products_price_positive', sql`${t.priceMinor} > 0`),
+  ],
+);
+
+// Список покупок; спільний для всіх учасників домогосподарства. Транзакцій не створює.
+export const shoppingLists = pgTable(
+  'shopping_lists',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    currency: char({ length: 3 }).notNull().default('UAH'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [index().on(t.householdId, t.createdAt)],
+);
+
+// Рядок списку. Куплені рядки — історія цін і покупок для аналітики.
+export const shoppingListItems = pgTable(
+  'shopping_list_items',
+  {
+    id: id(),
+    listId: uuid('list_id')
+      .notNull()
+      .references(() => shoppingLists.id, { onDelete: 'cascade' }),
+    // Продукт з історією покупок видалити не можна, лише заархівувати.
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    // Кількість у тисячних одиниці продукту: 1,5 кг = 1500.
+    quantityMilli: integer('quantity_milli').notNull(),
+    // Знімок ціни довідника в момент додавання, у копійках за одиницю.
+    expectedUnitPriceMinor: bigint('expected_unit_price_minor', { mode: 'number' }),
+    actualUnitPriceMinor: bigint('actual_unit_price_minor', { mode: 'number' }),
+    isBought: boolean('is_bought').notNull().default(false),
+    // Момент покупки; за ним аналітика відносить покупку до місяця.
+    boughtAt: instant(),
+    position: integer().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // Один продукт у списку один раз: повторне додавання збільшує кількість.
+    unique('shopping_list_items_product_unique').on(t.listId, t.productId),
+    index().on(t.productId),
+    check('shopping_list_items_quantity_positive', sql`${t.quantityMilli} > 0`),
+    check(
+      'shopping_list_items_prices_positive',
+      sql`${t.expectedUnitPriceMinor} > 0 AND ${t.actualUnitPriceMinor} > 0`,
+    ),
+    check('shopping_list_items_bought_at', sql`${t.isBought} = (${t.boughtAt} IS NOT NULL)`),
   ],
 );

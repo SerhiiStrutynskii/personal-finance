@@ -720,22 +720,99 @@ projection, interestSaved }` — розбивка платежу на сього
 
 ## Продукти
 
-Довідник продуктів для списків покупок. Об'єкт: `{ id, name, unit, price, currency, createdAt }`, де
+Довідник продуктів для списків покупок. Об'єкт: `{ id, name, unit, price, currency, isArchived, createdAt }`, де
 `unit` — `pcs` \| `kg` \| `l` \| `pack`, а `price` — ціна за одиницю в мінімальних одиницях (`> 0`) або
 `null`, якщо ціна невідома. Валюта — завжди `UAH`.
 
 Назва унікальна в домогосподарстві без урахування регістру (`409`). Список відсортовано за назвою за
 українським алфавітом.
 
-| Метод  | Шлях                | Тіло                       | Відповідь                          |
-| ------ | ------------------- | -------------------------- | ---------------------------------- |
-| GET    | `/api/products`     | —                          | `200 { items: Product[] }`         |
-| POST   | `/api/products`     | `{ name, unit?, price? }`  | `201 Product`; `409` для дубліката |
-| GET    | `/api/products/:id` | —                          | `200 Product`                      |
-| PATCH  | `/api/products/:id` | `{ name?, unit?, price? }` | `200 Product`; `409` для дубліката |
-| DELETE | `/api/products/:id` | —                          | `204`                              |
+| Метод  | Шлях                | Тіло                                    | Відповідь                              |
+| ------ | ------------------- | --------------------------------------- | -------------------------------------- |
+| GET    | `/api/products`     | —                                       | `200 { items: Product[] }`             |
+| POST   | `/api/products`     | `{ name, unit?, price? }`               | `201 Product`; `409` для дубліката     |
+| GET    | `/api/products/:id` | —                                       | `200 Product`                          |
+| PATCH  | `/api/products/:id` | `{ name?, unit?, price?, isArchived? }` | `200 Product`; `409` для дубліката     |
+| DELETE | `/api/products/:id` | —                                       | `204`; `409`, якщо продукт є в списках |
 
-За замовчуванням `unit` — `pcs`, `price` — `null`; `price: null` у `PATCH` стирає ціну.
+За замовчуванням `unit` — `pcs`, `price` — `null`; `price: null` у `PATCH` стирає ціну. `GET` без
+параметрів не повертає архівних продуктів; `?archived=true` — повертає всі. Продукт зі списків не
+видаляється, його архівують через `PATCH { isArchived: true }`.
+
+## Списки покупок
+
+Списки не створюють транзакцій. Правила — в `docs/domain.md`. Ціни — за одиницю продукту в мінімальних
+одиницях (`> 0`) або `null`; кількість — ціле число тисячних одиниці (`quantityMilli`, від 1 до
+1 000 000 000).
+
+| Метод  | Шлях                                    | Тіло                                                                          | Відповідь                                     |
+| ------ | --------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------- |
+| GET    | `/api/shopping-lists`                   | —                                                                             | `200 { items: ShoppingListSummary[] }`        |
+| POST   | `/api/shopping-lists`                   | `{ name }`                                                                    | `201 ShoppingList`                            |
+| GET    | `/api/shopping-lists/:id`               | —                                                                             | `200 ShoppingList`                            |
+| PATCH  | `/api/shopping-lists/:id`               | `{ name }`                                                                    | `200 ShoppingList`                            |
+| DELETE | `/api/shopping-lists/:id`               | —                                                                             | `204`                                         |
+| POST   | `/api/shopping-lists/:id/items`         | `{ productId, quantityMilli? }` або `{ name, unit?, price?, quantityMilli? }` | `201 ShoppingList`; `404` для чужого продукту |
+| PATCH  | `/api/shopping-lists/:id/items/:itemId` | `{ quantityMilli?, expectedUnitPrice?, actualUnitPrice?, isBought? }`         | `200 ShoppingList`                            |
+| DELETE | `/api/shopping-lists/:id/items/:itemId` | —                                                                             | `200 ShoppingList`                            |
+
+Зміни рядків повертають список цілком, бо разом із рядком змінюються підсумки. `quantityMilli` за
+замовчуванням — 1000 (одна одиниця). Рядок за назвою бере продукт з довідника без урахування регістру
+або створює новий з `unit` і `price`.
+
+`ShoppingListSummary` — список без рядків; `ShoppingList` — з рядками (спершу некуплені, потім куплені,
+всередині — в порядку додавання):
+
+```json
+{
+  "id": "…",
+  "name": "На тиждень",
+  "currency": "UAH",
+  "createdAt": "2026-10-20T10:00:00.000Z",
+  "totals": {
+    "itemCount": 2,
+    "boughtCount": 1,
+    "expected": 16000,
+    "actual": 7000,
+    "remaining": 9600,
+    "deviation": 600,
+    "unpricedCount": 0
+  },
+  "items": [
+    {
+      "id": "…",
+      "productId": "…",
+      "name": "Сир",
+      "unit": "kg",
+      "quantityMilli": 300,
+      "expectedUnitPrice": 32000,
+      "actualUnitPrice": null,
+      "expectedTotal": 9600,
+      "actualTotal": null,
+      "isBought": false,
+      "boughtAt": null
+    },
+    {
+      "id": "…",
+      "productId": "…",
+      "name": "Хліб",
+      "unit": "pcs",
+      "quantityMilli": 2000,
+      "expectedUnitPrice": 3200,
+      "actualUnitPrice": 3500,
+      "expectedTotal": 6400,
+      "actualTotal": 7000,
+      "isBought": true,
+      "boughtAt": "2026-10-20T10:05:00.000Z"
+    }
+  ]
+}
+```
+
+`expectedTotal` і `actualTotal` — кількість × ціна, округлені до копійки, або `null` без ціни.
+`totals`: `expected` — очікувана сума списку, `actual` — фактична сума куплених, `remaining` —
+очікувана сума некуплених, `deviation` — фактична мінус очікувана сума куплених рядків з обома цінами,
+`unpricedCount` — рядки без очікуваної ціни.
 
 ## Аналітика
 

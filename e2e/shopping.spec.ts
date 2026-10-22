@@ -1,10 +1,41 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { register } from './helpers.ts';
+
+async function openProducts(page: Page) {
+  await page.getByRole('link', { name: 'Покупки' }).click();
+  await page.getByRole('link', { name: 'Продукти', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Продукти' })).toBeVisible();
+}
+
+async function addProduct(page: Page, name: string, price: string) {
+  await page.getByRole('button', { name: 'Додати продукт' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Назва').fill(name);
+  await dialog.getByLabel(/^Ціна за/).fill(price);
+  await dialog.getByRole('button', { name: 'Додати' }).click();
+  await expect(dialog).toBeHidden();
+}
+
+async function createList(page: Page, name: string) {
+  await page.getByRole('link', { name: 'Покупки' }).click();
+  await expect(page.getByRole('heading', { name: 'Покупки' })).toBeVisible();
+  await page.getByRole('button', { name: 'Список', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Назва').fill(name);
+  await dialog.getByRole('button', { name: 'Створити' }).click();
+  await expect(page.getByRole('heading', { name })).toBeVisible();
+}
+
+async function addItem(page: Page, name: string, quantity: string) {
+  const form = page.getByRole('form', { name: 'Додати продукт у список' });
+  await form.getByLabel('Продукт', { exact: true }).fill(name);
+  await form.getByLabel(/^Кількість/).fill(quantity);
+  return form;
+}
 
 test('довідник продуктів: додати з ціною, змінити ціну, дублікат, видалити', async ({ page }) => {
   await register(page);
-  await page.getByRole('link', { name: 'Покупки' }).click();
-  await expect(page.getByRole('heading', { name: 'Продукти' })).toBeVisible();
+  await openProducts(page);
   await expect(page.getByText('Продуктів ще немає')).toBeVisible();
 
   // Новий продукт з одиницею й ціною за неї.
@@ -37,4 +68,60 @@ test('довідник продуктів: додати з ціною, змін�
   await page.getByRole('button', { name: 'Видалити продукт «Молоко»' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Видалити' }).click();
   await expect(page.getByText('Продуктів ще немає')).toBeVisible();
+});
+
+test('список покупок: очікувані й фактичні ціни, підсумки, нова ціна в довіднику', async ({
+  page,
+}) => {
+  await register(page);
+  await openProducts(page);
+  await addProduct(page, 'Хліб', '32');
+
+  await createList(page, 'На тиждень');
+  // Продукт з довідника — з його ціною.
+  let form = await addItem(page, 'хліб', '2');
+  await form.getByRole('button', { name: 'Додати' }).click();
+  const bread = page.getByTestId('shopping-item').filter({ hasText: 'Хліб' });
+  await expect(bread.getByTestId('item-expected')).toContainText(/64,00/);
+
+  // Нового продукту немає в довіднику: одиниця й ціна вводяться тут же.
+  form = await addItem(page, 'Сир', '0,3');
+  await form.getByRole('combobox', { name: 'Одиниця' }).click();
+  await page.getByRole('option', { name: 'кг', exact: true }).click();
+  await form.getByLabel('Ціна за кг, UAH').fill('320');
+  await form.getByRole('button', { name: 'Додати' }).click();
+  const cheese = page.getByTestId('shopping-item').filter({ hasText: 'Сир' });
+  await expect(cheese).toContainText('0,3 кг');
+  await expect(cheese.getByTestId('item-expected')).toContainText(/96,00/);
+
+  const totals = page.getByTestId('shopping-totals');
+  await expect(totals).toContainText(/Очікувано за весь список\s*160,00/);
+
+  // Позначка «куплено» підставляє очікувану ціну, яку можна виправити.
+  await bread.getByRole('checkbox', { name: 'Куплено «Хліб»' }).check();
+  const breadPrice = bread.getByLabel('Фактична ціна «Хліб» за шт');
+  await expect(breadPrice).toHaveValue('32,00');
+  await breadPrice.fill('35');
+  await breadPrice.press('Enter');
+  await expect(bread.getByTestId('item-actual')).toContainText(/70,00/);
+  await expect(totals).toContainText(/Куплено \(1 з 2\) фактично\s*70,00/);
+  await expect(totals).toContainText(/Залишилось купити на\s*96,00/);
+  await expect(totals).toContainText(/Відхилення від очікуваних цін\s*\+6,00/);
+
+  // Наступний список уже очікує нову ціну хліба.
+  await createList(page, 'Наступний');
+  form = await addItem(page, 'Хліб', '1');
+  await form.getByRole('button', { name: 'Додати' }).click();
+  await expect(page.getByTestId('shopping-item')).toContainText('35,00');
+
+  // Продукт з історії покупок не видаляється, а архівується.
+  await openProducts(page);
+  await expect(
+    page.getByTestId('product').filter({ hasText: 'Хліб' }).getByTestId('product-price'),
+  ).toHaveText(/^35,00\s\S+ \/ шт$/);
+  await page.getByRole('button', { name: 'Видалити продукт «Хліб»' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Видалити' }).click();
+  await expect(page.getByText(/Заархівуйте його/)).toBeVisible();
+  await page.getByRole('button', { name: 'Заархівувати «Хліб»' }).click();
+  await expect(page.getByTestId('product').filter({ hasText: 'Хліб' })).toBeHidden();
 });

@@ -52,6 +52,7 @@ describe('productFormValues і formatUnitPrice', () => {
     unit: 'kg' as const,
     price: 38990,
     currency: 'UAH',
+    isArchived: false,
     createdAt: '2026-10-01T00:00:00Z',
   };
 

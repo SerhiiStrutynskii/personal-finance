@@ -1,29 +1,50 @@
 import type { Product } from '@hf/shared';
-import { Pencil } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, Pencil } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { cn } from '../../shared/lib/utils.ts';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
-import { useDeleteProduct, useProducts } from './api.ts';
+import { useDeleteProduct, useProducts, useSaveProduct } from './api.ts';
 import { ProductDialog } from './ProductDialog.tsx';
 import { PRODUCT_UNIT_LABELS, formatUnitPrice } from './productForm.ts';
 
 /** Довідник продуктів зі збереженими цінами за одиницю. */
 export function ProductsPage() {
-  const products = useProducts();
+  const [showArchived, setShowArchived] = useState(false);
+  const products = useProducts(showArchived);
   const remove = useDeleteProduct();
+  const archive = useSaveProduct();
   // Вміст вікна зберігається й після закриття, щоб не змінюватися під час анімації.
   const [dialog, setDialog] = useState<{ open: boolean; product?: Product }>({ open: false });
 
   return (
     <div className="max-w-3xl space-y-4">
+      <Link
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"
+        to="/shopping"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Списки покупок
+      </Link>
       <PageHeader
         title="Продукти"
         action={<Button onClick={() => setDialog({ open: true })}>Додати продукт</Button>}
       />
       <ErrorText>{products.isError && errorMessage(products.error)}</ErrorText>
       <ErrorText>{remove.isError && errorMessage(remove.error)}</ErrorText>
+      <ErrorText>{archive.isError && errorMessage(archive.error)}</ErrorText>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="size-4 accent-primary"
+          checked={showArchived}
+          onChange={(e) => setShowArchived(e.target.checked)}
+        />
+        Показати архівні
+      </label>
       {products.isPending && <Muted>Завантаження…</Muted>}
       {products.data?.length === 0 && (
         <Muted>Продуктів ще немає. Додайте ті, що купуєте регулярно, разом із ціною.</Muted>
@@ -35,11 +56,15 @@ export function ProductsPage() {
             <li
               key={product.id}
               data-testid="product"
-              className="flex min-h-10 items-center justify-between gap-4 py-1"
+              className={cn(
+                'flex min-h-10 items-center justify-between gap-4 py-1',
+                product.isArchived && 'text-muted-foreground',
+              )}
             >
               <span>
                 {product.name}{' '}
                 <span className="text-muted-foreground">· {PRODUCT_UNIT_LABELS[product.unit]}</span>
+                {product.isArchived && <span className="text-muted-foreground"> · в архіві</span>}
               </span>
               <span className="ml-auto tabular-nums" data-testid="product-price">
                 {formatUnitPrice(product)}
@@ -54,8 +79,18 @@ export function ProductsPage() {
                 >
                   <Pencil />
                 </Button>
+                <ArchiveButton
+                  name={product.name}
+                  isArchived={product.isArchived}
+                  disabled={archive.isPending}
+                  onClick={() =>
+                    archive.mutate({ id: product.id, input: { isArchived: !product.isArchived } })
+                  }
+                />
                 <ConfirmButton
                   title={`Видалити продукт «${product.name}»?`}
+                  description="Продукт, який уже є в списках покупок, видалити не можна — лише заархівувати."
+
                   disabled={remove.isPending}
                   onConfirm={() => remove.mutate(product.id)}
                 />
@@ -71,5 +106,32 @@ export function ProductsPage() {
         product={dialog.product}
       />
     </div>
+  );
+}
+
+/** Архівний продукт зникає з довідника й підказок, але лишається в історії покупок. */
+function ArchiveButton({
+  name,
+  isArchived,
+  disabled,
+  onClick,
+}: {
+  name: string;
+  isArchived: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const label = isArchived ? `Повернути «${name}» з архіву` : `Заархівувати «${name}»`;
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {isArchived ? <ArchiveRestore /> : <Archive />}
+    </Button>
   );
 }

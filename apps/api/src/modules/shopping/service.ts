@@ -6,26 +6,31 @@ import {
 } from '@hf/shared';
 import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
-import { conflict, isUniqueViolation, notFound } from '../../http/errors.ts';
+import { conflict, isForeignKeyViolation, isUniqueViolation, notFound } from '../../http/errors.ts';
 import * as repo from './repo.ts';
 
-const toDto = (row: repo.ProductRow): Product => ({
+export const toDto = (row: repo.ProductRow): Product => ({
   id: row.id,
   name: row.name,
   unit: row.unit,
   price: row.priceMinor,
   currency: row.currency,
+  isArchived: row.isArchived,
   createdAt: row.createdAt.toISOString(),
 });
 
 /** Назва унікальна без урахування регістру: «Молоко» і «молоко» — той самий продукт. */
-function rethrowDuplicate(error: unknown): never {
+export function rethrowDuplicate(error: unknown): never {
   if (isUniqueViolation(error)) throw conflict('Продукт з такою назвою вже існує');
   throw error;
 }
 
-export async function listProducts(db: Db, auth: AuthContext): Promise<Product[]> {
-  const rows = await repo.listProducts(db, auth.householdId);
+export async function listProducts(
+  db: Db,
+  auth: AuthContext,
+  withArchived: boolean,
+): Promise<Product[]> {
+  const rows = await repo.listProducts(db, auth.householdId, withArchived);
   return rows.map(toDto).sort((a, b) => compareProductNames(a.name, b.name));
 }
 
@@ -63,6 +68,16 @@ export async function updateProduct(
   return toDto(row);
 }
 
+/** Продукт, який уже є в списках покупок, не видаляється: історія цін лишається цілою. */
 export async function deleteProduct(db: Db, auth: AuthContext, id: string): Promise<void> {
-  if (!(await repo.deleteProduct(db, auth.householdId, id))) throw notFound('Продукт');
+  let deleted: boolean;
+  try {
+    deleted = await repo.deleteProduct(db, auth.householdId, id);
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      throw conflict('Продукт є в списках покупок. Заархівуйте його, щоб приховати з довідника');
+    }
+    throw error;
+  }
+  if (!deleted) throw notFound('Продукт');
 }

@@ -16,6 +16,8 @@ import { GoalsPage } from '../features/goals/GoalsPage.tsx';
 import { PayoffPlanPage } from '../features/goals/PayoffPlanPage.tsx';
 import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { ProductsPage } from '../features/shopping/ProductsPage.tsx';
+import { ShoppingListPage } from '../features/shopping/ShoppingListPage.tsx';
+import { ShoppingListsPage } from '../features/shopping/ShoppingListsPage.tsx';
 import { TransactionsPage } from '../features/transactions/TransactionsPage.tsx';
 import { Layout } from '../shared/layout/Layout.tsx';
 import './app.css';
@@ -47,7 +49,9 @@ export function App() {
                 <Route path="debts/:id" element={<DebtPage />} />
                 <Route path="goals" element={<GoalsPage />} />
                 <Route path="goals/:id" element={<PayoffPlanPage />} />
+                <Route path="shopping" element={<ShoppingListsPage />} />
                 <Route path="shopping/products" element={<ProductsPage />} />
+                <Route path="shopping/:id" element={<ShoppingListPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

@@ -18,7 +18,7 @@ import {
   incomesRouter,
 } from './modules/incomes/routes.ts';
 import { categoriesRouter } from './modules/categories/routes.ts';
-import { productsRouter } from './modules/shopping/routes.ts';
+import { productsRouter, shoppingListsRouter } from './modules/shopping/routes.ts';
 import { transactionsRouter } from './modules/transactions/routes.ts';
 
 export interface AppOptions {
@@ -81,6 +81,7 @@ export function createApp({
   api.use('/income-sources', incomeSourcesRouter(db, now));
   api.use('/incomes', incomesRouter(db, now));
   api.use('/products', productsRouter(db));
+  api.use('/shopping-lists', shoppingListsRouter(db, now));
   api.use('/transactions', transactionsRouter(db, now));
   app.use('/api', api);
 
