@@ -122,4 +122,57 @@ describe('shopping analytics', () => {
     });
     expect((await stranger.get(`/api/products/${productId}/prices`)).status).toBe(404);
   });
+
+  it('за період: суми по місяцях за київським часом і помісячно по продукту', async () => {
+    const actor = await createActor();
+    // Шість місяців до жовтня — травень–жовтень; квітень у період не входить, але є в річному.
+    await buy(actor, '2026-04-15T10:00:00Z', { name: 'Хліб', price: 9900 });
+    await buy(
+      actor,
+      '2026-08-10T10:00:00Z',
+      { name: 'Хліб', price: 3000, quantityMilli: 2000 },
+      3000,
+    );
+    // 1 жовтня 00:30 за Києвом — жовтень.
+    await buy(actor, '2026-09-30T21:30:00Z', { name: 'Хліб', price: 3000 }, 3200);
+    await buy(
+      actor,
+      '2026-10-10T09:00:00Z',
+      { name: 'Сир', unit: 'kg', price: 40000, quantityMilli: 500 },
+      40000,
+    );
+
+    setNow('2026-10-20T10:00:00Z');
+    const { body } = await actor.get('/api/shopping/analytics/period?months=6');
+    expect(body).toMatchObject({
+      month: '2026-10',
+      months: ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'],
+      total: 6000 + 3200 + 20000,
+      averagePerMonth: Math.round(29200 / 6),
+      purchaseCount: 3,
+    });
+    expect(body.points.map((p: { spent: number }) => p.spent)).toEqual([0, 0, 0, 6000, 0, 23200]);
+    expect(body.products.map((p: { name: string }) => p.name)).toEqual(['Сир', 'Хліб']);
+    const bread = body.products[1];
+    expect(bread).toMatchObject({ spent: 9200, minUnitPrice: 3000, maxUnitPrice: 3200 });
+    expect(bread.byMonth.map((m: { spent: number }) => m.spent)).toEqual([0, 0, 0, 6000, 0, 3200]);
+
+    const year = await actor.get('/api/shopping/analytics/period?month=2026-10&months=12');
+    expect(year.body.months).toHaveLength(12);
+    expect(year.body.total).toBe(9900 + 29200);
+  });
+
+  it('за період: відхиляє майбутній місяць і іншу довжину, ізолює домогосподарства', async () => {
+    const owner = await createActor();
+    const stranger = await createActor();
+    await buy(owner, '2026-10-05T10:00:00Z', { name: 'Хліб', price: 3000 });
+
+    setNow('2026-10-20T10:00:00Z');
+    expect((await owner.get('/api/shopping/analytics/period?month=2026-11')).status).toBe(400);
+    expect((await owner.get('/api/shopping/analytics/period?months=3')).status).toBe(400);
+    expect((await stranger.get('/api/shopping/analytics/period')).body).toMatchObject({
+      total: 0,
+      products: [],
+    });
+  });
 });

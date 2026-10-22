@@ -185,3 +185,35 @@ export const productPriceHistorySchema = z.object({
   ),
 });
 export type ProductPriceHistory = z.infer<typeof productPriceHistorySchema>;
+
+export const shoppingPeriodSchema = z.object({
+  month: monthSchema,
+  currency: currencySchema,
+  months: z.array(monthSchema),
+  total: amountSchema,
+  averagePerMonth: amountSchema,
+  purchaseCount: amountSchema,
+  unpricedCount: amountSchema,
+  points: z.array(
+    z.object({ month: monthSchema, spent: amountSchema, purchaseCount: amountSchema }),
+  ),
+  products: z.array(
+    z.object({
+      productId: idSchema,
+      name: z.string(),
+      unit: productUnitSchema,
+      quantityMilli: amountSchema,
+      spent: amountSchema,
+      share: z.number(),
+      averagePerMonth: amountSchema,
+      averageUnitPrice: amountSchema,
+      minUnitPrice: amountSchema,
+      maxUnitPrice: amountSchema,
+      purchaseCount: amountSchema,
+      byMonth: z.array(
+        z.object({ month: monthSchema, spent: amountSchema, quantityMilli: amountSchema }),
+      ),
+    }),
+  ),
+});
+export type ShoppingPeriod = z.infer<typeof shoppingPeriodSchema>;

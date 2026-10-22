@@ -127,3 +127,103 @@ export function summarizePurchases(
     products,
   };
 }
+
+/** Покупка з місяцем у часовому поясі домогосподарства. */
+export interface MonthlyPurchase extends Purchase {
+  month: string;
+}
+
+export interface ProductPeriodRow {
+  productId: string;
+  name: string;
+  unit: ProductUnit;
+  quantityMilli: number;
+  spent: number;
+  /** Частка від усіх покупок періоду (0,25 = 25%). */
+  share: number;
+  /** Витрачено в середньому на місяць періоду, зокрема місяці без покупок. */
+  averagePerMonth: number;
+  averageUnitPrice: number;
+  minUnitPrice: number;
+  maxUnitPrice: number;
+  purchaseCount: number;
+  /** Помісячно для кожного місяця періоду; без покупок — нулі. */
+  byMonth: { month: string; spent: number; quantityMilli: number }[];
+}
+
+export interface PurchasesPeriod {
+  months: string[];
+  total: number;
+  averagePerMonth: number;
+  purchaseCount: number;
+  /** Покупки без фактичної ціни: у суми не входять. */
+  unpricedCount: number;
+  points: { month: string; spent: number; purchaseCount: number }[];
+  /** Усі продукти періоду за спаданням витраченого. */
+  products: ProductPeriodRow[];
+}
+
+/** Ціле ділення з округленням «половина — вгору» для невід'ємних сум. */
+const divideRounded = (amount: number, by: number) =>
+  Number((BigInt(amount) * 2n + BigInt(by)) / (BigInt(by) * 2n));
+
+/** Покупки за кілька місяців: по місяцях, по продуктах і кожен продукт помісячно. */
+export function summarizePeriod(
+  purchases: readonly MonthlyPurchase[],
+  months: readonly string[],
+): PurchasesPeriod {
+  const inPeriod = new Set(months);
+  const rows = purchases.filter((p) => inPeriod.has(p.month));
+  const priced = rows.filter(
+    (p): p is MonthlyPurchase & { actualUnitPrice: number } => p.actualUnitPrice !== null,
+  );
+
+  const points = months.map((month) => {
+    const ofMonth = priced.filter((p) => p.month === month);
+    return { month, spent: spentOf(ofMonth), purchaseCount: ofMonth.length };
+  });
+  const total = points.reduce((sum, point) => safeAdd(sum, point.spent), 0);
+
+  const byProduct = new Map<string, (MonthlyPurchase & { actualUnitPrice: number })[]>();
+  for (const purchase of priced) {
+    byProduct.set(purchase.productId, [...(byProduct.get(purchase.productId) ?? []), purchase]);
+  }
+  const products = [...byProduct.values()].map((list): ProductPeriodRow => {
+    const latest = [...list].sort((a, b) => a.boughtAt.localeCompare(b.boughtAt)).at(-1)!;
+    const quantityMilli = list.reduce((sum, p) => safeAdd(sum, p.quantityMilli), 0);
+    const spent = spentOf(list);
+    const prices = list.map((p) => p.actualUnitPrice);
+    return {
+      productId: latest.productId,
+      name: latest.name,
+      unit: latest.unit,
+      quantityMilli,
+      spent,
+      share: total === 0 ? 0 : spent / total,
+      averagePerMonth: divideRounded(spent, months.length),
+      averageUnitPrice: averageUnitPrice(spent, quantityMilli),
+      minUnitPrice: Math.min(...prices),
+      maxUnitPrice: Math.max(...prices),
+      purchaseCount: list.length,
+      byMonth: months.map((month) => {
+        const ofMonth = list.filter((p) => p.month === month);
+        return {
+          month,
+          spent: spentOf(ofMonth),
+          quantityMilli: ofMonth.reduce((sum, p) => safeAdd(sum, p.quantityMilli), 0),
+        };
+      }),
+    };
+  });
+  products.sort((a, b) => b.spent - a.spent || a.name.localeCompare(b.name, 'uk'));
+
+  return {
+    months: [...months],
+    total,
+    averagePerMonth: months.length === 0 ? 0 : divideRounded(total, months.length),
+    purchaseCount: rows.length,
+    unpricedCount: rows.length - priced.length,
+    points,
+    products,
+  };
+}

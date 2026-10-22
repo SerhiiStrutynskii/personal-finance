@@ -200,13 +200,36 @@ test('куплене за списками видно в аналітиці й �
   await page.getByRole('link', { name: 'Аналітика' }).click();
   const section = page.getByTestId('analytics-shopping');
   await expect(section).toContainText('Окремо від витрат');
-  await expect(section).toContainText(/Куплено за списками\s*134,00/);
-  await expect(section).toContainText(/Відхилення від очікуваних цін\s*\+6,00/);
-  const row = section.getByTestId('shopping-product-row');
+  await expect(section.getByTestId('shopping-month')).toContainText(/134,00/);
+  await expect(section.getByTestId('shopping-month')).toContainText(
+    /Відхилення від очікуваних цін\s*\+6,00/,
+  );
+
+  // Таблиця за період: продукт, кількість, сума, частка, ціни.
+  const period = section.getByTestId('shopping-period');
+  await expect(period).toContainText('За 6 міс.');
+  const row = period.getByTestId('shopping-period-row');
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('4 шт');
-  await expect(row).toContainText(/33,50\s\S+ \/ шт/);
-  await expect(row).toContainText(/\+3,00\s\S+ \(9,4%\)/);
+  await expect(row).toContainText(/134,00/);
+  await expect(row).toContainText('100,0%');
+  await expect(row).toContainText(/32,00\s\S+ – 35,00/);
+
+  // Графіки: по місяцях, кругова діаграма, обраний продукт помісячно.
+  await expect(period.getByTestId('shopping-monthly-chart').locator('svg').first()).toBeVisible();
+  await expect(period.getByTestId('shopping-pie-item')).toHaveCount(1);
+  await expect(period.getByTestId('shopping-pie-item')).toContainText('Хліб');
+  const productChart = period.getByTestId('shopping-product-chart');
+  await expect(productChart.getByRole('combobox', { name: 'Продукт для графіка' })).toHaveText(
+    'Хліб',
+  );
+  await expect(productChart.getByTestId('shopping-product-month')).toHaveCount(6);
+  await expect(productChart.getByTestId('shopping-product-month').last()).toContainText(/134,00/);
+
+  // 12 місяців — той самий перемикач, що й для решти аналітики.
+  await page.getByRole('button', { name: '12 міс.' }).click();
+  await expect(period).toContainText('За 12 міс.');
+  await expect(productChart.getByTestId('shopping-product-month')).toHaveCount(12);
 
   await row.getByRole('button', { name: 'Хліб' }).click();
   const dialog = page.getByRole('dialog');

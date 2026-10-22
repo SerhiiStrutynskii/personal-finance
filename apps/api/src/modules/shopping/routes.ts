@@ -1,5 +1,6 @@
 import {
   addShoppingListItemSchema,
+  analyticsTrendQuerySchema,
   createProductSchema,
   createShoppingListSchema,
   idParamsSchema,
@@ -113,6 +114,11 @@ export function shoppingRouter(db: Db, now: () => Date): Router {
   router.get('/analytics', async (req, res) => {
     const { month } = shoppingAnalyticsQuerySchema.parse(req.query);
     res.json(await analytics.getShoppingAnalytics(db, getAuth(res), month, now()));
+  });
+
+  router.get('/analytics/period', async (req, res) => {
+    const { month, months } = analyticsTrendQuerySchema.parse(req.query);
+    res.json(await analytics.getShoppingPeriod(db, getAuth(res), month, months, now()));
   });
 
   return router;

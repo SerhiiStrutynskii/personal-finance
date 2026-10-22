@@ -819,10 +819,11 @@ projection, interestSaved }` — розбивка платежу на сього
 
 Окремо від аналітики витрат: списки не створюють транзакцій. Правила — у `docs/domain.md`.
 
-| Метод | Шлях                                    | Відповідь                 |
-| ----- | --------------------------------------- | ------------------------- |
-| GET   | `/api/shopping/analytics?month=YYYY-MM` | `200 ShoppingAnalytics`   |
-| GET   | `/api/products/:id/prices`              | `200 ProductPriceHistory` |
+| Метод | Шлях                                                        | Відповідь                 |
+| ----- | ----------------------------------------------------------- | ------------------------- |
+| GET   | `/api/shopping/analytics?month=YYYY-MM`                     | `200 ShoppingAnalytics`   |
+| GET   | `/api/shopping/analytics/period?month=YYYY-MM&months=6\|12` | `200 ShoppingPeriod`      |
+| GET   | `/api/products/:id/prices`                                  | `200 ProductPriceHistory` |
 
 `month` за замовчуванням поточний; майбутній місяць — `400`.
 
@@ -855,6 +856,42 @@ projection, interestSaved }` — розбивка платежу на сього
 
 `products` — за спаданням `spent`; `previousUnitPrice` — ціна попередньої покупки продукту або `null`
 для першої. `expectedOfPriced` і `deviation` — по покупках з обома цінами.
+
+`ShoppingPeriod` — покупки за `months` місяців (6 за замовчуванням або 12), що закінчуються місяцем
+`month`:
+
+```json
+{
+  "month": "2026-10",
+  "currency": "UAH",
+  "months": ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"],
+  "total": 129267,
+  "averagePerMonth": 21545,
+  "purchaseCount": 13,
+  "unpricedCount": 0,
+  "points": [{ "month": "2026-09", "spent": 79880, "purchaseCount": 6 }],
+  "products": [
+    {
+      "productId": "…",
+      "name": "Молоко",
+      "unit": "l",
+      "quantityMilli": 5000,
+      "spent": 21200,
+      "share": 0.164,
+      "averagePerMonth": 3533,
+      "averageUnitPrice": 4240,
+      "minUnitPrice": 4150,
+      "maxUnitPrice": 4400,
+      "purchaseCount": 3,
+      "byMonth": [{ "month": "2026-09", "spent": 8300, "quantityMilli": 2000 }]
+    }
+  ]
+}
+```
+
+`points` і `byMonth` мають рядок для кожного місяця періоду, зокрема з нулями (у прикладі скорочено).
+`products` — усі продукти періоду за спаданням `spent`; `share` — частка від `total`; середнє на місяць
+ділить суму на всі місяці періоду.
 
 `ProductPriceHistory` — `{ product: Product, points: [{ boughtAt, unitPrice, quantityMilli, listId,
 listName }] }`, покупки з фактичною ціною від найдавнішої. Чужий продукт — `404`.

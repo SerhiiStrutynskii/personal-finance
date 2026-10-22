@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { averageUnitPrice, summarizePurchases, type Purchase } from '../analytics.ts';
+import {
+  averageUnitPrice,
+  summarizePeriod,
+  summarizePurchases,
+  type Purchase,
+} from '../analytics.ts';
 
 const BREAD = 'bread';
 const CHEESE = 'cheese';
@@ -123,5 +128,82 @@ describe('summarizePurchases', () => {
   it('перша покупка продукту не має попередньої ціни', () => {
     const { products } = summarizePurchases([purchase()], [], new Map());
     expect(products[0]?.previousUnitPrice).toBeNull();
+  });
+});
+
+describe('summarizePeriod', () => {
+  const MONTHS = ['2026-08', '2026-09', '2026-10'];
+  const monthly = (month: string, override: Partial<Purchase> = {}) => ({
+    ...purchase(override),
+    month,
+  });
+
+  it('рахує суми по місяцях, середнє на місяць і пропускає покупки поза періодом', () => {
+    const period = summarizePeriod(
+      [
+        monthly('2026-07', { actualUnitPrice: 99_900 }),
+        monthly('2026-08', { quantityMilli: 2000, actualUnitPrice: 3000 }),
+        monthly('2026-10', { actualUnitPrice: 3500 }),
+        monthly('2026-10', { actualUnitPrice: null }),
+      ],
+      MONTHS,
+    );
+    expect(period).toMatchObject({
+      months: MONTHS,
+      total: 6000 + 3500,
+      // 95 грн за 3 місяці = 31,666… → 31,67
+      averagePerMonth: 3167,
+      purchaseCount: 3,
+      unpricedCount: 1,
+      points: [
+        { month: '2026-08', spent: 6000, purchaseCount: 1 },
+        { month: '2026-09', spent: 0, purchaseCount: 0 },
+        { month: '2026-10', spent: 3500, purchaseCount: 1 },
+      ],
+    });
+  });
+
+  it('по продуктах: частка, середнє на місяць, ціни й помісячна розбивка', () => {
+    const { products } = summarizePeriod(
+      [
+        monthly('2026-08', { quantityMilli: 2000, actualUnitPrice: 3000 }),
+        monthly('2026-10', { actualUnitPrice: 3600, boughtAt: '2026-10-10T00:00:00Z' }),
+        monthly('2026-10', {
+          productId: CHEESE,
+          name: 'Сир',
+          unit: 'kg',
+          quantityMilli: 500,
+          actualUnitPrice: 40_000,
+        }),
+      ],
+      MONTHS,
+    );
+    expect(products.map((p) => p.name)).toEqual(['Сир', 'Хліб']);
+    expect(products[1]).toEqual({
+      productId: BREAD,
+      name: 'Хліб',
+      unit: 'pcs',
+      quantityMilli: 3000,
+      spent: 9600,
+      share: 9600 / 29_600,
+      averagePerMonth: 3200,
+      averageUnitPrice: 3200,
+      minUnitPrice: 3000,
+      maxUnitPrice: 3600,
+      purchaseCount: 2,
+      byMonth: [
+        { month: '2026-08', spent: 6000, quantityMilli: 2000 },
+        { month: '2026-09', spent: 0, quantityMilli: 0 },
+        { month: '2026-10', spent: 3600, quantityMilli: 1000 },
+      ],
+    });
+  });
+
+  it('порожній період — нулі для кожного місяця', () => {
+    const period = summarizePeriod([], MONTHS);
+    expect(period.total).toBe(0);
+    expect(period.averagePerMonth).toBe(0);
+    expect(period.points.map((p) => p.spent)).toEqual([0, 0, 0]);
+    expect(period.products).toEqual([]);
   });
 });

@@ -6,8 +6,10 @@ import type {
   ProductPriceHistory,
   ShoppingAnalytics,
   ShoppingList,
+  ShoppingPeriod,
   ShoppingListSummary,
   UpdateProductInput,
+  TrendLength,
   UpdateShoppingListItemInput,
 } from '@hf/shared';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
@@ -109,6 +111,15 @@ export function useShoppingAnalytics(month: string) {
   return useQuery({
     queryKey: ['analytics', 'shopping', month],
     queryFn: () => api.get<ShoppingAnalytics>('/api/shopping/analytics', { month }),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Покупки за `months` місяців, що закінчуються місяцем `month`. */
+export function useShoppingPeriod(month: string, months: TrendLength) {
+  return useQuery({
+    queryKey: ['analytics', 'shopping', 'period', month, months],
+    queryFn: () => api.get<ShoppingPeriod>('/api/shopping/analytics/period', { month, months }),
     placeholderData: keepPreviousData,
   });
 }
