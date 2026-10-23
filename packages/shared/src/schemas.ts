@@ -205,6 +205,8 @@ export const registerSchema = z.object({
   password: passwordSchema,
   name: nameSchema,
   householdName: nameSchema.default('Моє домогосподарство'),
+  /** Токен із посилання-запрошення: користувач приєднується до чужого домогосподарства. */
+  inviteToken: z.string().min(1).max(200).optional(),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
@@ -237,3 +239,51 @@ export type CurrentUser = z.infer<typeof currentUserSchema>;
 
 export const authSessionSchema = currentUserSchema.extend(authTokensSchema.shape);
 export type AuthSession = z.infer<typeof authSessionSchema>;
+
+// Домогосподарство: учасники й запрошення.
+
+export const householdMemberSchema = z.object({
+  userId: idSchema,
+  name: z.string(),
+  email: z.string(),
+  role: memberRoleSchema,
+  joinedAt: z.string(),
+});
+export type HouseholdMember = z.infer<typeof householdMemberSchema>;
+
+export const householdInviteSchema = z.object({
+  id: idSchema,
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  createdByName: z.string().nullable(),
+});
+export type HouseholdInvite = z.infer<typeof householdInviteSchema>;
+
+export const householdSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  role: memberRoleSchema,
+  members: z.array(householdMemberSchema),
+  /** Активні запрошення; бачить лише власник, учаснику — порожній список. */
+  invites: z.array(householdInviteSchema),
+});
+export type Household = z.infer<typeof householdSchema>;
+
+export const updateHouseholdSchema = z.object({ name: nameSchema });
+export type UpdateHouseholdInput = z.infer<typeof updateHouseholdSchema>;
+
+/** Нове запрошення; токен повертається лише тут, у БД зберігається його хеш. */
+export const createdInviteSchema = householdInviteSchema.extend({ token: z.string() });
+export type CreatedInvite = z.infer<typeof createdInviteSchema>;
+
+/** Відкриті дані запрошення для сторінки реєстрації. */
+export const invitePreviewSchema = z.object({
+  householdName: z.string(),
+  invitedBy: z.string().nullable(),
+});
+export type InvitePreview = z.infer<typeof invitePreviewSchema>;
+
+/** Скільки діє посилання-запрошення. */
+export const INVITE_TTL_DAYS = 7;
+/** Скільки активних запрошень може мати домогосподарство одночасно. */
+export const MAX_ACTIVE_INVITES = 10;

@@ -8,7 +8,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Db, DbOrTx } from '../../db/client.ts';
 import { accounts } from '../../db/schema.ts';
-import type { AuthContext } from '../../http/auth.ts';
+import { assertOwner, type AuthContext } from '../../http/auth.ts';
 import {
   badRequest,
   conflict,
@@ -197,6 +197,7 @@ export async function createDebt(
   input: CreateDebtInput,
   now: Date,
 ): Promise<Debt> {
+  assertOwner(auth);
   const timeZone = await timeZoneOf(db, auth);
   if (input.startDate > localDateKey(now, timeZone)) {
     throw badRequest('Дата початку боргу не може бути в майбутньому');
@@ -252,6 +253,7 @@ export async function updateDebt(
   input: UpdateDebtInput,
   now: Date,
 ): Promise<Debt> {
+  assertOwner(auth);
   const existing = await requireDebt(db, auth, id);
   const isCard = existing.type === 'credit_card';
 
@@ -309,6 +311,7 @@ export async function updateDebt(
 
 /** Закриває погашений борг; у кредитки разом із цим архівується рахунок-картка. */
 export async function closeDebt(db: Db, auth: AuthContext, id: string, now: Date): Promise<Debt> {
+  assertOwner(auth);
   const existing = await requireDebt(db, auth, id);
   const { balance } = await buildDebt(db, auth, existing, now);
   if (balance > 0) throw conflict('Борг ще не погашено, тому його не можна закрити');
@@ -333,6 +336,7 @@ export async function closeDebt(db: Db, auth: AuthContext, id: string, now: Date
  * перекази й баланс лишаються, щоб витрати й бюджети минулих місяців не змінилися.
  */
 export async function deleteDebt(db: Db, auth: AuthContext, id: string): Promise<void> {
+  assertOwner(auth);
   const existing = await requireDebt(db, auth, id);
   const { accountId } = existing;
 

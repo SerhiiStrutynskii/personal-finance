@@ -7,7 +7,7 @@ import {
   localMonthKey,
 } from '@hf/shared';
 import type { Db, DbOrTx } from '../../db/client.ts';
-import type { AuthContext } from '../../http/auth.ts';
+import { assertOwner, type AuthContext } from '../../http/auth.ts';
 import {
   badRequest,
   budgetPeriodClosed,
@@ -165,6 +165,7 @@ export async function createBudget(
   input: CreateBudgetInput,
   now: Date = new Date(),
 ): Promise<BudgetView> {
+  assertOwner(auth);
   const timeZone = await householdTimeZone(db, auth);
   const period = budgetPeriod(input.month, timeZone);
   if (getPeriodState(period.start, period.end, now) === 'past') throw budgetPeriodClosed();
@@ -227,6 +228,7 @@ export async function addExpenseLine(
   input: CreateExpenseLineInput,
   now: Date = new Date(),
 ): Promise<BudgetView> {
+  assertOwner(auth);
   const budget = await editableBudget(db, auth, budgetId, now);
   const category = await findCategory(db, auth.householdId, input.categoryId);
   if (!category) throw badRequest('Категорію не знайдено');
@@ -252,6 +254,7 @@ export async function updateExpenseLine(
   input: UpdateExpenseLineInput,
   now: Date = new Date(),
 ): Promise<BudgetView> {
+  assertOwner(auth);
   const budget = await editableBudget(db, auth, budgetId, now);
   if (!(await repo.updateExpenseLine(db, budget.id, lineId, input))) {
     throw notFound('Стаття витрат');
@@ -266,6 +269,7 @@ export async function deleteExpenseLine(
   lineId: string,
   now: Date = new Date(),
 ): Promise<BudgetView> {
+  assertOwner(auth);
   const budget = await editableBudget(db, auth, budgetId, now);
   if (!(await repo.deleteExpenseLine(db, budget.id, lineId))) throw notFound('Стаття витрат');
   return viewById(db, auth, budget.id, now);

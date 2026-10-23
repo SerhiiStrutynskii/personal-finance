@@ -1,5 +1,5 @@
 import type { Db } from '../../db/client.ts';
-import type { AuthContext } from '../../http/auth.ts';
+import { assertOwner, type AuthContext } from '../../http/auth.ts';
 import {
   badRequest,
   conflict,
@@ -49,6 +49,7 @@ export async function createCategory(
   auth: AuthContext,
   input: CreateCategoryInput,
 ): Promise<Category> {
+  assertOwner(auth);
   if (input.parentId) await assertValidParent(db, auth, input.parentId, input.kind);
   try {
     return toDto(await repo.insertCategory(db, auth.householdId, input));
@@ -97,6 +98,7 @@ export async function updateCategory(
   id: string,
   input: UpdateCategoryInput,
 ): Promise<Category> {
+  assertOwner(auth);
   const existing = await existingEditable(db, auth, id);
   if (input.parentId) await assertCanMove(db, auth, existing, input.parentId);
   try {
@@ -111,6 +113,7 @@ export async function updateCategory(
 }
 
 export async function deleteCategory(db: Db, auth: AuthContext, id: string): Promise<void> {
+  assertOwner(auth);
   await existingEditable(db, auth, id);
   if ((await repo.listChildren(db, auth.householdId, id)).length > 0) {
     throw conflict('Спершу видаліть або перенесіть підкатегорії цієї категорії');

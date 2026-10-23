@@ -1,6 +1,13 @@
 import type { AuthSession, CurrentUser, LoginInput, RegisterInput } from '@hf/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { ApiError, api, tokenStore } from '../../shared/api/index.ts';
 import { AuthContext, type AuthState } from './authContext.ts';
 
@@ -25,9 +32,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (rejected) tokenStore.clear();
   }, [rejected]);
 
-  // Після виходу в кеші не має лишитися даних попереднього користувача.
+  // Після виходу в кеші не має лишитися даних попереднього користувача. Чиститься лише при
+  // завершенні сесії: на старті без сесії очищення скасувало б уже запущені відкриті запити
+  // (налаштування входу, запрошення), і вони лишилися б у стані завантаження.
+  const hadSession = useRef(hasSession);
   useEffect(() => {
-    if (!hasSession) queryClient.clear();
+    if (hadSession.current && !hasSession) queryClient.clear();
+    hadSession.current = hasSession;
   }, [hasSession, queryClient]);
 
   const startSession = useCallback(
@@ -65,6 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       retry: () => void me.refetch(),
+      async reloadCurrentUser() {
+        await me.refetch();
+      },
     };
   }, [hasSession, me, rejected, startSession]);
 

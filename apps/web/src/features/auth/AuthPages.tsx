@@ -16,7 +16,7 @@ import {
 } from '../../shared/ui/card.tsx';
 import { Input } from '../../shared/ui/input.tsx';
 
-function AuthLayout({
+export function AuthLayout({
   title,
   children,
   footer,
@@ -128,15 +128,48 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
-  const { register } = useAuth();
   const registrationEnabled = useRegistrationEnabled();
+
+  // Реєстрацію закрито на сервері — показувати форму немає сенсу.
+  if (registrationEnabled === false) return <Navigate to="/login" replace />;
+
+  return (
+    <AuthLayout title="Реєстрація" footer={<LoginLink />}>
+      <RegisterForm />
+    </AuthLayout>
+  );
+}
+
+export function LoginLink() {
+  return (
+    <>
+      Уже є обліковий запис?{' '}
+      <Link className="underline" to="/login">
+        Увійти
+      </Link>
+    </>
+  );
+}
+
+/**
+ * Форма нового облікового запису. З `inviteToken` користувач приєднується до домогосподарства
+ * із запрошення, без нього — отримує власне.
+ */
+export function RegisterForm({
+  inviteToken,
+  onRegistered,
+}: {
+  inviteToken?: string;
+  onRegistered?: () => void;
+}) {
+  const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { error, pending, submit } = useSubmit(async () => {
-    const parsed = registerSchema.safeParse({ name, email, password });
+    const parsed = registerSchema.safeParse({ name, email, password, inviteToken });
     if (!parsed.success) {
       const fields = new Set(parsed.error.issues.map((issue) => String(issue.path[0])));
       setFieldErrors({
@@ -150,48 +183,34 @@ export function RegisterPage() {
     }
     setFieldErrors({});
     await register(parsed.data);
+    onRegistered?.();
   });
 
-  // Реєстрацію закрито на сервері — показувати форму немає сенсу.
-  if (registrationEnabled === false) return <Navigate to="/login" replace />;
-
   return (
-    <AuthLayout
-      title="Реєстрація"
-      footer={
-        <>
-          Уже є обліковий запис?{' '}
-          <Link className="underline" to="/login">
-            Увійти
-          </Link>
-        </>
-      }
-    >
-      <form className="space-y-3" onSubmit={submit} noValidate>
-        <Field label="Імʼя" error={fieldErrors.name}>
-          <Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label="Email" error={fieldErrors.email}>
-          <Input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </Field>
-        <Field label="Пароль" error={fieldErrors.password}>
-          <Input
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </Field>
-        <ErrorText>{error}</ErrorText>
-        <Button type="submit" className="w-full max-sm:h-10" disabled={pending}>
-          Зареєструватися
-        </Button>
-      </form>
-    </AuthLayout>
+    <form className="space-y-3" onSubmit={submit} noValidate>
+      <Field label="Імʼя" error={fieldErrors.name}>
+        <Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Email" error={fieldErrors.email}>
+        <Input
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </Field>
+      <Field label="Пароль" error={fieldErrors.password}>
+        <Input
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </Field>
+      <ErrorText>{error}</ErrorText>
+      <Button type="submit" className="w-full max-sm:h-10" disabled={pending}>
+        Зареєструватися
+      </Button>
+    </form>
   );
 }

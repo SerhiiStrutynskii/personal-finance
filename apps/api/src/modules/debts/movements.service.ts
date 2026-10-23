@@ -1,6 +1,6 @@
 import { isEarlyPayment, suggestPaymentSplit, toMonthlyRate, type MonthPayment } from '@hf/shared';
 import type { Db, DbOrTx } from '../../db/client.ts';
-import type { AuthContext } from '../../http/auth.ts';
+import { assertOwner, type AuthContext } from '../../http/auth.ts';
 import { badRequest, conflict, notFound, unprocessable } from '../../http/errors.ts';
 import { ensureSystemCategory } from '../categories/repo.ts';
 import { deleteTransaction, insertTransaction } from '../transactions/repo.ts';
@@ -88,6 +88,7 @@ export async function addPayment(
   input: DebtPaymentInput,
   now: Date,
 ): Promise<DebtDetails> {
+  assertOwner(auth);
   const row = await requireDebt(db, auth, id);
   assertLoan(row);
   const account = await requirePaymentAccount(db, auth, input.accountId);
@@ -145,6 +146,7 @@ export async function addCharge(
   input: DebtChargeInput,
   now: Date,
 ): Promise<DebtDetails> {
+  assertOwner(auth);
   const row = await requireDebt(db, auth, id);
   assertLoan(row);
   if (input.date < row.startDate) {
@@ -175,6 +177,7 @@ export async function addAdjustment(
   input: DebtAdjustmentInput,
   now: Date,
 ): Promise<DebtDetails> {
+  assertOwner(auth);
   const row = await requireDebt(db, auth, id);
   const context = await loadDebtContext(db, auth, [row], undefined, now);
   const difference = input.actualBalance - balanceOf(row, context);
@@ -219,6 +222,7 @@ export async function deleteEntry(
   entryId: string,
   now: Date,
 ): Promise<void> {
+  assertOwner(auth);
   const row = await requireDebt(db, auth, id);
   assertLoan(row);
   const entry = await repo.findEntry(db, auth.householdId, id, entryId);
@@ -297,6 +301,7 @@ export async function addCardPayment(
   input: CardPaymentInput,
   now: Date,
 ): Promise<DebtDetails> {
+  assertOwner(auth);
   const row = await requireDebt(db, auth, id);
   const cardAccountId = assertCard(row);
   if (input.fromAccountId === cardAccountId) {
@@ -331,6 +336,7 @@ export async function addCardFee(
   input: DebtChargeInput,
   now: Date,
 ): Promise<DebtDetails> {
+  assertOwner(auth);
   const row = await requireDebt(db, auth, id);
   const cardAccountId = assertCard(row);
   const context = await loadDebtContext(db, auth, [row], undefined, now);

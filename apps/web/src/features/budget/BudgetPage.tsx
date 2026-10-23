@@ -16,7 +16,7 @@ import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { monthLabel } from '../../shared/ui/format.ts';
 import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
 import { activeAccounts, useAccounts } from '../accounts/api.ts';
-import { useCurrentUser } from '../auth/authContext.ts';
+import { useCurrentUser, useIsOwner } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
 import { TransactionDialog } from '../transactions/TransactionDialog.tsx';
 import { AddLimitDialog } from './AddLimitDialog.tsx';
@@ -98,6 +98,7 @@ export function BudgetPage() {
 
 function EmptyBudget({ month, timeZone }: { month: string; timeZone: string }) {
   const create = useCreateBudget();
+  const isOwner = useIsOwner();
   const period = budgetPeriod(month, timeZone);
   const isPast = getPeriodState(period.start, period.end, new Date()) === 'past';
   const label = monthLabel(month).toLowerCase();
@@ -115,19 +116,24 @@ function EmptyBudget({ month, timeZone }: { month: string; timeZone: string }) {
 
   return (
     <div className="space-y-3 rounded-lg border border-dashed p-6" data-testid="budget-empty">
-      <p>Бюджету на {label} ще немає.</p>
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={create.isPending} onClick={() => create.mutate({ month })}>
-          Створити
-        </Button>
-        <Button
-          variant="outline"
-          disabled={create.isPending}
-          onClick={() => create.mutate({ month, copyFrom: shiftMonth(month, -1) })}
-        >
-          Скопіювати ліміти з попереднього
-        </Button>
-      </div>
+      <p>
+        Бюджету на {label} ще немає.
+        {!isOwner && ' Його створює власник домогосподарства.'}
+      </p>
+      {isOwner && (
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={create.isPending} onClick={() => create.mutate({ month })}>
+            Створити
+          </Button>
+          <Button
+            variant="outline"
+            disabled={create.isPending}
+            onClick={() => create.mutate({ month, copyFrom: shiftMonth(month, -1) })}
+          >
+            Скопіювати ліміти з попереднього
+          </Button>
+        </div>
+      )}
       <ErrorText>{create.isError && errorMessage(create.error)}</ErrorText>
     </div>
   );

@@ -1,13 +1,15 @@
+import type { MemberRole } from '@hf/shared';
 import type { RequestHandler, Response } from 'express';
 import type { Db } from '../db/client.ts';
 import { findMembership } from '../modules/auth/repo.ts';
 import type { TokenService } from '../modules/auth/tokens.ts';
-import { unauthorized } from './errors.ts';
+import { ownerOnly, unauthorized } from './errors.ts';
 
 /** Хто робить запит і в межах якого домогосподарства. Передається в кожну функцію сервісів. */
 export interface AuthContext {
   userId: string;
   householdId: string;
+  role: MemberRole;
 }
 
 const BEARER = /^Bearer (\S+)$/;
@@ -25,7 +27,7 @@ export function requireAuth(db: Db, tokens: TokenService): RequestHandler {
     const household = await findMembership(db, userId);
     if (!household) throw unauthorized();
 
-    const auth: AuthContext = { userId, householdId: household.id };
+    const auth: AuthContext = { userId, householdId: household.id, role: household.role };
     res.locals.auth = auth;
     next();
   };
@@ -35,4 +37,12 @@ export function getAuth(res: Response): AuthContext {
   const auth = res.locals.auth as AuthContext | undefined;
   if (!auth) throw unauthorized();
   return auth;
+}
+
+/**
+ * Рахунки, категорії, бюджет, борги й цілі змінює лише власник; учасник їх бачить, а сам веде
+ * витрати, прибутки й покупки. Викликається на початку кожної такої зміни в сервісі.
+ */
+export function assertOwner(auth: AuthContext): void {
+  if (auth.role !== 'owner') throw ownerOnly();
 }

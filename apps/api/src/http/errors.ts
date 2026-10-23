@@ -31,6 +31,9 @@ export const unprocessable = (code: string, message: string) => new AppError(422
 /** Реєстрацію нових користувачів вимкнено налаштуванням сервера. */
 export const registrationClosed = () =>
   new AppError(403, 'REGISTRATION_CLOSED', 'Реєстрацію нових користувачів закрито');
+/** Дію може виконати лише власник домогосподарства. */
+export const ownerOnly = () =>
+  new AppError(403, 'OWNER_ONLY', 'Це може змінити лише власник домогосподарства');
 export const conflict = (message: string) => new AppError(409, 'CONFLICT', message);
 
 // ON DELETE RESTRICT повідомляє 23001, звичайний зовнішній ключ — 23503

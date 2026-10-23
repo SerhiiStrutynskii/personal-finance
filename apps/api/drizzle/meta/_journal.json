@@ -99,6 +99,13 @@
       "when": 1792699480679,
       "tag": "0013_shopping_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792790780886,
+      "tag": "0014_household_invites",
+      "breakpoints": true
     }
   ]
 }

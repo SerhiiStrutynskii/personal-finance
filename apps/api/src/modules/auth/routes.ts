@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { getAuth, requireAuth } from '../../http/auth.ts';
 import { registrationClosed } from '../../http/errors.ts';
-import { loginSchema, refreshSchema, registerSchema } from './schema.ts';
+import { previewInvite } from '../household/service.ts';
+import { inviteTokenParamsSchema, loginSchema, refreshSchema, registerSchema } from './schema.ts';
 import * as service from './service.ts';
 
 export function authRouter(deps: service.AuthDeps): Router {
@@ -12,8 +13,19 @@ export function authRouter(deps: service.AuthDeps): Router {
     res.json({ registrationEnabled: deps.registrationEnabled });
   });
 
+  // Відкриті дані запрошення для сторінки реєстрації за посиланням.
+  router.get('/invites/:token', async (req, res) => {
+    const { token } = inviteTokenParamsSchema.parse(req.params);
+    res.json(await previewInvite(deps.db, token, deps.now()));
+  });
+
   router.post('/register', async (req, res) => {
-    if (!deps.registrationEnabled) throw registrationClosed();
+    // Закрита реєстрація не стосується запрошень: так власник додає родину. Перевіряється до
+    // розбору тіла, щоб відмова не залежала від коректності решти даних.
+    const inviteToken: unknown = req.body?.inviteToken;
+    if (!deps.registrationEnabled && !(typeof inviteToken === 'string' && inviteToken)) {
+      throw registrationClosed();
+    }
     const input = registerSchema.parse(req.body);
     res.status(201).json(await service.register(deps, input));
   });

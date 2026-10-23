@@ -6,6 +6,7 @@ import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { ListRow } from '../../shared/ui/list-row.tsx';
+import { useIsOwner } from '../auth/authContext.ts';
 import { useDebts } from '../debts/api.ts';
 import { TransfersSection } from '../transactions/TransfersSection.tsx';
 import { AddAccountDialog } from './AddAccountDialog.tsx';
@@ -16,6 +17,7 @@ export function AccountsPage() {
   const accounts = useAccounts();
   const remove = useDeleteAccount();
   const debts = useDebts();
+  const isOwner = useIsOwner();
   // Рахунок кредитки → її борг: баланс картки звіряється на сторінці боргу.
   const cardDebts = new Map(
     (debts.data?.debts ?? []).flatMap((debt) =>
@@ -25,13 +27,17 @@ export function AccountsPage() {
 
   return (
     <div>
-      <PageHeader title="Рахунки" action={<AddAccountDialog />} />
+      <PageHeader title="Рахунки" action={isOwner && <AddAccountDialog />} />
       <ErrorText>{accounts.isError && errorMessage(accounts.error)}</ErrorText>
       <ErrorText>{remove.isError && errorMessage(remove.error)}</ErrorText>
 
       {!accounts.data && !accounts.isError && <Muted>Завантаження…</Muted>}
       {accounts.data?.length === 0 && (
-        <Muted>Рахунків ще немає. Додайте перший кнопкою вгорі.</Muted>
+        <Muted>
+          {isOwner
+            ? 'Рахунків ще немає. Додайте перший кнопкою вгорі.'
+            : 'Рахунків ще немає. Їх додає власник домогосподарства.'}
+        </Muted>
       )}
 
       {accounts.data && accounts.data.length > 0 && (
@@ -53,14 +59,16 @@ export function AccountsPage() {
                 </span>
               }
               actions={
-                <div className="flex items-center gap-1">
-                  <BalanceAction account={account} debtId={cardDebts.get(account.id)} />
-                  <ConfirmButton
-                    title={`Видалити рахунок «${account.name}»?`}
-                    disabled={remove.isPending}
-                    onConfirm={() => remove.mutate(account.id)}
-                  />
-                </div>
+                isOwner && (
+                  <div className="flex items-center gap-1">
+                    <BalanceAction account={account} debtId={cardDebts.get(account.id)} />
+                    <ConfirmButton
+                      title={`Видалити рахунок «${account.name}»?`}
+                      disabled={remove.isPending}
+                      onConfirm={() => remove.mutate(account.id)}
+                    />
+                  </div>
+                )
               }
             >
               {account.name}

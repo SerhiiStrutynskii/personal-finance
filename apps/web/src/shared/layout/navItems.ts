@@ -8,6 +8,7 @@ import {
   Tags,
   Target,
   TrendingUp,
+  Users,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ export const navItems: NavItem[] = [
   { title: 'Цілі', icon: Target, route: '/goals' },
   { title: 'Покупки', icon: ShoppingCart, route: '/shopping' },
   { title: 'Аналітика', icon: ChartArea, route: '/analytics' },
+  { title: 'Домогосподарство', icon: Users, route: '/household' },
 ];
 
 /** Розділ меню, до якого належить сторінка: `/shopping/42` → «Покупки». */

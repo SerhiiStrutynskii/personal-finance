@@ -4,6 +4,7 @@ import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
+import { useIsOwner } from '../auth/authContext.ts';
 import { AddCategoryDialog } from './AddCategoryDialog.tsx';
 import { CATEGORY_KIND_LABELS, CATEGORY_KINDS, useCategories, useDeleteCategory } from './api.ts';
 import { MoveCategoryDialog } from './MoveCategoryDialog.tsx';
@@ -12,11 +13,13 @@ import { categoryTree } from './tree.ts';
 export function CategoriesPage() {
   const categories = useCategories();
   const remove = useDeleteCategory();
+  const isOwner = useIsOwner();
 
   function actions(category: Category, hasChildren: boolean) {
     if (category.systemKey) {
       return <span className="text-xs text-muted-foreground">системна</span>;
     }
+    if (!isOwner) return null;
     return (
       <div className="flex items-center gap-1">
         {!category.parentId && (
@@ -48,7 +51,7 @@ export function CategoriesPage() {
 
   return (
     <div>
-      <PageHeader title="Категорії" action={<AddCategoryDialog />} />
+      <PageHeader title="Категорії" action={isOwner && <AddCategoryDialog />} />
       <ErrorText>{categories.isError && errorMessage(categories.error)}</ErrorText>
       <ErrorText>{remove.isError && errorMessage(remove.error)}</ErrorText>
       {!categories.data && !categories.isError && <Muted>Завантаження…</Muted>}

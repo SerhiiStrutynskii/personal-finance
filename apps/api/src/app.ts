@@ -12,6 +12,7 @@ import { budgetsRouter } from './modules/budgets/routes.ts';
 import { dashboardRouter } from './modules/dashboard/routes.ts';
 import { debtsRouter } from './modules/debts/routes.ts';
 import { goalsRouter } from './modules/goals/routes.ts';
+import { householdRouter } from './modules/household/routes.ts';
 import {
   incomeOccurrencesRouter,
   incomeSourcesRouter,
@@ -65,6 +66,7 @@ export function createApp({
       tokens,
       loginLimiter: loginLimiter ?? createLoginLimiter(),
       registrationEnabled,
+      now,
     }),
   );
 
@@ -77,6 +79,7 @@ export function createApp({
   api.use('/dashboard', dashboardRouter(db, now));
   api.use('/debts', debtsRouter(db, now));
   api.use('/goals', goalsRouter(db, now));
+  api.use('/household', householdRouter(db, now));
   api.use('/income-occurrences', incomeOccurrencesRouter(db, now));
   api.use('/income-sources', incomeSourcesRouter(db, now));
   api.use('/incomes', incomesRouter(db, now));

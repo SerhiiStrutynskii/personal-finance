@@ -10,6 +10,8 @@ export interface AuthState {
   register(input: RegisterInput): Promise<void>;
   logout(): void;
   retry(): void;
+  /** Перечитує користувача й домогосподарство: після виходу з нього чи перейменування. */
+  reloadCurrentUser(): Promise<void>;
 }
 
 export const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -25,4 +27,12 @@ export function useCurrentUser(): CurrentUser {
   const { current } = useAuth();
   if (!current) throw new Error('useCurrentUser потребує виконаного входу');
   return current;
+}
+
+/**
+ * Рахунки, категорії, бюджет, борги й цілі змінює лише власник домогосподарства; учасник їх
+ * бачить. Сервер перевіряє те саме, тут — лише щоб не показувати недоступні дії.
+ */
+export function useIsOwner(): boolean {
+  return useCurrentUser().household.role === 'owner';
 }

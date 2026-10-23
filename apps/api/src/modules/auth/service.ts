@@ -4,6 +4,7 @@ import type { AuthContext } from '../../http/auth.ts';
 import { conflict, isUniqueViolation, tooManyRequests, unauthorized } from '../../http/errors.ts';
 import { hashPassword, verifyPassword } from './password.ts';
 import type { RateLimiter } from './rate-limiter.ts';
+import { joinByInvite } from '../household/service.ts';
 import * as repo from './repo.ts';
 import type { AuthSession, AuthTokens, CurrentUser, LoginInput, RegisterInput } from './schema.ts';
 import {
@@ -18,8 +19,9 @@ export interface AuthDeps {
   db: Db;
   tokens: TokenService;
   loginLimiter: RateLimiter;
-  /** false — нові користувачі не реєструються. */
+  /** false — нові користувачі реєструються лише за запрошенням. */
   registrationEnabled: boolean;
+  now: () => Date;
 }
 
 type Membership = NonNullable<Awaited<ReturnType<typeof repo.findMembership>>>;
@@ -49,8 +51,12 @@ async function issueTokens(
   };
 }
 
+/**
+ * Новий користувач. Із запрошенням він стає учасником чужого домогосподарства, без нього —
+ * власником нового.
+ */
 export async function register(
-  { db, tokens }: AuthDeps,
+  { db, tokens, now }: AuthDeps,
   input: RegisterInput,
 ): Promise<AuthSession> {
   const passwordHash = await hashPassword(input.password);
@@ -61,9 +67,14 @@ export async function register(
         name: input.name,
         passwordHash,
       });
-      const household = await repo.insertHouseholdWithOwner(tx, input.householdName, user.id);
+      const household = input.inviteToken
+        ? await joinByInvite(tx, input.inviteToken, user.id, now())
+        : {
+            ...(await repo.insertHouseholdWithOwner(tx, input.householdName, user.id)),
+            role: 'owner' as const,
+          };
       return {
-        ...toCurrentUser(user, { ...household, role: 'owner' }),
+        ...toCurrentUser(user, household),
         ...(await issueTokens(tx, tokens, user.id)),
       };
     });

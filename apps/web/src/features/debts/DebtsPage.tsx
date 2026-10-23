@@ -3,6 +3,7 @@ import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
+import { useIsOwner } from '../auth/authContext.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
@@ -29,6 +30,7 @@ import { PaymentStatusLabel } from './PaymentStatusLabel.tsx';
 export function DebtsPage() {
   const debts = useDebts();
   const remove = useDeleteDebt();
+  const isOwner = useIsOwner();
   // Борг зберігається й після закриття, щоб вміст вікна не змінювався під час анімації.
   const [dialog, setDialog] = useState<{ open: boolean; original?: Debt }>({ open: false });
   const [deletion, setDeletion] = useState<{ open: boolean; debt?: Debt }>({ open: false });
@@ -39,10 +41,12 @@ export function DebtsPage() {
       <PageHeader
         title="Борги"
         action={
-          <Button onClick={() => setDialog({ open: true })}>
-            <Plus />
-            Борг
-          </Button>
+          isOwner && (
+            <Button onClick={() => setDialog({ open: true })}>
+              <Plus />
+              Борг
+            </Button>
+          )
         }
       />
       <ErrorText>{debts.isError && errorMessage(debts.error)}</ErrorText>
@@ -50,7 +54,11 @@ export function DebtsPage() {
       {debts.isPending && <Muted>Завантаження…</Muted>}
 
       {overview && overview.debts.length === 0 && (
-        <Muted>Боргів ще немає. Додайте кредитну картку, розстрочку чи позику кнопкою вгорі.</Muted>
+        <Muted>
+          {isOwner
+            ? 'Боргів ще немає. Додайте кредитну картку, розстрочку чи позику кнопкою вгорі.'
+            : 'Боргів ще немає. Їх додає власник домогосподарства.'}
+        </Muted>
       )}
       {overview && overview.debts.length > 0 && (
         <>
@@ -61,6 +69,7 @@ export function DebtsPage() {
                 key={debt.id}
                 debt={debt}
                 today={overview.today}
+                canEdit={isOwner}
                 onEdit={() => setDialog({ open: true, original: debt })}
                 onDelete={() => setDeletion({ open: true, debt })}
               />
@@ -91,11 +100,14 @@ export function DebtsPage() {
 function DebtRow({
   debt,
   today,
+  canEdit,
   onEdit,
   onDelete,
 }: {
   debt: Debt;
   today: string;
+  /** Змінювати й видаляти борг може лише власник домогосподарства. */
+  canEdit: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -124,23 +136,25 @@ function DebtRow({
         </Link>
         <div className="-my-1.5 -mr-2 flex shrink-0 items-center gap-1">
           <div className="text-base font-semibold tabular-nums">{money(debt.balance)}</div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={`Дії з боргом «${debt.name}»`}>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onEdit}>
-                <Pencil />
-                Змінити умови
-              </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                <Trash2 />
-                Видалити
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canEdit && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label={`Дії з боргом «${debt.name}»`}>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={onEdit}>
+                  <Pencil />
+                  Змінити умови
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                  <Trash2 />
+                  Видалити
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1 text-muted-foreground">

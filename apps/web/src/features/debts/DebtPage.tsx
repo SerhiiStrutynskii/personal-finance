@@ -3,6 +3,7 @@ import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
+import { useIsOwner } from '../auth/authContext.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
@@ -64,6 +65,8 @@ function DebtContent({ debt }: { debt: DebtDetails }) {
   const accounts = useAccounts();
   const close = useCloseDebt();
   const remove = useDeleteDebt();
+  // Платежі, нарахування, звірки й умови боргу змінює лише власник домогосподарства.
+  const isOwner = useIsOwner();
   // Вид вікна зберігається й після закриття, щоб вміст не змінювався під час анімації.
   const [action, setAction] = useState<{ open: boolean; kind: Action }>({
     open: false,
@@ -101,45 +104,47 @@ function DebtContent({ debt }: { debt: DebtDetails }) {
           </div>
           {debt.description && <p className="mt-1 text-sm">{debt.description}</p>}
         </div>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {!closed && (
-            <>
-              <Button onClick={open('pay')} disabled={debt.balance === 0}>
-                {isCard ? 'Погасити' : 'Сплатити'}
-              </Button>
-              <Button variant="outline" onClick={open('charge')}>
-                {isCard ? 'Відсотки / комісія' : 'Нарахування'}
-              </Button>
-            </>
-          )}
-          <Button variant="outline" onClick={open('adjust')} disabled={closed && isCard}>
-            Звірити залишок
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Дії з боргом">
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={open('edit')}>Змінити умови</DropdownMenuItem>
-              {!closed && (
+        {isOwner && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            {!closed && (
+              <>
+                <Button onClick={open('pay')} disabled={debt.balance === 0}>
+                  {isCard ? 'Погасити' : 'Сплатити'}
+                </Button>
+                <Button variant="outline" onClick={open('charge')}>
+                  {isCard ? 'Відсотки / комісія' : 'Нарахування'}
+                </Button>
+              </>
+            )}
+            <Button variant="outline" onClick={open('adjust')} disabled={closed && isCard}>
+              Звірити залишок
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Дії з боргом">
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={open('edit')}>Змінити умови</DropdownMenuItem>
+                {!closed && (
+                  <DropdownMenuItem
+                    disabled={debt.balance > 0}
+                    onSelect={() => setConfirm({ open: true, kind: 'close' })}
+                  >
+                    Закрити борг
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
-                  disabled={debt.balance > 0}
-                  onSelect={() => setConfirm({ open: true, kind: 'close' })}
+                  variant="destructive"
+                  onSelect={() => setConfirm({ open: true, kind: 'delete' })}
                 >
-                  Закрити борг
+                  Видалити
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => setConfirm({ open: true, kind: 'delete' })}
-              >
-                Видалити
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
       <ErrorText>{error && errorMessage(error)}</ErrorText>
 
@@ -293,6 +298,7 @@ const ENTRY_LABELS = { payment: 'Платіж', charge: 'Нарахування'
 /** Записи позики: платежі з розбивкою, нарахування, звірки. */
 function LoanHistory({ debt, accounts }: { debt: DebtDetails; accounts: readonly Account[] }) {
   const remove = useDeleteDebtEntry();
+  const isOwner = useIsOwner();
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency: debt.currency });
   if (debt.entries.length === 0) return <Muted>Рухів ще немає.</Muted>;
 
@@ -315,16 +321,18 @@ function LoanHistory({ debt, accounts }: { debt: DebtDetails; accounts: readonly
             // Платіж і від'ємна звірка зменшують борг, нарахування — збільшує.
             amount={`${entry.kind === 'payment' || entry.amount < 0 ? '−' : '+'}${money(Math.abs(entry.amount))}`}
             actions={
-              <ConfirmButton
-                title="Видалити цей запис?"
-                description={
-                  entry.kind === 'payment'
-                    ? 'Разом із записом зникне транзакція рахунку, і його баланс відновиться.'
-                    : 'Залишок боргу буде перераховано.'
-                }
-                disabled={remove.isPending}
-                onConfirm={() => remove.mutate({ id: debt.id, entryId: entry.id })}
-              />
+              isOwner && (
+                <ConfirmButton
+                  title="Видалити цей запис?"
+                  description={
+                    entry.kind === 'payment'
+                      ? 'Разом із записом зникне транзакція рахунку, і його баланс відновиться.'
+                      : 'Залишок боргу буде перераховано.'
+                  }
+                  disabled={remove.isPending}
+                  onConfirm={() => remove.mutate({ id: debt.id, entryId: entry.id })}
+                />
+              )
             }
           >
             {ENTRY_LABELS[entry.kind]}

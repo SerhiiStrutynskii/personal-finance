@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '../../shared/ui/button.tsx';
 import { Muted } from '../../shared/ui/controls.tsx';
 import { Progress } from '../../shared/ui/progress.tsx';
+import { useIsOwner } from '../auth/authContext.ts';
 import { AddCategoryDialog } from '../categories/AddCategoryDialog.tsx';
 import { InlineLimit } from './InlineLimit.tsx';
 import { CategoryStatusLabel } from './status.tsx';
@@ -22,11 +23,14 @@ interface Props {
 
 /**
  * Ліміти й фактичні витрати по категоріях. Видатки тут не додаються: для цього є кнопка
- * «+ Видаток» у шапці екрана. Чи можна змінювати ліміти, вирішує бекенд (canEditLimits).
+ * «+ Видаток» у шапці екрана. Чи можна змінювати ліміти, вирішує бекенд (canEditLimits) і роль.
  * Нова категорія витрат одразу відкриває вікно ліміту на неї.
  */
 export function ExpenseSection({ budget, onAddLimit, canAddLimit, onDeleteLine }: Props) {
-  const { currency, canEditLimits } = budget;
+  const { currency } = budget;
+  // Ліміти змінює лише власник домогосподарства.
+  const isOwner = useIsOwner();
+  const canEditLimits = budget.canEditLimits && isOwner;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
 
   return (

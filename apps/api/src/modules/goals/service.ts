@@ -20,7 +20,7 @@ import {
   type UpdateGoalInput,
 } from '@hf/shared';
 import type { Db, DbOrTx } from '../../db/client.ts';
-import type { AuthContext } from '../../http/auth.ts';
+import { assertOwner, type AuthContext } from '../../http/auth.ts';
 import {
   badRequest,
   conflict,
@@ -206,6 +206,7 @@ export async function createGoal(
   input: CreateGoalInput,
   now: Date,
 ): Promise<Goal> {
+  assertOwner(auth);
   const shared = { name: input.name, description: input.description || null };
 
   if (input.kind === 'savings') {
@@ -257,6 +258,7 @@ export async function updateGoal(
   input: UpdateGoalInput,
   now: Date,
 ): Promise<Goal> {
+  assertOwner(auth);
   const existing = await requireGoal(db, auth, id);
   const isSavings = existing.kind === 'savings';
   const foreign = (isSavings ? DEBT_PAYOFF_ONLY : SAVINGS_ONLY).filter(
@@ -295,6 +297,7 @@ export async function updateGoal(
 
 /** Архівна ціль лишається в списку окремо й звільняє рахунок для нової цілі. */
 export async function archiveGoal(db: Db, auth: AuthContext, id: string, now: Date): Promise<Goal> {
+  assertOwner(auth);
   await requireGoal(db, auth, id);
   const row = await repo.updateGoal(db, auth.householdId, id, { status: 'archived' });
   return buildGoal(db, auth, row!, now);
@@ -302,6 +305,7 @@ export async function archiveGoal(db: Db, auth: AuthContext, id: string, now: Da
 
 /** Видаляє лише ціль: рахунок, перекази й борги лишаються. */
 export async function deleteGoal(db: Db, auth: AuthContext, id: string): Promise<void> {
+  assertOwner(auth);
   await requireGoal(db, auth, id);
   await repo.deleteGoal(db, auth.householdId, id);
 }
@@ -314,6 +318,7 @@ export async function contribute(
   input: GoalContributionInput,
   now: Date,
 ): Promise<Goal> {
+  assertOwner(auth);
   const row = await requireGoal(db, auth, id);
   if (row.kind !== 'savings') throw kindMismatch('Поповнити можна лише ціль накопичення');
   if (row.status !== 'active') throw conflict('Архівну ціль поповнити не можна');

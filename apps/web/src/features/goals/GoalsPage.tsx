@@ -11,6 +11,7 @@ import {
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
+import { useIsOwner } from '../auth/authContext.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
@@ -38,6 +39,7 @@ export function GoalsPage() {
   const debts = useDebts();
   const archive = useArchiveGoal();
   const remove = useDeleteGoal();
+  const isOwner = useIsOwner();
   // Ціль зберігається й після закриття, щоб вміст вікна не змінювався під час анімації.
   const [dialog, setDialog] = useState<{ open: boolean; original?: Goal }>({ open: false });
   const [contribution, setContribution] = useState<{ open: boolean; goal?: SavingsGoal }>({
@@ -58,17 +60,21 @@ export function GoalsPage() {
       <PageHeader
         title="Цілі"
         action={
-          <Button onClick={() => setDialog({ open: true })}>
-            <Plus />
-            Ціль
-          </Button>
+          isOwner && (
+            <Button onClick={() => setDialog({ open: true })}>
+              <Plus />
+              Ціль
+            </Button>
+          )
         }
       />
       <ErrorText>{error && errorMessage(error)}</ErrorText>
       {goals.isPending && <Muted>Завантаження…</Muted>}
       {list && list.goals.length === 0 && (
         <Muted>
-          Цілей ще немає. Додайте ціль накопичення або план виходу з боргів кнопкою вгорі.
+          {isOwner
+            ? 'Цілей ще немає. Додайте ціль накопичення або план виходу з боргів кнопкою вгорі.'
+            : 'Цілей ще немає. Їх додає власник домогосподарства.'}
         </Muted>
       )}
 
@@ -78,6 +84,7 @@ export function GoalsPage() {
             <GoalCard
               key={goal.id}
               goal={goal}
+              canEdit={isOwner}
               onEdit={() => setDialog({ open: true, original: goal })}
               onContribute={
                 goal.kind === 'savings' ? () => setContribution({ open: true, goal }) : undefined
@@ -121,12 +128,15 @@ export function GoalsPage() {
 
 function GoalCard({
   goal,
+  canEdit,
   onEdit,
   onContribute,
   onArchive,
   onDelete,
 }: {
   goal: Goal;
+  /** Поповнювати, змінювати й видаляти ціль може лише власник домогосподарства. */
+  canEdit: boolean;
   onEdit: () => void;
   onContribute: (() => void) | undefined;
   onArchive: () => void;
@@ -165,7 +175,7 @@ function GoalCard({
           {goal.description && <p className="mt-1">{goal.description}</p>}
         </div>
         <div className="flex items-center gap-2">
-          {onContribute && !archived && (
+          {canEdit && onContribute && !archived && (
             <Button variant="outline" size="sm" onClick={onContribute}>
               Поповнити
             </Button>
@@ -175,28 +185,30 @@ function GoalCard({
               <Link to={`/goals/${goal.id}`}>План погашення</Link>
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={`Дії з ціллю «${goal.name}»`}>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onEdit}>
-                <Pencil />
-                Змінити
-              </DropdownMenuItem>
-              {!archived && (
-                <DropdownMenuItem onSelect={onArchive}>
-                  <Archive />В архів
+          {canEdit && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label={`Дії з ціллю «${goal.name}»`}>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={onEdit}>
+                  <Pencil />
+                  Змінити
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                <Trash2 />
-                Видалити
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {!archived && (
+                  <DropdownMenuItem onSelect={onArchive}>
+                    <Archive />В архів
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                  <Trash2 />
+                  Видалити
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

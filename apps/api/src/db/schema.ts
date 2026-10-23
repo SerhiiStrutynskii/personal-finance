@@ -90,6 +90,26 @@ export const householdMembers = pgTable(
   (t) => [primaryKey({ columns: [t.householdId, t.userId] }), index().on(t.userId)],
 );
 
+// Запрошення до домогосподарства за посиланням: одноразове, з терміном дії.
+export const householdInvites = pgTable(
+  'household_invites',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    // SHA-256 від токена з посилання; сам токен ніде не зберігається
+    tokenHash: text('token_hash').notNull().unique(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: instant().notNull(),
+    acceptedBy: uuid('accepted_by').references(() => users.id, { onDelete: 'set null' }),
+    acceptedAt: instant(),
+    revokedAt: instant(),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.householdId)],
+);
+
 export const accounts = pgTable(
   'accounts',
   {

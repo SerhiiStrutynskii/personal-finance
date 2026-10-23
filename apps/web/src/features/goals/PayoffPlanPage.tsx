@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, XAxis } from 'recharts';
 import { errorMessage } from '../../shared/api/index.ts';
+import { useIsOwner } from '../auth/authContext.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
 import {
@@ -76,6 +77,7 @@ function PlanContent({ goal }: { goal: DebtPayoffGoal }) {
   const { currency } = goal;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
   const save = useSaveGoal();
+  const isOwner = useIsOwner();
   const [extraText, setExtraText] = useState(plannedAmountText(goal.extraPayment, currency));
   const [strategy, setStrategy] = useState<PayoffStrategy>(goal.strategy);
 
@@ -145,15 +147,18 @@ function PlanContent({ goal }: { goal: DebtPayoffGoal }) {
             />
           </Field>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            disabled={!changed || typeof parsed !== 'number' || save.isPending}
-            onClick={() => save.mutate({ id: goal.id, input: { extraPayment: extra, strategy } })}
-          >
-            Зберегти як план цілі
-          </Button>
-          {!changed && <Muted>Це збережений план цілі.</Muted>}
-        </div>
+        {/* Розрахунок «а що, як» доступний усім; зберегти план цілі може лише власник. */}
+        {isOwner && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              disabled={!changed || typeof parsed !== 'number' || save.isPending}
+              onClick={() => save.mutate({ id: goal.id, input: { extraPayment: extra, strategy } })}
+            >
+              Зберегти як план цілі
+            </Button>
+            {!changed && <Muted>Це збережений план цілі.</Muted>}
+          </div>
+        )}
         <ErrorText>{save.isError && errorMessage(save.error)}</ErrorText>
         <ErrorText>{query.isError && errorMessage(query.error)}</ErrorText>
       </section>

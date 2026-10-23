@@ -1,5 +1,5 @@
 import type { Db } from '../../db/client.ts';
-import type { AuthContext } from '../../http/auth.ts';
+import { assertOwner, type AuthContext } from '../../http/auth.ts';
 import { badRequest, conflict, isForeignKeyViolation, notFound } from '../../http/errors.ts';
 import { insertTransaction } from '../transactions/repo.ts';
 import * as repo from './repo.ts';
@@ -50,6 +50,7 @@ export async function createAccount(
   { openingBalance, ...input }: CreateAccountInput,
   now: Date = new Date(),
 ): Promise<Account> {
+  assertOwner(auth);
   const row = await db.transaction(async (tx) => {
     const created = await repo.insertAccount(tx, auth.householdId, input);
     if (openingBalance > 0) {
@@ -76,6 +77,7 @@ export async function updateAccount(
   id: string,
   input: UpdateAccountInput,
 ): Promise<Account> {
+  assertOwner(auth);
   const existing = await repo.findAccount(db, auth.householdId, id);
   if (!existing) throw notFound('Рахунок');
   if (input.type !== undefined && existing.type === 'credit_card') {
@@ -97,6 +99,7 @@ export async function adjustBalance(
   input: AccountBalanceAdjustmentInput,
   now: Date,
 ): Promise<Account> {
+  assertOwner(auth);
   const row = await repo.findAccount(db, auth.householdId, id);
   if (!row) throw notFound('Рахунок');
   if (row.type === 'credit_card') {
@@ -123,6 +126,7 @@ export async function adjustBalance(
 }
 
 export async function deleteAccount(db: Db, auth: AuthContext, id: string): Promise<void> {
+  assertOwner(auth);
   try {
     // Рахунок, у якому є лише початковий залишок і коригування балансу, видаляється разом із ними.
     const deleted = await db.transaction(async (tx) => {
