@@ -9,8 +9,19 @@ export async function register(page: Page) {
   await expect(page.getByRole('heading', { name: /Вітаємо/ })).toBeVisible();
 }
 
+/** Перехід через меню: на телефоні пункти меню сховані у висувному меню. */
+export async function goTo(page: Page, section: string) {
+  const burger = page.getByRole('button', { name: 'Відкрити меню' });
+  if (await burger.isVisible()) {
+    await burger.click();
+    await page.getByRole('dialog').getByRole('link', { name: section, exact: true }).click();
+    return;
+  }
+  await page.getByRole('link', { name: section, exact: true }).click();
+}
+
 export async function addAccount(page: Page, name: string) {
-  await page.getByRole('link', { name: 'Рахунки' }).click();
+  await goTo(page, 'Рахунки');
   await page.getByRole('button', { name: 'Додати рахунок' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Назва').fill(name);
@@ -20,7 +31,7 @@ export async function addAccount(page: Page, name: string) {
 }
 
 export async function addExpenseCategory(page: Page, name: string) {
-  await page.getByRole('link', { name: 'Категорії' }).click();
+  await goTo(page, 'Категорії');
   await page.getByRole('button', { name: 'Додати категорію' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Назва').fill(name);

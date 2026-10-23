@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { register } from './helpers.ts';
+import { addAccount, addExpenseCategory, goTo, register } from './helpers.ts';
 
 test.describe('телефон', () => {
   test.use({ viewport: { width: 390, height: 844 } });
@@ -29,16 +29,9 @@ test.describe('телефон', () => {
 
   test('на головній «Потребує уваги» стоїть над грошима', async ({ page }) => {
     await register(page);
-    await page.getByRole('button', { name: 'Відкрити меню' }).click();
-    await page.getByRole('dialog').getByRole('link', { name: 'Рахунки' }).click();
-    await page.getByRole('button', { name: 'Додати рахунок' }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Назва').fill('Картка');
-    await dialog.getByRole('button', { name: 'Додати' }).click();
-    await expect(dialog).toBeHidden();
+    await addAccount(page, 'Картка');
 
-    await page.getByRole('button', { name: 'Відкрити меню' }).click();
-    await page.getByRole('dialog').getByRole('link', { name: 'Головна' }).click();
+    await goTo(page, 'Головна');
     const attention = await page.getByTestId('dashboard-attention').boundingBox();
     const money = await page.getByTestId('dashboard-money').boundingBox();
     expect(attention!.y).toBeLessThan(money!.y);
@@ -46,6 +39,37 @@ test.describe('телефон', () => {
     const add = await page.getByRole('button', { name: 'Видаток', exact: true }).boundingBox();
     const transfer = await page.getByRole('button', { name: 'Новий переказ' }).boundingBox();
     expect(Math.abs(add!.y - transfer!.y)).toBeLessThan(2);
+  });
+
+  test('витрати списком: сума й дії видно без прокручування вбік', async ({ page }) => {
+    await register(page);
+    await addAccount(page, 'Картка');
+    await addExpenseCategory(page, 'Продукти');
+
+    await goTo(page, 'Витрати');
+    await page.getByRole('button', { name: 'Додати' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Сума, UAH').fill('1234,5');
+    await dialog.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', { name: 'Продукти' }).click();
+    await dialog.getByLabel('Опис').fill('Супермаркет');
+    await dialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(dialog).toBeHidden();
+
+    const item = page.getByTestId('transaction-item');
+    await expect(item).toHaveCount(1);
+    await expect(item).toContainText('Супермаркет');
+    await expect(item).toContainText('Продукти · Картка');
+    await expect(item.getByText(/1\s234,50/)).toBeInViewport({ ratio: 1 });
+    const actions = item.getByRole('button', { name: 'Дії із записом' });
+    await expect(actions).toBeInViewport({ ratio: 1 });
+
+    await actions.click();
+    await page.getByRole('menuitem', { name: 'Змінити' }).click();
+    await dialog.getByLabel('Опис').fill('Ринок');
+    await dialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(item).toContainText('Ринок');
   });
 });
 

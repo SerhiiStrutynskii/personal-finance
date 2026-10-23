@@ -5,13 +5,14 @@ import {
   type Transaction,
 } from '@hf/shared';
 import { Check, Plus, TriangleAlert } from 'lucide-react';
-import { useState, type ComponentProps, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
 import { Figure } from '../../shared/ui/figure.tsx';
+import { ListRow } from '../../shared/ui/list-row.tsx';
 import {
   formatDayMonth,
   formatShortDate,
@@ -146,34 +147,6 @@ function Block({
   );
 }
 
-/** Рядок списку: назва й деталі ліворуч, сума праворуч; сума ніколи не переноситься. */
-function Row({
-  children,
-  meta,
-  amount,
-  note,
-  className = '',
-  ...props
-}: {
-  meta?: ReactNode;
-  amount: ReactNode;
-  /** Дрібний підпис під сумою. */
-  note?: ReactNode;
-} & ComponentProps<'li'>) {
-  return (
-    <li className={`flex items-start justify-between gap-3 ${className}`} {...props}>
-      <div className="min-w-0 break-words">
-        <div>{children}</div>
-        {meta && <div className="text-xs text-muted-foreground">{meta}</div>}
-      </div>
-      <div className="shrink-0 text-right tabular-nums">
-        {amount}
-        {note && <div className="text-xs text-muted-foreground">{note}</div>}
-      </div>
-    </li>
-  );
-}
-
 /** Кроки для нового користувача; виконаний крок позначено галочкою. */
 function SetupSteps({ setup }: { setup: Dashboard['setup'] }) {
   const steps = [
@@ -242,14 +215,14 @@ function MoneyBlock({ data }: { data: Dashboard }) {
           )}
           <ul className="divide-y text-sm">
             {money.accounts.map((account) => (
-              <Row
+              <ListRow
                 key={account.id}
                 className="py-1.5"
                 amount={format(account.balance, account.currency)}
               >
                 {account.name}{' '}
                 <span className="text-muted-foreground">· {ACCOUNT_TYPE_LABELS[account.type]}</span>
-              </Row>
+              </ListRow>
             ))}
           </ul>
         </CardContent>
@@ -330,7 +303,7 @@ function AttentionBlock({ data }: { data: Dashboard }) {
             : 'border-status-partial bg-status-partial/10';
           const text = view.urgent ? 'text-status-over' : 'text-status-partial';
           return (
-            <Row
+            <ListRow
               key={`${item.kind}-${item.id ?? 'none'}`}
               className={`rounded-lg border p-3 text-sm ${tone}`}
               data-testid="attention-item"
@@ -347,7 +320,7 @@ function AttentionBlock({ data }: { data: Dashboard }) {
               <Link className="font-medium underline-offset-4 hover:underline" to={view.link(item)}>
                 {item.name}
               </Link>
-            </Row>
+            </ListRow>
           );
         })}
       </ul>
@@ -365,7 +338,7 @@ function UpcomingBlock({ data }: { data: Dashboard }) {
           const view = UPCOMING_VIEW[item.kind];
           const Icon = view.icon;
           return (
-            <Row
+            <ListRow
               key={`${item.kind}-${item.id}`}
               className="py-2"
               data-testid="upcoming-item"
@@ -380,7 +353,7 @@ function UpcomingBlock({ data }: { data: Dashboard }) {
               <Link className="underline-offset-4 hover:underline" to={view.link(item.id)}>
                 {item.name}
               </Link>
-            </Row>
+            </ListRow>
           );
         })}
       </ul>
@@ -446,7 +419,7 @@ function RecentBlock({ data, timeZone }: { data: Dashboard; timeZone: string }) 
       {data.recent.length === 0 && <Muted>Операцій ще немає.</Muted>}
       <ul className="divide-y text-sm">
         {data.recent.map((item) => (
-          <Row
+          <ListRow
             key={item.id}
             className="py-2"
             data-testid="recent-item"
@@ -465,7 +438,7 @@ function RecentBlock({ data, timeZone }: { data: Dashboard; timeZone: string }) 
             {item.description ||
               item.categoryName ||
               (item.type === 'income' ? 'Прибуток' : 'Видаток')}
-          </Row>
+          </ListRow>
         ))}
       </ul>
     </Block>
