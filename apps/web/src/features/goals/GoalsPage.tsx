@@ -201,13 +201,13 @@ function GoalCard({
       </div>
 
       <div className="mt-3">
-        <div className="mb-1 flex flex-wrap justify-between gap-2" data-testid="goal-progress">
-          <span>
+        <div className="mb-1 flex items-start justify-between gap-3" data-testid="goal-progress">
+          <span className="min-w-0">
             {isSavings
               ? `Зібрано ${money(goal.saved)} з ${money(goal.targetAmount)}`
               : `Погашено ${money(goal.paid)} з ${money(goal.startBalance)}`}
           </span>
-          <span className="tabular-nums">{percentText(goal.progress)}</span>
+          <span className="shrink-0 tabular-nums">{percentText(goal.progress)}</span>
         </div>
         <Progress
           className="h-1.5"

@@ -19,6 +19,7 @@ import {
   percentText,
   shortMonthLabel,
 } from '../../shared/ui/format.ts';
+import { Figure } from '../../shared/ui/figure.tsx';
 import { Input } from '../../shared/ui/input.tsx';
 import { Progress } from '../../shared/ui/progress.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
@@ -71,16 +72,6 @@ const chartConfig = {
 /** Скільки рядків залишку показує таблиця; решту видно на графіку. */
 const TABLE_ROWS = 24;
 
-function Figure({ title, value, hint }: { title: string; value: string; hint?: string }) {
-  return (
-    <div>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="text-sm text-muted-foreground">{hint}</div>}
-    </div>
-  );
-}
-
 function PlanContent({ goal }: { goal: DebtPayoffGoal }) {
   const { currency } = goal;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
@@ -107,12 +98,13 @@ function PlanContent({ goal }: { goal: DebtPayoffGoal }) {
 
       <Card>
         <CardContent className="space-y-3 text-sm">
-          <div className="flex flex-wrap justify-between gap-2" data-testid="goal-progress">
-            <span>
+          {/* Відсоток завжди праворуч у першому рядку, текст переноситься ліворуч. */}
+          <div className="flex items-start justify-between gap-3" data-testid="goal-progress">
+            <span className="min-w-0">
               Погашено {money(goal.paid)} з {money(goal.startBalance)} · лишилося{' '}
               {money(goal.currentBalance)}
             </span>
-            <span className="tabular-nums">{percentText(goal.progress)}</span>
+            <span className="shrink-0 tabular-nums">{percentText(goal.progress)}</span>
           </div>
           <Progress
             className="h-1.5"
@@ -170,7 +162,7 @@ function PlanContent({ goal }: { goal: DebtPayoffGoal }) {
         <>
           <Card data-testid="payoff-summary">
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
                 <Figure
                   title="Вихід із боргів"
                   value={data.plan.debtFreeMonth ? monthLabel(data.plan.debtFreeMonth) : '—'}
@@ -181,10 +173,12 @@ function PlanContent({ goal }: { goal: DebtPayoffGoal }) {
                   }
                 />
                 <Figure
+                  compact
                   title="Відсотків буде сплачено"
                   value={data.plan.totalInterest === null ? '—' : money(data.plan.totalInterest)}
                 />
                 <Figure
+                  compact
                   title="Проти мінімальних платежів"
                   value={
                     data.monthsSaved === null
