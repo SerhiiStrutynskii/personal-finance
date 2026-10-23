@@ -30,9 +30,9 @@ export function ErrorText({ children }: { children: ReactNode }) {
   );
 }
 
-export function PageHeader({ title, action }: { title: string; action?: ReactNode }) {
+export function PageHeader({ title, action }: { title: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <h1 className="font-heading text-xl font-semibold">{title}</h1>
       {action}
     </div>

@@ -5,13 +5,19 @@ import {
   type Transaction,
 } from '@hf/shared';
 import { Check, Plus, TriangleAlert } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
-import { formatDate, formatDayMonth, monthLabel, percentText } from '../../shared/ui/format.ts';
+import { Figure } from '../../shared/ui/figure.tsx';
+import {
+  formatDayMonth,
+  formatShortDate,
+  monthLabel,
+  percentText,
+} from '../../shared/ui/format.ts';
 import { Progress } from '../../shared/ui/progress.tsx';
 import { ACCOUNT_TYPE_LABELS, activeAccounts, useAccounts } from '../accounts/api.ts';
 import { signedMoney } from '../analytics/signedMoney.ts';
@@ -49,10 +55,15 @@ export function DashboardPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <PageHeader
-        title={`Вітаємо, ${user.name}`}
+        title={
+          <>
+            Вітаємо, <span className="sm:hidden">{firstName(user.name)}</span>
+            <span className="max-sm:hidden">{user.name}</span>
+          </>
+        }
         action={
           usableAccounts.length > 0 && (
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
               <Button onClick={open('expense')}>
                 <Plus />
                 Видаток
@@ -75,7 +86,8 @@ export function DashboardPage() {
 
       {data && !data.setup.hasAccounts && <SetupSteps setup={data.setup} />}
       {data && data.setup.hasAccounts && (
-        <>
+        // На телефоні «Потребує уваги» одразу під кроками, щоб проблеми було видно без прокручування.
+        <div className="flex flex-col gap-6">
           {!(data.setup.hasTransactions && data.setup.hasBudget) && (
             <SetupSteps setup={data.setup} />
           )}
@@ -88,7 +100,7 @@ export function DashboardPage() {
           <UpcomingBlock data={data} />
           <GoalsBlock data={data} />
           <RecentBlock data={data} timeZone={user.timeZone} />
-        </>
+        </div>
       )}
 
       <TransactionDialog
@@ -103,20 +115,27 @@ export function DashboardPage() {
   );
 }
 
+/** «Демо Користувач» -> «Демо»: на телефоні повне ім'я переносить заголовок. */
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name;
+}
+
 function Block({
   title,
   to,
   testId,
+  className = '',
   children,
 }: {
   title: string;
   /** Розділ, на який веде заголовок блока. */
   to: string;
   testId: string;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-2" data-testid={testId}>
+    <section className={`space-y-2 ${className}`} data-testid={testId}>
       <h2 className="font-heading text-lg font-semibold">
         <Link className="underline-offset-4 hover:underline" to={to}>
           {title}
@@ -127,13 +146,31 @@ function Block({
   );
 }
 
-function Figure({ title, value, hint }: { title: string; value: string; hint?: string }) {
+/** Рядок списку: назва й деталі ліворуч, сума праворуч; сума ніколи не переноситься. */
+function Row({
+  children,
+  meta,
+  amount,
+  note,
+  className = '',
+  ...props
+}: {
+  meta?: ReactNode;
+  amount: ReactNode;
+  /** Дрібний підпис під сумою. */
+  note?: ReactNode;
+} & ComponentProps<'li'>) {
   return (
-    <div>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="text-sm text-muted-foreground">{hint}</div>}
-    </div>
+    <li className={`flex items-start justify-between gap-3 ${className}`} {...props}>
+      <div className="min-w-0 break-words">
+        <div>{children}</div>
+        {meta && <div className="text-xs text-muted-foreground">{meta}</div>}
+      </div>
+      <div className="shrink-0 text-right tabular-nums">
+        {amount}
+        {note && <div className="text-xs text-muted-foreground">{note}</div>}
+      </div>
+    </li>
   );
 }
 
@@ -145,7 +182,7 @@ function SetupSteps({ setup }: { setup: Dashboard['setup'] }) {
     { done: setup.hasBudget, to: '/budget', text: 'Складіть бюджет на місяць' },
   ];
   return (
-    <Card data-testid="dashboard-setup">
+    <Card data-testid="dashboard-setup" className="max-md:-order-2">
       <CardContent className="space-y-2">
         <div className="font-medium">З чого почати</div>
         <ol className="space-y-1 text-sm">
@@ -179,38 +216,40 @@ function MoneyBlock({ data }: { data: Dashboard }) {
     <Block title="Гроші зараз" to="/accounts" testId="dashboard-money">
       <Card>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
             <Figure
               title="Чисті активи"
               value={format(money.netWorth)}
               hint="рахунки в гривні мінус позики"
             />
-            <Figure title="На рахунках" value={format(money.accountsTotal)} />
-            <Figure title="Загальний борг" value={format(money.debtTotal)} />
+            <Figure compact title="На рахунках" value={format(money.accountsTotal)} />
+            <Figure compact title="Загальний борг" value={format(money.debtTotal)} />
           </div>
           {debtPayments.required > 0 && (
-            <p className="text-sm" data-testid="dashboard-debt-payments">
-              <Link className="underline underline-offset-4" to="/debts">
-                Обов’язкові платежі по боргах цього місяця
-              </Link>
-              : <span className="font-medium tabular-nums">{format(debtPayments.required)}</span>
-              <span className="text-muted-foreground">
-                {' '}
-                · сплачено {format(debtPayments.paid)} · лишилось {format(debtPayments.remaining)}
-              </span>
-            </p>
+            <div className="text-sm" data-testid="dashboard-debt-payments">
+              <div className="flex items-start justify-between gap-3">
+                <Link className="underline underline-offset-4" to="/debts">
+                  Обов’язкові платежі по боргах цього місяця
+                </Link>
+                <span className="shrink-0 font-medium tabular-nums">
+                  {format(debtPayments.required)}
+                </span>
+              </div>
+              <div className="text-muted-foreground">
+                сплачено {format(debtPayments.paid)} · лишилось {format(debtPayments.remaining)}
+              </div>
+            </div>
           )}
           <ul className="divide-y text-sm">
             {money.accounts.map((account) => (
-              <li key={account.id} className="flex justify-between gap-4 py-1.5">
-                <span>
-                  {account.name}{' '}
-                  <span className="text-muted-foreground">
-                    · {ACCOUNT_TYPE_LABELS[account.type]}
-                  </span>
-                </span>
-                <span className="tabular-nums">{format(account.balance, account.currency)}</span>
-              </li>
+              <Row
+                key={account.id}
+                className="py-1.5"
+                amount={format(account.balance, account.currency)}
+              >
+                {account.name}{' '}
+                <span className="text-muted-foreground">· {ACCOUNT_TYPE_LABELS[account.type]}</span>
+              </Row>
             ))}
           </ul>
         </CardContent>
@@ -229,18 +268,20 @@ function MonthBlock({ data }: { data: Dashboard }) {
     <Block title="Цей місяць" to="/analytics" testId="dashboard-month">
       <Card>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Figure title="Прибуток" value={money(month.income)} />
-            <Figure title="Витрати" value={money(month.expenses)} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
+            <Figure compact title="Прибуток" value={money(month.income)} />
+            <Figure compact title="Витрати" value={money(month.expenses)} />
             <Figure title="Різниця" value={signedMoney(month.net, currency)} />
           </div>
           {planned !== null && planned > 0 && (
             <div className="text-sm">
-              <div className="mb-1 flex flex-wrap justify-between gap-2">
-                <span>
+              <div className="mb-1 flex items-start justify-between gap-3">
+                <span className="min-w-0">
                   Витрачено {money(month.expenses)} з {money(planned)} лімітів
                 </span>
-                <span className="tabular-nums">{percentText(month.expenses / planned)}</span>
+                <span className="shrink-0 tabular-nums">
+                  {percentText(month.expenses / planned)}
+                </span>
               </div>
               <Progress
                 className="h-1.5"
@@ -268,7 +309,12 @@ function MonthBlock({ data }: { data: Dashboard }) {
 function AttentionBlock({ data }: { data: Dashboard }) {
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency: data.currency });
   return (
-    <Block title="Потребує уваги" to="/analytics" testId="dashboard-attention">
+    <Block
+      title="Потребує уваги"
+      to="/analytics"
+      testId="dashboard-attention"
+      className="max-md:-order-1"
+    >
       {data.attention.length === 0 && (
         <p className="inline-flex items-center gap-1 text-sm font-medium text-status-surplus">
           <Check className="size-4" aria-hidden />
@@ -284,25 +330,24 @@ function AttentionBlock({ data }: { data: Dashboard }) {
             : 'border-status-partial bg-status-partial/10';
           const text = view.urgent ? 'text-status-over' : 'text-status-partial';
           return (
-            <li
+            <Row
               key={`${item.kind}-${item.id ?? 'none'}`}
-              className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm ${tone}`}
+              className={`rounded-lg border p-3 text-sm ${tone}`}
               data-testid="attention-item"
               data-kind={item.kind}
+              meta={
+                <span className={`inline-flex items-center gap-1 text-sm font-medium ${text}`}>
+                  <Icon className="size-4" aria-hidden />
+                  {view.label}
+                </span>
+              }
+              amount={item.amount !== null && money(item.amount)}
+              note={item.date && formatDayMonth(item.date)}
             >
-              <span className={`inline-flex items-center gap-1 font-medium ${text}`}>
-                <Icon className="size-4" aria-hidden />
-                {view.label}
-              </span>
-              <Link className="underline-offset-4 hover:underline" to={view.link(item)}>
+              <Link className="font-medium underline-offset-4 hover:underline" to={view.link(item)}>
                 {item.name}
               </Link>
-              <span className="tabular-nums">
-                {item.amount !== null && money(item.amount)}
-                {item.amount !== null && item.date && ' · '}
-                {item.date && formatDayMonth(item.date)}
-              </span>
-            </li>
+            </Row>
           );
         })}
       </ul>
@@ -320,26 +365,22 @@ function UpcomingBlock({ data }: { data: Dashboard }) {
           const view = UPCOMING_VIEW[item.kind];
           const Icon = view.icon;
           return (
-            <li
+            <Row
               key={`${item.kind}-${item.id}`}
-              className="flex flex-wrap items-center justify-between gap-2 py-2"
+              className="py-2"
               data-testid="upcoming-item"
-            >
-              <span className="inline-flex items-center gap-2">
-                <span className="w-12 tabular-nums text-muted-foreground">
-                  {formatDayMonth(item.date)}
+              meta={
+                <span className="inline-flex items-center gap-1">
+                  <Icon className="size-3.5" aria-hidden />
+                  {formatDayMonth(item.date)} · {view.label}
                 </span>
-                <Icon className="size-4 text-muted-foreground" aria-hidden />
-                <Link className="underline-offset-4 hover:underline" to={view.link(item.id)}>
-                  {item.name}
-                </Link>
-                <span className="text-muted-foreground">· {view.label}</span>
-              </span>
-              <span className="tabular-nums">
-                {item.kind === 'income' ? '+' : '−'}
-                {money(item.amount)}
-              </span>
-            </li>
+              }
+              amount={`${item.kind === 'income' ? '+' : '−'}${money(item.amount)}`}
+            >
+              <Link className="underline-offset-4 hover:underline" to={view.link(item.id)}>
+                {item.name}
+              </Link>
+            </Row>
           );
         })}
       </ul>
@@ -405,28 +446,26 @@ function RecentBlock({ data, timeZone }: { data: Dashboard; timeZone: string }) 
       {data.recent.length === 0 && <Muted>Операцій ще немає.</Muted>}
       <ul className="divide-y text-sm">
         {data.recent.map((item) => (
-          <li
+          <Row
             key={item.id}
-            className="flex flex-wrap items-center justify-between gap-2 py-2"
+            className="py-2"
             data-testid="recent-item"
+            meta={[
+              formatShortDate(item.occurredAt, timeZone),
+              item.description && item.categoryName,
+              item.accountName,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            amount={`${RECENT_SIGN[item.type]}${formatMoney({
+              amountMinor: Math.abs(item.amountMinor),
+              currency: item.currency,
+            })}`}
           >
-            <span>
-              <span className="text-muted-foreground">
-                {formatDate(item.occurredAt, timeZone)} ·{' '}
-              </span>
-              {item.description ||
-                item.categoryName ||
-                (item.type === 'income' ? 'Прибуток' : 'Видаток')}
-              <span className="text-muted-foreground">
-                {item.description && item.categoryName ? ` · ${item.categoryName}` : ''} ·{' '}
-                {item.accountName}
-              </span>
-            </span>
-            <span className="tabular-nums">
-              {RECENT_SIGN[item.type]}
-              {formatMoney({ amountMinor: Math.abs(item.amountMinor), currency: item.currency })}
-            </span>
-          </li>
+            {item.description ||
+              item.categoryName ||
+              (item.type === 'income' ? 'Прибуток' : 'Видаток')}
+          </Row>
         ))}
       </ul>
     </Block>

@@ -48,3 +48,23 @@ export function shortMonthLabel(month: string): string {
 export function percentText(ratio: number): string {
   return `${(Math.round(ratio * 1000) / 10).toFixed(1).replace('.', ',')}%`;
 }
+
+const shortDateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** Коротка дата в часовому поясі: «05.10», а для іншого року — «05.10.2025». */
+export function formatShortDate(instant: string, timeZone: string, now = new Date()): string {
+  let formatter = shortDateFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    shortDateFormatters.set(timeZone, formatter);
+  }
+  // en-CA дає «2026-10-05» — той самий вигляд, що й дати без часу.
+  const date = formatter.format(new Date(instant));
+  const sameYear = date.slice(0, 4) === formatter.format(now).slice(0, 4);
+  return sameYear ? formatDayMonth(date) : formatDateString(date);
+}

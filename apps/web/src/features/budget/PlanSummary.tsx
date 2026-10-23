@@ -2,6 +2,7 @@ import { formatMoney, type PlanState } from '@hf/shared';
 import { Check, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
 import { signedMoney } from '../analytics/signedMoney.ts';
 
 interface Props {
@@ -13,15 +14,6 @@ interface Props {
   currency: string;
 }
 
-function Figure({ title, value }: { title: string; value: string }) {
-  return (
-    <div>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
 /** План місяця: очікувані прибутки, очікувані витрати й чи сходиться бюджет. */
 export function PlanSummary({ plannedIncome, plannedExpenses, state, currency }: Props) {
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
@@ -30,9 +22,10 @@ export function PlanSummary({ plannedIncome, plannedExpenses, state, currency }:
   return (
     <Card data-testid="month-plan" data-state={state ?? 'none'}>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Figure title="Очікувані прибутки" value={money(plannedIncome)} />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
+          <Figure compact title="Очікувані прибутки" value={money(plannedIncome)} />
           <Figure
+            compact
             title="Очікувані витрати"
             value={plannedExpenses === null ? '—' : money(plannedExpenses)}
           />
