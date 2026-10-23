@@ -6,7 +6,7 @@ import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
 import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
-import { formatDate } from '../../shared/ui/format.ts';
+import { formatShortDate } from '../../shared/ui/format.ts';
 import { Progress } from '../../shared/ui/progress.tsx';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useDeleteShoppingList, useShoppingLists } from './api.ts';
@@ -64,7 +64,7 @@ export function ShoppingListsPage() {
                       {list.name}
                     </Link>
                     <span className="text-xs text-muted-foreground">
-                      {formatDate(list.createdAt, user.timeZone)}
+                      {formatShortDate(list.createdAt, user.timeZone)}
                     </span>
                   </div>
                   <Progress

@@ -114,6 +114,47 @@ test.describe('телефон', () => {
     await input.press('Enter');
     await expect(line.getByTestId('limit-amount')).toContainText('250,00');
   });
+
+  test('покупки: продукти через меню «⋯», список із ціною в рядку', async ({ page }) => {
+    await register(page);
+    await goTo(page, 'Покупки');
+    await page.getByRole('link', { name: 'Продукти', exact: true }).click();
+    await page.getByRole('button', { name: 'Додати продукт' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Назва').fill('Хліб');
+    await dialog.getByLabel(/^Ціна за/).fill('32');
+    await dialog.getByRole('button', { name: 'Додати' }).click();
+    await expect(dialog).toBeHidden();
+
+    // Чотири іконки сховані в меню.
+    await expect(page.getByRole('button', { name: 'Змінити «Хліб»' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Дії з продуктом «Хліб»' }).click();
+    await page.getByRole('menuitem', { name: 'Змінити' }).click();
+    await expect(dialog.getByLabel(/^Ціна за/)).toHaveValue('32,00');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    await goTo(page, 'Покупки');
+    await page.getByRole('button', { name: 'Список', exact: true }).click();
+    await dialog.getByLabel('Назва').fill('Субота');
+    await dialog.getByRole('button', { name: 'Створити' }).click();
+    const form = page.getByRole('form', { name: 'Додати продукт у список' });
+    await form.getByLabel('Продукт', { exact: true }).fill('Хліб');
+    await form.getByLabel(/^Кількість/).fill('2');
+    await form.getByRole('button', { name: 'Додати' }).click();
+
+    const bread = page.getByTestId('shopping-item').filter({ hasText: 'Хліб' });
+    const price = bread.getByLabel('Фактична ціна «Хліб» за шт');
+    await expect(price).toBeInViewport({ ratio: 1 });
+    await expect(bread.getByTestId('item-expected')).toContainText('64,00');
+    // Назва — підпис галочки: у магазині досить торкнутися назви.
+    await bread.getByText('Хліб', { exact: true }).click();
+    await expect(bread.getByRole('checkbox', { name: 'Куплено «Хліб»' })).toBeChecked();
+    await expect(price).toHaveValue('32,00');
+    await price.fill('35');
+    await price.press('Enter');
+    await expect(bread.getByTestId('item-actual')).toContainText('70,00');
+  });
 });
 
 test.describe('планшет', () => {

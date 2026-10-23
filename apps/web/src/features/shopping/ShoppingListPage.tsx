@@ -5,10 +5,11 @@ import {
   type ShoppingListItem,
 } from '@hf/shared';
 import { ArrowLeft, Pencil, Printer } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { cn } from '../../shared/lib/utils.ts';
+import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
 import { ErrorText, Field, Muted } from '../../shared/ui/controls.tsx';
@@ -244,75 +245,125 @@ interface ItemRowProps {
 
 function ItemRow({ item, currency, disabled, onUpdate, onEdit, onRemove }: ItemRowProps) {
   const unit = PRODUCT_UNIT_LABELS[item.unit];
+  const isWide = useMediaQuery(WIDE_SCREEN);
+  const checkboxId = useId();
   // Поки зміна йде на сервер, прапорець уже показує нове значення.
   const [pendingBought, setPendingBought] = useState<boolean | null>(null);
   const isBought = pendingBought ?? item.isBought;
+
+  const checkbox = (
+    <input
+      id={checkboxId}
+      type="checkbox"
+      className="size-4 shrink-0 accent-primary"
+      checked={isBought}
+      disabled={disabled}
+      aria-label={`Куплено «${item.name}»`}
+      onChange={(e) => {
+        setPendingBought(e.target.checked);
+        onUpdate({ isBought: e.target.checked }, () => setPendingBought(null));
+      }}
+    />
+  );
+  const name = (
+    <label htmlFor={checkboxId} className="min-w-0 cursor-pointer">
+      <span className={cn('block font-medium break-words', isBought && 'line-through')}>
+        {item.name}
+      </span>
+      <span className="block text-muted-foreground">
+        {quantityLabel(item)}
+        {item.expectedUnitPrice !== null && (
+          <>
+            {' '}
+            · {moneyOrDash(item.expectedUnitPrice, currency)} / {unit}
+          </>
+        )}
+      </span>
+    </label>
+  );
+  const priceInput = (
+    <ActualPriceInput
+      // Нове значення з сервера скидає введений текст.
+      key={`${item.id}:${item.actualUnitPrice}`}
+      item={item}
+      currency={currency}
+      disabled={disabled}
+      onCommit={(actualUnitPrice) => onUpdate({ actualUnitPrice })}
+    />
+  );
+  const actions = (
+    <div className="flex shrink-0 items-center gap-1">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`Змінити «${item.name}»`}
+        title={`Змінити «${item.name}»`}
+        onClick={onEdit}
+      >
+        <Pencil />
+      </Button>
+      <ConfirmButton
+        title={`Прибрати «${item.name}» зі списку?`}
+        label="Прибрати"
+        disabled={disabled}
+        onConfirm={onRemove}
+      />
+    </div>
+  );
+
+  if (!isWide) {
+    // Телефон у магазині: галочка, назва й поле ціни в першому рядку, суми й дії — під назвою.
+    return (
+      <li
+        data-testid="shopping-item"
+        className={cn('flex items-start gap-3 py-2', isBought && 'opacity-60')}
+      >
+        <div className="flex h-9 items-center">{checkbox}</div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            {name}
+            {priceInput}
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap gap-x-3 tabular-nums">
+              <span data-testid="item-expected">
+                <span className="text-muted-foreground">Очікувано </span>
+                {moneyOrDash(item.expectedTotal, currency)}
+              </span>
+              <span data-testid="item-actual">
+                <span className="text-muted-foreground">Фактично </span>
+                {moneyOrDash(item.actualTotal, currency)}
+              </span>
+            </div>
+            <div className="-my-1 -mr-1">{actions}</div>
+          </div>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <li
       data-testid="shopping-item"
       className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 py-2', isBought && 'opacity-60')}
     >
-      <label className="flex min-w-0 flex-1 items-center gap-3">
-        <input
-          type="checkbox"
-          className="size-4 shrink-0 accent-primary"
-          checked={isBought}
-          disabled={disabled}
-          aria-label={`Куплено «${item.name}»`}
-          onChange={(e) => {
-            setPendingBought(e.target.checked);
-            onUpdate({ isBought: e.target.checked }, () => setPendingBought(null));
-          }}
-        />
-        <span className="min-w-0">
-          <span className={cn('block font-medium', isBought && 'line-through')}>{item.name}</span>
-          <span className="block text-muted-foreground">
-            {quantityLabel(item)}
-            {item.expectedUnitPrice !== null && (
-              <>
-                {' '}
-                · {moneyOrDash(item.expectedUnitPrice, currency)} / {unit}
-              </>
-            )}
-          </span>
-        </span>
-      </label>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {checkbox}
+        {name}
+      </div>
 
       <div className="text-right tabular-nums" data-testid="item-expected">
         <span className="block text-xs text-muted-foreground">Очікувано</span>
         {moneyOrDash(item.expectedTotal, currency)}
       </div>
       <div className="flex items-center gap-2">
-        <ActualPriceInput
-          // Нове значення з сервера скидає введений текст.
-          key={`${item.id}:${item.actualUnitPrice}`}
-          item={item}
-          currency={currency}
-          disabled={disabled}
-          onCommit={(actualUnitPrice) => onUpdate({ actualUnitPrice })}
-        />
+        {priceInput}
         <div className="w-24 text-right tabular-nums" data-testid="item-actual">
           <span className="block text-xs text-muted-foreground">Фактично</span>
           {moneyOrDash(item.actualTotal, currency)}
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`Змінити «${item.name}»`}
-          title={`Змінити «${item.name}»`}
-          onClick={onEdit}
-        >
-          <Pencil />
-        </Button>
-        <ConfirmButton
-          title={`Прибрати «${item.name}» зі списку?`}
-          label="Прибрати"
-          disabled={disabled}
-          onConfirm={onRemove}
-        />
-      </div>
+      {actions}
     </li>
   );
 }
@@ -377,7 +428,7 @@ function Totals({ list }: { list: ShoppingList }) {
         data-testid="shopping-totals"
       >
         {rows.map(([label, value]) => (
-          <div key={label}>
+          <div key={label} className="flex items-baseline justify-between gap-3 sm:block">
             <dt className="text-muted-foreground">{label}</dt>
             <dd
               className={cn(

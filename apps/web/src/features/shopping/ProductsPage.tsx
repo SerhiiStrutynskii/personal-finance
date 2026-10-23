@@ -1,8 +1,24 @@
 import type { Product } from '@hf/shared';
-import { Archive, ArchiveRestore, ArrowLeft, ChartLine, Pencil } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  ChartLine,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../shared/lib/utils.ts';
+import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
+import { ConfirmDialog } from '../../shared/ui/confirm-dialog.tsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../shared/ui/dropdown-menu.tsx';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ConfirmButton } from '../../shared/ui/confirm-button.tsx';
@@ -11,6 +27,9 @@ import { useDeleteProduct, useProducts, useSaveProduct } from './api.ts';
 import { PriceHistoryDialog } from './PriceHistoryDialog.tsx';
 import { ProductDialog } from './ProductDialog.tsx';
 import { PRODUCT_UNIT_LABELS, formatUnitPrice } from './productForm.ts';
+
+const DELETE_DESCRIPTION =
+  'Продукт, який уже є в списках покупок, видалити не можна — лише заархівувати.';
 
 /** Довідник продуктів зі збереженими цінами за одиницю. */
 export function ProductsPage() {
@@ -21,6 +40,13 @@ export function ProductsPage() {
   // Вміст вікна зберігається й після закриття, щоб не змінюватися під час анімації.
   const [dialog, setDialog] = useState<{ open: boolean; product?: Product }>({ open: false });
   const [history, setHistory] = useState<Product>();
+  // На телефоні чотири іконки не вміщаються поруч із ціною — дії ховаються в меню «⋯».
+  const isWide = useMediaQuery(WIDE_SCREEN);
+  const [deletion, setDeletion] = useState<{ open: boolean; product?: Product }>({
+    open: false,
+  });
+  const toggleArchive = (product: Product) =>
+    archive.mutate({ id: product.id, input: { isArchived: !product.isArchived } });
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -59,58 +85,103 @@ export function ProductsPage() {
               key={product.id}
               data-testid="product"
               className={cn(
-                'flex min-h-10 items-center justify-between gap-4 py-1',
+                'flex min-h-10 items-center justify-between gap-3 py-1',
                 product.isArchived && 'text-muted-foreground',
               )}
             >
-              <span>
+              <span className="min-w-0 break-words">
                 {product.name}{' '}
                 <span className="text-muted-foreground">· {PRODUCT_UNIT_LABELS[product.unit]}</span>
                 {product.isArchived && <span className="text-muted-foreground"> · в архіві</span>}
               </span>
-              <span className="ml-auto tabular-nums" data-testid="product-price">
+              <span className="ml-auto shrink-0 tabular-nums" data-testid="product-price">
                 {formatUnitPrice(product)}
               </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Історія цін «${product.name}»`}
-                  title={`Історія цін «${product.name}»`}
-                  onClick={() => setHistory(product)}
-                >
-                  <ChartLine />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Змінити «${product.name}»`}
-                  title={`Змінити «${product.name}»`}
-                  onClick={() => setDialog({ open: true, product })}
-                >
-                  <Pencil />
-                </Button>
-                <ArchiveButton
-                  name={product.name}
-                  isArchived={product.isArchived}
-                  disabled={archive.isPending}
-                  onClick={() =>
-                    archive.mutate({ id: product.id, input: { isArchived: !product.isArchived } })
-                  }
-                />
-                <ConfirmButton
-                  title={`Видалити продукт «${product.name}»?`}
-                  description="Продукт, який уже є в списках покупок, видалити не можна — лише заархівувати."
-
-                  disabled={remove.isPending}
-                  onConfirm={() => remove.mutate(product.id)}
-                />
-              </div>
+              {!isWide && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="-mr-2 shrink-0"
+                      aria-label={`Дії з продуктом «${product.name}»`}
+                    >
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setHistory(product)}>
+                      <ChartLine />
+                      Історія цін
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setDialog({ open: true, product })}>
+                      <Pencil />
+                      Змінити
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={archive.isPending}
+                      onSelect={() => toggleArchive(product)}
+                    >
+                      {product.isArchived ? <ArchiveRestore /> : <Archive />}
+                      {product.isArchived ? 'Повернути з архіву' : 'Заархівувати'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={remove.isPending}
+                      onSelect={() => setDeletion({ open: true, product })}
+                    >
+                      <Trash2 />
+                      Видалити
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {isWide && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Історія цін «${product.name}»`}
+                    title={`Історія цін «${product.name}»`}
+                    onClick={() => setHistory(product)}
+                  >
+                    <ChartLine />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Змінити «${product.name}»`}
+                    title={`Змінити «${product.name}»`}
+                    onClick={() => setDialog({ open: true, product })}
+                  >
+                    <Pencil />
+                  </Button>
+                  <ArchiveButton
+                    name={product.name}
+                    isArchived={product.isArchived}
+                    disabled={archive.isPending}
+                    onClick={() => toggleArchive(product)}
+                  />
+                  <ConfirmButton
+                    title={`Видалити продукт «${product.name}»?`}
+                    description={DELETE_DESCRIPTION}
+                    disabled={remove.isPending}
+                    onConfirm={() => remove.mutate(product.id)}
+                  />
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
 
+      <ConfirmDialog
+        open={deletion.open}
+        onOpenChange={(open) => setDeletion({ ...deletion, open })}
+        title={`Видалити продукт «${deletion.product?.name ?? ''}»?`}
+        description={DELETE_DESCRIPTION}
+        onConfirm={() => deletion.product && remove.mutate(deletion.product.id)}
+      />
       <PriceHistoryDialog product={history} onClose={() => setHistory(undefined)} />
       <ProductDialog
         open={dialog.open}

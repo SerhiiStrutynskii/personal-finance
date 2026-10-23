@@ -11,9 +11,9 @@ export async function register(page: Page) {
 
 /** Перехід через меню: на телефоні пункти меню сховані у висувному меню. */
 export async function goTo(page: Page, section: string) {
-  const burger = page.getByRole('button', { name: 'Відкрити меню' });
-  if (await burger.isVisible()) {
-    await burger.click();
+  // Ширина, як у MobileNav: вужче за md (768px) меню висувне.
+  if ((page.viewportSize()?.width ?? 1280) < 768) {
+    await page.getByRole('button', { name: 'Відкрити меню' }).click();
     await page.getByRole('dialog').getByRole('link', { name: section, exact: true }).click();
     return;
   }
