@@ -2,7 +2,7 @@ import { formatMoney, type BudgetView } from '@hf/shared';
 import { Link } from 'react-router-dom';
 import { Button } from '../../shared/ui/button.tsx';
 import { Muted } from '../../shared/ui/controls.tsx';
-import { formatDateString } from '../../shared/ui/format.ts';
+import { formatDayMonth } from '../../shared/ui/format.ts';
 import { OccurrenceStatusLabel } from '../incomes/OccurrenceStatusLabel.tsx';
 import { OCCURRENCE_ROW_CLASS } from '../incomes/occurrenceStyles.ts';
 
@@ -34,15 +34,17 @@ export function IncomeSection({ budget }: { budget: BudgetView }) {
               data-status={occurrence.status}
               className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border p-3 text-sm ${OCCURRENCE_ROW_CLASS[occurrence.status]}`}
             >
-              <div>
-                <span className="font-medium">{occurrence.name}</span>{' '}
-                <span className="text-muted-foreground">
-                  · {formatDateString(occurrence.plannedDate)} ·{' '}
-                  <span
-                    className={`tabular-nums ${occurrence.status === 'skipped' ? 'line-through' : ''}`}
-                  >
-                    {money(occurrence.plannedAmount)}
+              <div className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="font-medium">{occurrence.name}</span>{' '}
+                  <span className="text-muted-foreground">
+                    · {formatDayMonth(occurrence.plannedDate)}
                   </span>
+                </span>
+                <span
+                  className={`shrink-0 tabular-nums ${occurrence.status === 'skipped' ? 'line-through' : ''}`}
+                >
+                  {money(occurrence.plannedAmount)}
                 </span>
               </div>
               <OccurrenceStatusLabel occurrence={occurrence} currency={currency} />

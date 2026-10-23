@@ -1,16 +1,7 @@
 import { formatMoney, type BudgetView } from '@hf/shared';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
 import { PlanSummary } from './PlanSummary.tsx';
-
-function Figure({ title, planned, actual }: { title: string; planned: string; actual: string }) {
-  return (
-    <div>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-xl font-semibold tabular-nums">{actual}</div>
-      <div className="text-sm text-muted-foreground tabular-nums">план {planned}</div>
-    </div>
-  );
-}
 
 export function BudgetSummary({ budget }: { budget: BudgetView }) {
   const { summary, currency } = budget;
@@ -25,21 +16,23 @@ export function BudgetSummary({ budget }: { budget: BudgetView }) {
         currency={currency}
       />
       <Card data-testid="budget-summary">
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
           <Figure
+            compact
             title="Прибутки"
-            actual={money(summary.receivedIncomeTotal)}
-            planned={money(summary.plannedIncomeTotal)}
+            value={money(summary.receivedIncomeTotal)}
+            hint={`план ${money(summary.plannedIncomeTotal)}`}
           />
           <Figure
+            compact
             title="Витрати"
-            actual={money(summary.spentTotal)}
-            planned={money(summary.plannedExpenseTotal)}
+            value={money(summary.spentTotal)}
+            hint={`план ${money(summary.plannedExpenseTotal)}`}
           />
           <Figure
             title="Залишок"
-            actual={money(summary.actualBalance)}
-            planned={money(summary.plannedBalance)}
+            value={money(summary.actualBalance)}
+            hint={`план ${money(summary.plannedBalance)}`}
           />
         </CardContent>
       </Card>

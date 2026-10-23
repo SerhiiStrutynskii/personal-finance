@@ -57,9 +57,11 @@ export function ExpenseSection({ budget, onAddLimit, canAddLimit, onDeleteLine }
             data-status={line.status}
             className={`rounded-lg border p-3 ${STATUS_ROW_CLASS[line.status]}`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-              <div className="font-medium">{line.categoryName}</div>
-              <div className="flex items-center gap-1 text-sm">
+            {/* Суми й кнопки праворуч від назви; якщо не вміщаються (поле редагування ліміту
+                на телефоні) — переходять на наступний рядок, а назва не стискається в стовпчик. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <div className="min-w-20 flex-1 font-medium break-words">{line.categoryName}</div>
+              <div className="ml-auto flex shrink-0 items-center gap-1 text-sm">
                 <span className="tabular-nums">{money(line.spent)}</span>
                 <span className="text-muted-foreground">з</span>
                 <InlineLimit budget={budget} line={line} editable={canEditLimits} />
@@ -104,9 +106,9 @@ export function ExpenseSection({ budget, onAddLimit, canAddLimit, onDeleteLine }
                 key={item.categoryId ?? 'uncategorized'}
                 data-testid="unplanned-expense"
                 data-status={item.status}
-                className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border p-3 ${STATUS_ROW_CLASS[item.status]}`}
+                className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${STATUS_ROW_CLASS[item.status]}`}
               >
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium">{item.categoryName}</div>
                   <div className="text-sm">
                     <CategoryStatusLabel
@@ -121,6 +123,7 @@ export function ExpenseSection({ budget, onAddLimit, canAddLimit, onDeleteLine }
                   <Button
                     variant="outline"
                     size="sm"
+                    className="shrink-0"
                     onClick={() => onAddLimit(item.categoryId ?? undefined)}
                   >
                     Додати ліміт

@@ -21,7 +21,13 @@ export function Figure({
       <div className={`font-semibold tabular-nums ${compact ? 'text-base sm:text-xl' : 'text-xl'}`}>
         {value}
       </div>
-      {hint && <div className="w-full text-sm text-muted-foreground">{hint}</div>}
+      {hint && (
+        <div
+          className={`w-full text-sm text-muted-foreground ${compact ? 'text-right sm:text-left' : ''}`}
+        >
+          {hint}
+        </div>
+      )}
     </div>
   );
 }

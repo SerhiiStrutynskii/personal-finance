@@ -90,6 +90,30 @@ test.describe('телефон', () => {
       Math.abs(month!.y + month!.height / 2 - (sources!.y + sources!.height / 2)),
     ).toBeLessThan(4);
   });
+
+  test('бюджет: редагування ліміту в рядку не стискає назву категорії', async ({ page }) => {
+    await register(page);
+    await addAccount(page, 'Картка');
+    await addExpenseCategory(page, 'Продукти');
+    await goTo(page, 'Бюджет');
+    await page.getByRole('button', { name: 'Створити' }).click();
+    await page.getByRole('button', { name: 'Додати ліміт' }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Ліміт, UAH').fill('100');
+    await dialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(dialog).toBeHidden();
+
+    const line = page.getByTestId('expense-line');
+    await line.getByRole('button', { name: 'Змінити ліміт «Продукти»' }).click();
+    const input = line.getByLabel('Ліміт «Продукти», UAH');
+    await expect(input).toBeInViewport({ ratio: 1 });
+    // Назва лишається словом в один рядок, а не стовпчиком із літер.
+    const name = await line.getByText('Продукти', { exact: true }).boundingBox();
+    expect(name!.height).toBeLessThan(30);
+    await input.fill('250');
+    await input.press('Enter');
+    await expect(line.getByTestId('limit-amount')).toContainText('250,00');
+  });
 });
 
 test.describe('планшет', () => {
