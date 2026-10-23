@@ -71,6 +71,25 @@ test.describe('телефон', () => {
     await expect(dialog).toBeHidden();
     await expect(item).toContainText('Ринок');
   });
+
+  test('прибутки й рахунки: дії в рядку поруч із сумою', async ({ page }) => {
+    await register(page);
+    await addAccount(page, 'Картка');
+    const balance = page.getByTestId('account-balance');
+    await expect(balance).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole('button', { name: 'Видалити рахунок «Картка»' })).toBeInViewport({
+      ratio: 1,
+    });
+
+    await goTo(page, 'Прибутки');
+    const month = await page.getByTestId('current-month').boundingBox();
+    const sources = await page
+      .getByRole('link', { name: 'Джерела прибутку', exact: true })
+      .boundingBox();
+    expect(
+      Math.abs(month!.y + month!.height / 2 - (sources!.y + sources!.height / 2)),
+    ).toBeLessThan(4);
+  });
 });
 
 test.describe('планшет', () => {

@@ -19,7 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../shared/ui/dropdown-menu.tsx';
-import { formatDateString } from '../../shared/ui/format.ts';
+import { formatDateString, formatDayMonth } from '../../shared/ui/format.ts';
+import { ListRow } from '../../shared/ui/list-row.tsx';
+import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
 import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
 import {
   Table,
@@ -57,10 +59,14 @@ export function IncomesPage() {
       <PageHeader
         title="Прибутки"
         action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
             <MonthSwitcher month={month} onChange={setMonth} />
             <Button variant="outline" asChild>
-              <Link to="/incomes/sources">Джерела прибутку</Link>
+              <Link to="/incomes/sources" aria-label="Джерела прибутку">
+                {/* На телефоні коротко, щоб кнопка вмістилась поруч із перемикачем місяця. */}
+                <span className="sm:hidden">Джерела</span>
+                <span className="max-sm:hidden">Джерела прибутку</span>
+              </Link>
             </Button>
           </div>
         }
@@ -119,6 +125,36 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
     currency,
   });
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
+  const isWide = useMediaQuery(WIDE_SCREEN);
+  const oneTimeActions = (item: IncomesView['oneTime'][number]) => {
+    const original = transactions.data?.items.find(
+      (transaction) => transaction.id === item.transactionId,
+    );
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Дії із записом">
+            <MoreHorizontal />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {original && (
+            <DropdownMenuItem onSelect={() => setEditing({ open: true, original })}>
+              <Pencil />
+              Змінити
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => setDeletion({ open: true, id: item.transactionId, name: item.name })}
+          >
+            <Trash2 />
+            Видалити
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
   const error =
     accounts.error ??
@@ -178,9 +214,24 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
             </Button>
           )}
         </div>
-        {incomes.oneTime.length === 0 ? (
-          <Muted>Разових прибутків цього місяця немає.</Muted>
-        ) : (
+        {incomes.oneTime.length === 0 && <Muted>Разових прибутків цього місяця немає.</Muted>}
+        {incomes.oneTime.length > 0 && !isWide && (
+          <ul className="divide-y text-sm">
+            {incomes.oneTime.map((item) => (
+              <ListRow
+                key={item.transactionId}
+                className="py-2"
+                data-testid="one-time-income"
+                meta={formatDayMonth(item.date)}
+                amount={money(item.amount)}
+                actions={oneTimeActions(item)}
+              >
+                {item.name || 'Прибуток'}
+              </ListRow>
+            ))}
+          </ul>
+        )}
+        {incomes.oneTime.length > 0 && isWide && (
           <Table>
             <TableHeader>
               <TableRow>
@@ -193,44 +244,14 @@ function IncomesContent({ incomes }: { incomes: IncomesView }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {incomes.oneTime.map((item) => {
-                const original = transactions.data?.items.find(
-                  (transaction) => transaction.id === item.transactionId,
-                );
-                return (
-                  <TableRow key={item.transactionId} data-testid="one-time-income">
-                    <TableCell>{formatDateString(item.date)}</TableCell>
-                    <TableCell className="whitespace-normal">{item.name || '—'}</TableCell>
-                    <TableCell className="text-right tabular-nums">{money(item.amount)}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Дії із записом">
-                            <MoreHorizontal />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {original && (
-                            <DropdownMenuItem onSelect={() => setEditing({ open: true, original })}>
-                              <Pencil />
-                              Змінити
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() =>
-                              setDeletion({ open: true, id: item.transactionId, name: item.name })
-                            }
-                          >
-                            <Trash2 />
-                            Видалити
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {incomes.oneTime.map((item) => (
+                <TableRow key={item.transactionId} data-testid="one-time-income">
+                  <TableCell>{formatDateString(item.date)}</TableCell>
+                  <TableCell className="whitespace-normal">{item.name || '—'}</TableCell>
+                  <TableCell className="text-right tabular-nums">{money(item.amount)}</TableCell>
+                  <TableCell className="text-right">{oneTimeActions(item)}</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         )}

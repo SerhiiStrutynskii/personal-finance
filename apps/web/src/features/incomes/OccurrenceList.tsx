@@ -46,23 +46,27 @@ export function OccurrenceList({
             data-status={occurrence.status}
             className={`rounded-lg border p-3 ${OCCURRENCE_ROW_CLASS[occurrence.status]}`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="font-medium break-words">{occurrence.name}</div>
+            <div className="text-sm text-muted-foreground">
               <div>
-                <div className="font-medium">{occurrence.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  План: {formatDateString(occurrence.plannedDate)},{' '}
-                  <span className={`tabular-nums ${skipped ? 'line-through' : ''}`}>
-                    {money(occurrence.plannedAmount)}
-                  </span>
-                  {occurrence.actualDate && (
-                    <>
-                      {' · '}Факт: {formatDateString(occurrence.actualDate)},{' '}
-                      <span className="tabular-nums">{money(occurrence.actualAmount)}</span>
-                    </>
-                  )}
-                </div>
+                План: {formatDateString(occurrence.plannedDate)} ·{' '}
+                <span className={`tabular-nums ${skipped ? 'line-through' : ''}`}>
+                  {money(occurrence.plannedAmount)}
+                </span>
               </div>
-              <div className="flex items-center gap-1">
+              {occurrence.actualDate && (
+                <div>
+                  Факт: {formatDateString(occurrence.actualDate)} ·{' '}
+                  <span className="tabular-nums">{money(occurrence.actualAmount)}</span>
+                </div>
+              )}
+            </div>
+            {/* Статус і дії одним рядком: на телефоні кнопки не висять окремо. */}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <div className="min-w-0 text-sm">
+                <OccurrenceStatusLabel occurrence={occurrence} currency={currency} />
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
                 {occurrence.status !== 'received' && (
                   <Button variant="outline" size="sm" onClick={() => onReceive(occurrence)}>
                     Отримано
@@ -100,9 +104,6 @@ export function OccurrenceList({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            </div>
-            <div className="mt-2 text-sm">
-              <OccurrenceStatusLabel occurrence={occurrence} currency={currency} />
             </div>
           </li>
         );

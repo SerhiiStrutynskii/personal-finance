@@ -1,15 +1,7 @@
 import { formatMoney, type IncomesView } from '@hf/shared';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
 import { Progress } from '../../shared/ui/progress.tsx';
-
-function Figure({ title, value }: { title: string; value: string }) {
-  return (
-    <div>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
 
 export function IncomeSummary({ incomes }: { incomes: IncomesView }) {
   const { summary, currency } = incomes;
@@ -24,9 +16,9 @@ export function IncomeSummary({ incomes }: { incomes: IncomesView }) {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Figure title="Заплановано" value={money(summary.plannedTotal)} />
-          <Figure title="Отримано" value={money(summary.receivedTotal)} />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
+          <Figure compact title="Заплановано" value={money(summary.plannedTotal)} />
+          <Figure compact title="Отримано" value={money(summary.receivedTotal)} />
           <Figure title="Ще очікується" value={money(summary.expectedRemaining)} />
         </div>
         <Progress
