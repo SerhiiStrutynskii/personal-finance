@@ -188,6 +188,29 @@ test.describe('телефон', () => {
       .evaluate((main) => main.scrollWidth > main.clientWidth);
     expect(overflow).toBe(false);
   });
+
+  test('діалог — шторка знизу, що прокручується, коли екран низький', async ({ page }) => {
+    await register(page);
+    await goTo(page, 'Цілі');
+    await page.getByRole('button', { name: 'Ціль', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    // після анімації появи шторка притиснута до низу й займає всю ширину
+    await expect
+      .poll(async () => {
+        const box = await dialog.boundingBox();
+        return box && [box.width, Math.round(box.y + box.height)];
+      })
+      .toEqual([390, 844]);
+
+    // Відкрита клавіатура лишає мало місця: заголовок видно, кнопка доступна прокручуванням.
+    await page.setViewportSize({ width: 390, height: 450 });
+    await expect(dialog.getByRole('heading', { name: 'Нова ціль' })).toBeInViewport();
+    const save = dialog.getByRole('button', { name: 'Зберегти' });
+    await expect(save).not.toBeInViewport();
+    await save.scrollIntoViewIfNeeded();
+    await expect(save).toBeInViewport();
+    await expect(dialog.getByRole('heading', { name: 'Нова ціль' })).not.toBeInViewport();
+  });
 });
 
 test.describe('планшет', () => {

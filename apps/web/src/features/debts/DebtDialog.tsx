@@ -52,7 +52,7 @@ export function DebtDialog({ open, onOpenChange, today, original }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Вміст монтується при кожному відкритті, тому форма починається з актуальних значень. */}
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{original ? 'Умови боргу' : 'Новий борг'}</DialogTitle>
           <DialogDescription>
