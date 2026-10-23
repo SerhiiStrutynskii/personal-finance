@@ -3,7 +3,8 @@ import { Check, Info, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
 import { Muted } from '../../shared/ui/controls.tsx';
-import { Figure, Section } from './parts.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
+import { Section } from './parts.tsx';
 
 /** Перевитрати за бюджетом місяця і прогноз витрат до кінця поточного місяця. */
 export function OverspendingSection({ data }: { data: AnalyticsMonth }) {
@@ -64,12 +65,14 @@ export function OverspendingSection({ data }: { data: AnalyticsMonth }) {
           <CardContent className="space-y-3">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Figure
+                compact
                 title="Витрачено"
                 value={money(forecast.spent)}
                 hint={`за ${forecast.daysElapsed} з ${forecast.daysInMonth} днів`}
               />
-              <Figure title="Прогноз на кінець місяця" value={money(forecast.projected)} />
+              <Figure compact title="Прогноз на кінець місяця" value={money(forecast.projected)} />
               <Figure
+                compact
                 title="Сума лімітів"
                 value={
                   forecast.plannedExpenseTotal === null ? '—' : money(forecast.plannedExpenseTotal)

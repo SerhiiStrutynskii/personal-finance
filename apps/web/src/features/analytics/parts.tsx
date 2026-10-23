@@ -22,13 +22,3 @@ export function Section({
     </section>
   );
 }
-
-export function Figure({ title, value, hint }: { title: string; value: string; hint?: string }) {
-  return (
-    <div>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="text-sm text-muted-foreground">{hint}</div>}
-    </div>
-  );
-}

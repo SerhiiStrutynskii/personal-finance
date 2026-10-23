@@ -8,6 +8,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '../../shared/ui/chart.tsx';
+import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
 import { monthLabel, percentText, shortMonthLabel } from '../../shared/ui/format.ts';
 import {
   Table,
@@ -17,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../shared/ui/table.tsx';
+import { ListRow } from '../../shared/ui/list-row.tsx';
 import { Section } from './parts.tsx';
 import { signedMoney } from './signedMoney.ts';
 
@@ -29,6 +31,7 @@ const chartConfig = {
 export function TrendSection({ data }: { data: AnalyticsTrend }) {
   const { currency } = data;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
+  const isWide = useMediaQuery(WIDE_SCREEN);
 
   return (
     <Section
@@ -66,32 +69,55 @@ export function TrendSection({ data }: { data: AnalyticsTrend }) {
           />
         </BarChart>
       </ChartContainer>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Місяць</TableHead>
-            <TableHead className="text-right">Прибуток</TableHead>
-            <TableHead className="text-right">Витрати</TableHead>
-            <TableHead className="text-right">Різниця</TableHead>
-            <TableHead className="text-right">Норма заощаджень</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      {!isWide && (
+        <ul className="divide-y text-sm">
           {data.points.map((point) => (
-            <TableRow key={point.month} data-testid="trend-row" data-month={point.month}>
-              <TableCell>{monthLabel(point.month)}</TableCell>
-              <TableCell className="text-right tabular-nums">{money(point.income)}</TableCell>
-              <TableCell className="text-right tabular-nums">{money(point.expenses)}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {signedMoney(point.net, currency)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {point.savingsRate === null ? '—' : percentText(point.savingsRate)}
-              </TableCell>
-            </TableRow>
+            <ListRow
+              key={point.month}
+              className="py-2"
+              data-testid="trend-row"
+              data-month={point.month}
+              meta={`прибуток ${money(point.income)} · витрати ${money(point.expenses)}`}
+              amount={signedMoney(point.net, currency)}
+              note={
+                point.savingsRate === null
+                  ? undefined
+                  : `заощаджено ${percentText(point.savingsRate)}`
+              }
+            >
+              {monthLabel(point.month)}
+            </ListRow>
           ))}
-        </TableBody>
-      </Table>
+        </ul>
+      )}
+      {isWide && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Місяць</TableHead>
+              <TableHead className="text-right">Прибуток</TableHead>
+              <TableHead className="text-right">Витрати</TableHead>
+              <TableHead className="text-right">Різниця</TableHead>
+              <TableHead className="text-right">Норма заощаджень</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.points.map((point) => (
+              <TableRow key={point.month} data-testid="trend-row" data-month={point.month}>
+                <TableCell>{monthLabel(point.month)}</TableCell>
+                <TableCell className="text-right tabular-nums">{money(point.income)}</TableCell>
+                <TableCell className="text-right tabular-nums">{money(point.expenses)}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {signedMoney(point.net, currency)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {point.savingsRate === null ? '—' : percentText(point.savingsRate)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </Section>
   );
 }

@@ -155,6 +155,39 @@ test.describe('телефон', () => {
     await price.press('Enter');
     await expect(bread.getByTestId('item-actual')).toContainText('70,00');
   });
+
+  test('аналітика: таблиці стають списками без прокручування вбік', async ({ page }) => {
+    await register(page);
+    await addAccount(page, 'Картка');
+    await addExpenseCategory(page, 'Продукти');
+
+    await goTo(page, 'Витрати');
+    await page.getByRole('button', { name: 'Додати' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Сума, UAH').fill('300');
+    await dialog.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', { name: 'Продукти' }).click();
+    await dialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(dialog).toBeHidden();
+
+    await goTo(page, 'Аналітика');
+    const food = page.getByTestId('analytics-category').filter({ hasText: 'Продукти' });
+    await expect(food).toContainText('100,0% · минулого місяця 0,00');
+    await food.scrollIntoViewIfNeeded();
+    await expect(food.getByText('+300,00')).toBeInViewport({ ratio: 1 });
+
+    const trend = page.getByTestId('analytics-trend').getByTestId('trend-row');
+    await expect(trend).toHaveCount(6);
+    await expect(trend.last()).toContainText('витрати 300,00');
+    await trend.last().scrollIntoViewIfNeeded();
+    await expect(trend.last().getByText(/[−-]300,00/)).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('net-worth-row')).toHaveCount(6);
+
+    const overflow = await page
+      .locator('main')
+      .evaluate((main) => main.scrollWidth > main.clientWidth);
+    expect(overflow).toBe(false);
+  });
 });
 
 test.describe('планшет', () => {

@@ -2,6 +2,7 @@ import { formatMoney, formatQuantity, type ShoppingPeriod } from '@hf/shared';
 import { Info } from 'lucide-react';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis } from 'recharts';
+import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
 import {
   ChartContainer,
@@ -11,6 +12,7 @@ import {
 } from '../../shared/ui/chart.tsx';
 import { Field, Muted } from '../../shared/ui/controls.tsx';
 import { monthLabel, percentText, shortMonthLabel } from '../../shared/ui/format.ts';
+import { ListRow } from '../../shared/ui/list-row.tsx';
 import { SelectField } from '../../shared/ui/select-field.tsx';
 import {
   Table,
@@ -23,7 +25,7 @@ import {
 } from '../../shared/ui/table.tsx';
 import { PriceHistoryDialog } from '../shopping/PriceHistoryDialog.tsx';
 import { PRODUCT_UNIT_LABELS } from '../shopping/productForm.ts';
-import { Figure } from './parts.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
 import { sliceColor, topProductSlices } from './shoppingChart.ts';
 
 const spentConfig = { spent: { label: 'Куплено', color: 'var(--chart-3)' } } satisfies ChartConfig;
@@ -52,13 +54,15 @@ export function ShoppingPeriodSection({ data }: { data: ShoppingPeriod }) {
         <>
           <Card>
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Figure title="Разом за період" value={money(data.total)} />
+              <Figure compact title="Разом за період" value={money(data.total)} />
               <Figure
+                compact
                 title="В середньому на місяць"
                 value={money(data.averagePerMonth)}
                 hint="орієнтир для плану покупок"
               />
               <Figure
+                compact
                 title="Покупок"
                 value={String(data.purchaseCount)}
                 hint={data.unpricedCount > 0 ? `без ціни: ${data.unpricedCount}` : undefined}
@@ -93,6 +97,63 @@ function ProductsTable({
   onHistory: (product: { id: string; name: string }) => void;
 }) {
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency: data.currency });
+  const isWide = useMediaQuery(WIDE_SCREEN);
+  const priceRange = (row: ShoppingPeriod['products'][number]) =>
+    row.minUnitPrice === row.maxUnitPrice
+      ? money(row.minUnitPrice)
+      : `${money(row.minUnitPrice)} – ${money(row.maxUnitPrice)}`;
+  const nameButton = (row: ShoppingPeriod['products'][number]) => (
+    <button
+      type="button"
+      className="text-left underline-offset-4 hover:underline"
+      title={`Історія цін «${row.name}»`}
+      onClick={() => onHistory({ id: row.productId, name: row.name })}
+    >
+      {row.name}
+    </button>
+  );
+
+  if (!isWide) {
+    return (
+      <section className="space-y-2">
+        <h4 className="font-medium">Що й скільки куплено</h4>
+        <ul className="divide-y text-sm" data-testid="shopping-period-table">
+          {data.products.map((row) => {
+            const unit = PRODUCT_UNIT_LABELS[row.unit];
+            return (
+              <ListRow
+                key={row.productId}
+                className="py-2"
+                data-testid="shopping-period-row"
+                meta={
+                  <>
+                    <div>
+                      {formatQuantity(row.quantityMilli)} {unit} · покупок: {row.purchaseCount} ·{' '}
+                      {money(row.averagePerMonth)} на місяць
+                    </div>
+                    <div>
+                      ціна {priceRange(row)}, в середньому {money(row.averageUnitPrice)} / {unit}
+                    </div>
+                  </>
+                }
+                amount={money(row.spent)}
+                note={percentText(row.share)}
+              >
+                {nameButton(row)}
+              </ListRow>
+            );
+          })}
+          <ListRow
+            className="py-2 font-medium"
+            meta={`${money(data.averagePerMonth)} на місяць`}
+            amount={money(data.total)}
+          >
+            Разом
+          </ListRow>
+        </ul>
+      </section>
+    );
+  }
   return (
     <section className="space-y-2">
       <h4 className="font-medium">Що й скільки куплено</h4>
@@ -114,16 +175,7 @@ function ProductsTable({
             const unit = PRODUCT_UNIT_LABELS[row.unit];
             return (
               <TableRow key={row.productId} data-testid="shopping-period-row">
-                <TableCell>
-                  <button
-                    type="button"
-                    className="text-left underline-offset-4 hover:underline"
-                    title={`Історія цін «${row.name}»`}
-                    onClick={() => onHistory({ id: row.productId, name: row.name })}
-                  >
-                    {row.name}
-                  </button>
-                </TableCell>
+                <TableCell>{nameButton(row)}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatQuantity(row.quantityMilli)} {unit}
                 </TableCell>
@@ -135,11 +187,7 @@ function ProductsTable({
                 <TableCell className="text-right tabular-nums">
                   {money(row.averageUnitPrice)} / {unit}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {row.minUnitPrice === row.maxUnitPrice
-                    ? money(row.minUnitPrice)
-                    : `${money(row.minUnitPrice)} – ${money(row.maxUnitPrice)}`}
-                </TableCell>
+                <TableCell className="text-right tabular-nums">{priceRange(row)}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.purchaseCount}</TableCell>
               </TableRow>
             );
@@ -266,7 +314,7 @@ function ProductByMonth({ data }: { data: ShoppingPeriod }) {
     <section className="space-y-2" data-testid="shopping-product-chart">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="font-medium">Продукт по місяцях</h4>
-        <div className="w-64">
+        <div className="w-full sm:w-64">
           <Field label="Продукт для графіка">
             <SelectField
               value={product.productId}

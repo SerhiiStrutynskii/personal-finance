@@ -7,6 +7,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '../../shared/ui/chart.tsx';
+import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
 import { monthLabel, percentText, shortMonthLabel } from '../../shared/ui/format.ts';
 import {
   Table,
@@ -16,7 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from '../../shared/ui/table.tsx';
-import { Figure, Section } from './parts.tsx';
+import { ListRow } from '../../shared/ui/list-row.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
+import { Section } from './parts.tsx';
 import { signedMoney } from './signedMoney.ts';
 
 const chartConfig = {
@@ -29,6 +32,8 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
   const last = data.points.at(-1);
   const first = data.points[0];
+  const isWide = useMediaQuery(WIDE_SCREEN);
+  const netWorth = (amountMinor: number) => signedMoney(amountMinor, currency).replace(/^\+/, '');
   const hasDebtPayments =
     plannedDebtLoad.monthlyPayments > 0 || data.points.some((point) => point.debtPayments > 0);
 
@@ -41,8 +46,9 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
       <Card>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Figure
+            compact
             title="Чисті активи"
-            value={last ? signedMoney(last.netWorth, currency).replace(/^\+/, '') : '—'}
+            value={last ? netWorth(last.netWorth) : '—'}
             hint={
               last && first && data.points.length > 1
                 ? `${signedMoney(last.netWorth - first.netWorth, currency)} за ${data.months} міс.`
@@ -50,6 +56,7 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
             }
           />
           <Figure
+            compact
             title="Платежі по боргах цього місяця"
             value={last ? money(last.debtPayments) : '—'}
             hint={
@@ -57,6 +64,7 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
             }
           />
           <Figure
+            compact
             title="Планове навантаження"
             value={plannedDebtLoad.ratio === null ? '—' : percentText(plannedDebtLoad.ratio)}
             hint={
@@ -100,40 +108,62 @@ export function NetWorthSection({ data }: { data: AnalyticsTrend }) {
         </LineChart>
       </ChartContainer>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Місяць</TableHead>
-            <TableHead className="text-right">Чисті активи</TableHead>
-            {hasDebtPayments && (
-              <>
-                <TableHead className="text-right">Платежі по боргах</TableHead>
-                <TableHead className="text-right">Частка прибутку</TableHead>
-              </>
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      {!isWide && (
+        <ul className="divide-y text-sm">
           {data.points.map((point) => (
-            <TableRow key={point.month} data-testid="net-worth-row" data-month={point.month}>
-              <TableCell>{monthLabel(point.month)}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {signedMoney(point.netWorth, currency).replace(/^\+/, '')}
-              </TableCell>
+            <ListRow
+              key={point.month}
+              className="py-2"
+              data-testid="net-worth-row"
+              data-month={point.month}
+              meta={
+                hasDebtPayments
+                  ? `платежі по боргах ${money(point.debtPayments)}${point.debtLoad === null ? '' : ` · ${percentText(point.debtLoad)} прибутку`}`
+                  : undefined
+              }
+              amount={netWorth(point.netWorth)}
+            >
+              {monthLabel(point.month)}
+            </ListRow>
+          ))}
+        </ul>
+      )}
+      {isWide && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Місяць</TableHead>
+              <TableHead className="text-right">Чисті активи</TableHead>
               {hasDebtPayments && (
                 <>
-                  <TableCell className="text-right tabular-nums">
-                    {money(point.debtPayments)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {point.debtLoad === null ? '—' : percentText(point.debtLoad)}
-                  </TableCell>
+                  <TableHead className="text-right">Платежі по боргах</TableHead>
+                  <TableHead className="text-right">Частка прибутку</TableHead>
                 </>
               )}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {data.points.map((point) => (
+              <TableRow key={point.month} data-testid="net-worth-row" data-month={point.month}>
+                <TableCell>{monthLabel(point.month)}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {netWorth(point.netWorth)}
+                </TableCell>
+                {hasDebtPayments && (
+                  <>
+                    <TableCell className="text-right tabular-nums">
+                      {money(point.debtPayments)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {point.debtLoad === null ? '—' : percentText(point.debtLoad)}
+                    </TableCell>
+                  </>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </Section>
   );
 }

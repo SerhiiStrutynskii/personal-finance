@@ -8,8 +8,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '../../shared/ui/chart.tsx';
+import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
 import { Muted } from '../../shared/ui/controls.tsx';
 import { percentText } from '../../shared/ui/format.ts';
+import { ListRow } from '../../shared/ui/list-row.tsx';
 import {
   Table,
   TableBody,
@@ -31,6 +33,7 @@ export function CategoriesSection({ data }: { data: AnalyticsMonth }) {
   const { currency } = data;
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
   const spending = data.categories.filter((row) => row.spent > 0);
+  const isWide = useMediaQuery(WIDE_SCREEN);
   // Групи з підкатегоріями розгортаються; ключ — id групи ('none' для витрат без категорії).
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const toggle = (key: string) =>
@@ -73,7 +76,10 @@ export function CategoriesSection({ data }: { data: AnalyticsMonth }) {
           </BarChart>
         </ChartContainer>
       )}
-      {data.categories.length > 0 && (
+      {data.categories.length > 0 && !isWide && (
+        <CategoryList data={data} expanded={expanded} onToggle={toggle} />
+      )}
+      {data.categories.length > 0 && isWide && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -88,7 +94,6 @@ export function CategoriesSection({ data }: { data: AnalyticsMonth }) {
             {data.categories.map((row) => {
               const key = row.categoryId ?? 'none';
               const isOpen = expanded.has(key);
-              const Chevron = isOpen ? ChevronDown : ChevronRight;
               const numbers = (
                 item: Pick<typeof row, 'spent' | 'share' | 'previousSpent' | 'change'>,
               ) => (
@@ -109,19 +114,7 @@ export function CategoriesSection({ data }: { data: AnalyticsMonth }) {
                 <Fragment key={key}>
                   <TableRow>
                     <TableCell>
-                      {row.subcategories ? (
-                        <button
-                          type="button"
-                          className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 hover:bg-muted"
-                          aria-expanded={isOpen}
-                          onClick={() => toggle(key)}
-                        >
-                          <Chevron className="size-4 text-muted-foreground" aria-hidden />
-                          {row.categoryName}
-                        </button>
-                      ) : (
-                        row.categoryName
-                      )}
+                      <CategoryName row={row} isOpen={isOpen} onToggle={() => toggle(key)} />
                     </TableCell>
                     {numbers(row)}
                   </TableRow>
@@ -156,5 +149,92 @@ export function CategoriesSection({ data }: { data: AnalyticsMonth }) {
         </Table>
       )}
     </Section>
+  );
+}
+
+type CategoryRow = AnalyticsMonth['categories'][number];
+
+/** Назва категорії; група з підкатегоріями — кнопка, що їх розгортає. */
+function CategoryName({
+  row,
+  isOpen,
+  onToggle,
+}: {
+  row: CategoryRow;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  if (!row.subcategories) return row.categoryName;
+  const Chevron = isOpen ? ChevronDown : ChevronRight;
+  return (
+    <button
+      type="button"
+      className="-ml-1 inline-flex items-center gap-1 rounded-sm px-1 text-left hover:bg-muted"
+      aria-expanded={isOpen}
+      onClick={onToggle}
+    >
+      <Chevron className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      {row.categoryName}
+    </button>
+  );
+}
+
+/** Ті самі числа, що й у таблиці, рядками для вузького екрана. */
+function CategoryList({
+  data,
+  expanded,
+  onToggle,
+}: {
+  data: AnalyticsMonth;
+  expanded: ReadonlySet<string>;
+  onToggle: (key: string) => void;
+}) {
+  const { currency } = data;
+  const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
+  const meta = (item: Pick<CategoryRow, 'share' | 'previousSpent'>) =>
+    `${percentText(item.share)} · минулого місяця ${money(item.previousSpent)}`;
+  const change = (item: Pick<CategoryRow, 'change'>) => signedMoney(item.change, currency);
+
+  return (
+    <ul className="divide-y text-sm" data-testid="analytics-category-list">
+      {data.categories.map((row) => {
+        const key = row.categoryId ?? 'none';
+        const isOpen = expanded.has(key);
+        return (
+          <Fragment key={key}>
+            <ListRow
+              className="py-2"
+              data-testid="analytics-category"
+              meta={meta(row)}
+              amount={money(row.spent)}
+              note={change(row)}
+            >
+              <CategoryName row={row} isOpen={isOpen} onToggle={() => onToggle(key)} />
+            </ListRow>
+            {isOpen &&
+              row.subcategories?.map((child) => (
+                <ListRow
+                  key={`${key}:${child.categoryId}:${child.categoryName}`}
+                  className="py-2 pl-6 text-muted-foreground"
+                  data-testid="analytics-subcategory"
+                  meta={meta(child)}
+                  amount={money(child.spent)}
+                  note={change(child)}
+                >
+                  {child.categoryName}
+                </ListRow>
+              ))}
+          </Fragment>
+        );
+      })}
+      <ListRow
+        className="py-2 font-medium"
+        meta={`минулого місяця ${money(data.previousTotalSpent)}`}
+        amount={money(data.totalSpent)}
+        note={change(data)}
+      >
+        Разом
+      </ListRow>
+    </ul>
   );
 }

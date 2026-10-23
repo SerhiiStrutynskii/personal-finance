@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent } from '../../shared/ui/card.tsx';
 import { Muted } from '../../shared/ui/controls.tsx';
 import { monthLabel } from '../../shared/ui/format.ts';
-import { Figure, Section } from './parts.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
+import { Section } from './parts.tsx';
 import { ShoppingPeriodSection } from './ShoppingPeriodSection.tsx';
 import { signedMoney } from './signedMoney.ts';
 
@@ -45,16 +46,19 @@ function MonthFigures({ data }: { data: ShoppingAnalytics }) {
     <Card data-testid="shopping-month">
       <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Figure
+          compact
           title={`Куплено за ${monthLabel(data.month).toLowerCase()}`}
           value={money(data.spent)}
           hint={`${signedMoney(data.change, currency)} до попереднього місяця`}
         />
         <Figure
+          compact
           title="Відхилення від очікуваних цін"
           value={signedMoney(data.deviation, currency)}
           hint={deviationHint(data)}
         />
         <Figure
+          compact
           title="Покупок за місяць"
           value={String(data.purchaseCount)}
           hint={data.unpricedCount > 0 ? `без ціни: ${data.unpricedCount}` : undefined}
