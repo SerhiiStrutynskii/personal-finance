@@ -1,0 +1,41 @@
+import {
+  Calculator,
+  ChartArea,
+  CreditCard,
+  HandCoins,
+  Home,
+  ShoppingCart,
+  Tags,
+  Target,
+  TrendingUp,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
+
+export interface NavItem {
+  title: string;
+  icon: LucideIcon;
+  route: string;
+}
+
+export const navItems: NavItem[] = [
+  { title: 'Головна', icon: Home, route: '/' },
+  { title: 'Витрати', icon: HandCoins, route: '/expenses' },
+  { title: 'Прибутки', icon: TrendingUp, route: '/incomes' },
+  { title: 'Рахунки', icon: CreditCard, route: '/accounts' },
+  { title: 'Категорії', icon: Tags, route: '/categories' },
+  { title: 'Бюджет', icon: Calculator, route: '/budget' },
+  { title: 'Борги', icon: Wallet, route: '/debts' },
+  { title: 'Цілі', icon: Target, route: '/goals' },
+  { title: 'Покупки', icon: ShoppingCart, route: '/shopping' },
+  { title: 'Аналітика', icon: ChartArea, route: '/analytics' },
+];
+
+/** Розділ меню, до якого належить сторінка: `/shopping/42` → «Покупки». */
+export function currentNavItem(pathname: string): NavItem | undefined {
+  return navItems.find((item) =>
+    item.route === '/'
+      ? pathname === '/'
+      : pathname === item.route || pathname.startsWith(`${item.route}/`),
+  );
+}
