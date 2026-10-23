@@ -114,24 +114,16 @@ function DebtRow({
       data-testid="debt-row"
       data-status={debt.month.status}
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-        <div className="min-w-0">
-          <Link className="font-medium underline-offset-4 hover:underline" to={`/debts/${debt.id}`}>
-            {debt.name}
-          </Link>
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Icon className="size-4" aria-hidden />
-            {DEBT_TYPE_LABELS[debt.type]} · {rateText(debt)}
-            {closed && ' · закрито'}
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
-          <div className="text-right">
-            <div className="text-base font-semibold tabular-nums">{money(debt.balance)}</div>
-            <div className="text-muted-foreground">
-              Платіж {money(debt.monthlyPayment)} до {formatDayMonth(debt.month.dueDate)}
-            </div>
-          </div>
+      {/* Залишок і дії праворуч від назви; деталі під ними на всю ширину картки. */}
+      <div className="flex items-start justify-between gap-3">
+        <Link
+          className="min-w-0 font-medium break-words underline-offset-4 hover:underline"
+          to={`/debts/${debt.id}`}
+        >
+          {debt.name}
+        </Link>
+        <div className="-my-1.5 -mr-2 flex shrink-0 items-center gap-1">
+          <div className="text-base font-semibold tabular-nums">{money(debt.balance)}</div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label={`Дії з боргом «${debt.name}»`}>
@@ -151,6 +143,14 @@ function DebtRow({
           </DropdownMenu>
         </div>
       </div>
+      <div className="flex items-center gap-1 text-muted-foreground">
+        <Icon className="size-4 shrink-0" aria-hidden />
+        {DEBT_TYPE_LABELS[debt.type]} · {rateText(debt)}
+        {closed && ' · закрито'}
+      </div>
+      <div className="text-muted-foreground">
+        Платіж {money(debt.monthlyPayment)} до {formatDayMonth(debt.month.dueDate)}
+      </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         {closed ? (
@@ -159,8 +159,8 @@ function DebtRow({
           <PaymentStatusLabel payment={debt.month} today={today} currency={debt.currency} />
         )}
         {debt.card ? (
-          <div className="w-full sm:w-64">
-            <div className="mb-1 text-right text-muted-foreground">
+          <div className="w-full sm:w-96">
+            <div className="mb-1 text-muted-foreground sm:text-right">
               Використано {money(debt.balance)} з {money(debt.card.creditLimit)}
               {debt.card.nearLimit && ' · ліміт майже вичерпано'}
             </div>
@@ -172,8 +172,8 @@ function DebtRow({
           </div>
         ) : (
           debt.initialAmount > 0 && (
-            <div className="w-full sm:w-64">
-              <div className="mb-1 text-right text-muted-foreground">
+            <div className="w-full sm:w-96">
+              <div className="mb-1 text-muted-foreground sm:text-right">
                 Погашено {money(Math.max(0, debt.initialAmount - debt.balance))} з{' '}
                 {money(debt.initialAmount)}
               </div>

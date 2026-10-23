@@ -7,18 +7,24 @@ export function Figure({
   value,
   hint,
   compact = false,
+  testId,
 }: {
   title: string;
   value: string;
   hint?: string;
   compact?: boolean;
+  /** data-testid на самій сумі. */
+  testId?: string;
 }) {
   return (
     <div
       className={compact ? 'flex flex-wrap items-baseline justify-between gap-x-4 sm:block' : ''}
     >
       <div className="text-sm text-muted-foreground">{title}</div>
-      <div className={`font-semibold tabular-nums ${compact ? 'text-base sm:text-xl' : 'text-xl'}`}>
+      <div
+        className={`font-semibold tabular-nums ${compact ? 'text-base sm:text-xl' : 'text-xl'}`}
+        data-testid={testId}
+      >
         {value}
       </div>
       {hint && (

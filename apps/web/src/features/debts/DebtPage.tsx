@@ -14,12 +14,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../shared/ui/dropdown-menu.tsx';
+import { Figure } from '../../shared/ui/figure.tsx';
 import {
-  formatDate,
   formatDateString,
   formatDayMonth,
+  formatShortDate,
   monthLabel,
 } from '../../shared/ui/format.ts';
+import { ListRow } from '../../shared/ui/list-row.tsx';
 import { Progress } from '../../shared/ui/progress.tsx';
 import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
@@ -99,7 +101,7 @@ function DebtContent({ debt }: { debt: DebtDetails }) {
           </div>
           {debt.description && <p className="mt-1 text-sm">{debt.description}</p>}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {!closed && (
             <>
               <Button onClick={open('pay')} disabled={debt.balance === 0}>
@@ -143,13 +145,14 @@ function DebtContent({ debt }: { debt: DebtDetails }) {
 
       <Card>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
             <Figure title="Залишок боргу" value={money(debt.balance)} testId="debt-balance" />
             <Figure
+              compact
               title={isCard ? 'Мінімальний платіж' : 'Щомісячний платіж'}
               value={`${money(debt.monthlyPayment)} до ${formatDayMonth(debt.month.dueDate)}`}
             />
-            <Figure title="Ставка" value={rateText(debt)} />
+            <Figure compact title="Ставка" value={rateText(debt)} />
           </div>
           {!closed && (
             <div
@@ -276,17 +279,6 @@ function DebtContent({ debt }: { debt: DebtDetails }) {
 const accountName = (accounts: readonly Account[] | undefined, id: string | null) =>
   id ? (accounts?.find((account) => account.id === id)?.name ?? '—') : '—';
 
-function Figure({ title, value, testId }: { title: string; value: string; testId?: string }) {
-  return (
-    <div>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="text-xl font-semibold tabular-nums" data-testid={testId}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function Term({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 border-b py-1">
@@ -309,24 +301,20 @@ function LoanHistory({ debt, accounts }: { debt: DebtDetails; accounts: readonly
       <ErrorText>{remove.isError && errorMessage(remove.error)}</ErrorText>
       <ul className="divide-y text-sm" data-testid="debt-history">
         {debt.entries.map((entry) => (
-          <li key={entry.id} className="flex items-center justify-between gap-4 py-2">
-            <div className="min-w-0">
-              <div>
-                {formatDateString(entry.date)} · {ENTRY_LABELS[entry.kind]}
-                {entry.accountId && ` з рахунку «${accountName(accounts, entry.accountId)}»`}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {entry.kind === 'payment' &&
-                  `тіло ${money(entry.principalPart ?? 0)}, відсотки ${money(entry.interestPart ?? 0)}`}
-                {entry.note}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="tabular-nums">
-                {/* Платіж і від'ємна звірка зменшують борг, нарахування — збільшує. */}
-                {entry.kind === 'payment' ? '−' : entry.amount < 0 ? '−' : '+'}
-                {money(Math.abs(entry.amount))}
-              </span>
+          <ListRow
+            key={entry.id}
+            className="items-center py-2"
+            meta={[
+              formatDateString(entry.date),
+              entry.kind === 'payment' &&
+                `тіло ${money(entry.principalPart ?? 0)}, відсотки ${money(entry.interestPart ?? 0)}`,
+              entry.note,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            // Платіж і від'ємна звірка зменшують борг, нарахування — збільшує.
+            amount={`${entry.kind === 'payment' || entry.amount < 0 ? '−' : '+'}${money(Math.abs(entry.amount))}`}
+            actions={
               <ConfirmButton
                 title="Видалити цей запис?"
                 description={
@@ -337,8 +325,11 @@ function LoanHistory({ debt, accounts }: { debt: DebtDetails; accounts: readonly
                 disabled={remove.isPending}
                 onConfirm={() => remove.mutate({ id: debt.id, entryId: entry.id })}
               />
-            </div>
-          </li>
+            }
+          >
+            {ENTRY_LABELS[entry.kind]}
+            {entry.accountId && ` з рахунку «${accountName(accounts, entry.accountId)}»`}
+          </ListRow>
         ))}
       </ul>
     </>
@@ -380,19 +371,20 @@ function CardHistory({ debt, accounts }: { debt: DebtDetails; accounts: readonly
               ? ` з рахунку «${accountName(accounts, transaction.accountId)}»`
               : '';
           return (
-            <li key={transaction.id} className="flex items-center justify-between gap-4 py-2">
-              <div className="min-w-0">
-                <div>
-                  {formatDate(transaction.occurredAt, user.timeZone)} · {label}
-                  {from}
-                </div>
-                <div className="text-xs text-muted-foreground">{transaction.description}</div>
-              </div>
-              <span className="tabular-nums">
-                {increases ? '+' : '−'}
-                {money(amount)}
-              </span>
-            </li>
+            <ListRow
+              key={transaction.id}
+              className="py-2"
+              meta={[
+                formatShortDate(transaction.occurredAt, user.timeZone),
+                transaction.description,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              amount={`${increases ? '+' : '−'}${money(amount)}`}
+            >
+              {label}
+              {from}
+            </ListRow>
           );
         })}
       </ul>
