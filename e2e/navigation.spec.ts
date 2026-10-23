@@ -201,6 +201,10 @@ test.describe('телефон', () => {
         return box && [box.width, Math.round(box.y + box.height)];
       })
       .toEqual([390, 844]);
+    // поля й кнопки форми — 40px, під палець
+    expect((await dialog.getByLabel('Назва').boundingBox())?.height).toBe(40);
+    expect((await dialog.getByRole('combobox').first().boundingBox())?.height).toBe(40);
+    expect((await dialog.getByRole('button', { name: 'Зберегти' }).boundingBox())?.height).toBe(40);
 
     // Відкрита клавіатура лишає мало місця: заголовок видно, кнопка доступна прокручуванням.
     await page.setViewportSize({ width: 390, height: 450 });

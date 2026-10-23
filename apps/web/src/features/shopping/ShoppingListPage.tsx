@@ -191,7 +191,7 @@ function AddItemForm({ list }: { list: ShoppingList }) {
           onChange={(e) => setValues({ ...values, quantity: e.target.value })}
         />
       </Field>
-      <Button type="submit" className="self-end" disabled={add.isPending}>
+      <Button type="submit" className="self-end max-sm:h-10" disabled={add.isPending}>
         Додати
       </Button>
 
@@ -318,7 +318,7 @@ function ItemRow({ item, currency, disabled, onUpdate, onEdit, onRemove }: ItemR
         data-testid="shopping-item"
         className={cn('flex items-start gap-3 py-2', isBought && 'opacity-60')}
       >
-        <div className="flex h-9 items-center">{checkbox}</div>
+        <div className="flex h-10 items-center">{checkbox}</div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             {name}

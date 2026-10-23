@@ -119,7 +119,7 @@ export function LoginPage() {
           />
         </Field>
         <ErrorText>{error}</ErrorText>
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full max-sm:h-10" disabled={pending}>
           Увійти
         </Button>
       </form>
@@ -188,7 +188,7 @@ export function RegisterPage() {
           />
         </Field>
         <ErrorText>{error}</ErrorText>
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full max-sm:h-10" disabled={pending}>
           Зареєструватися
         </Button>
       </form>

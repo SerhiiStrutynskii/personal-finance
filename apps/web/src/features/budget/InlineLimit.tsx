@@ -79,12 +79,19 @@ export function InlineLimit({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
         />
-        <Button type="submit" size="icon-sm" aria-label="Зберегти ліміт" disabled={save.isPending}>
+        <Button
+          type="submit"
+          size="icon-sm"
+          className="max-sm:size-10"
+          aria-label="Зберегти ліміт"
+          disabled={save.isPending}
+        >
           <Check />
         </Button>
         <Button
           variant="ghost"
           size="icon-sm"
+          className="max-sm:size-10"
           aria-label="Скасувати"
           onClick={() => setEditing(false)}
         >
