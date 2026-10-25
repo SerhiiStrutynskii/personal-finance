@@ -1,4 +1,11 @@
-import type { AuthSession, CurrentUser, LoginInput, RegisterInput } from '@hf/shared';
+import type {
+  AuthSession,
+  AuthTokens,
+  ChangePasswordInput,
+  CurrentUser,
+  LoginInput,
+  RegisterInput,
+} from '@hf/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
@@ -74,6 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Локально сесію вже завершено; відкликання на сервері — найкраща спроба.
           api.post('/api/auth/logout', { refreshToken }, { auth: false }).catch(() => {});
         }
+      },
+      async changePassword(input: ChangePasswordInput) {
+        // Користувач той самий: кеш лишається, змінюються лише токени.
+        const { accessToken, refreshToken } = await api.post<AuthTokens>(
+          '/api/auth/password',
+          input,
+        );
+        tokenStore.setTokens({ accessToken, refreshToken });
       },
       retry: () => void me.refetch(),
       async reloadCurrentUser() {

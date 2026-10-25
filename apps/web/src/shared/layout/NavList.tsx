@@ -1,6 +1,7 @@
-import { LogOut } from 'lucide-react';
+import { KeyRound, LogOut } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../features/auth/authContext.ts';
+import { ChangePasswordDialog } from '../../features/auth/ChangePasswordDialog.tsx';
 import { navItems } from './navItems.ts';
 import { SidebarItem } from './SidebarItem.tsx';
 
@@ -30,6 +31,13 @@ export function NavList({ isOpen, onNavigate }: { isOpen: boolean; onNavigate?: 
             <div className="truncate text-xs text-black/50">{current.household.name}</div>
           </div>
         )}
+        <ChangePasswordDialog
+          trigger={
+            <button className="block w-full text-left" title="Змінити пароль">
+              <SidebarItem title="Змінити пароль" icon={KeyRound} isOpen={isOpen} />
+            </button>
+          }
+        />
         <button className="block w-full text-left" onClick={logout} title="Вийти">
           <SidebarItem title="Вийти" icon={LogOut} isOpen={isOpen} />
         </button>
