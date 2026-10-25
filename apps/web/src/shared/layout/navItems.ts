@@ -9,6 +9,7 @@ import {
   Target,
   TrendingUp,
   Users,
+  UtensilsCrossed,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ export const navItems: NavItem[] = [
   { title: 'Борги', icon: Wallet, route: '/debts' },
   { title: 'Цілі', icon: Target, route: '/goals' },
   { title: 'Покупки', icon: ShoppingCart, route: '/shopping' },
+  { title: 'Меню', icon: UtensilsCrossed, route: '/menu' },
   { title: 'Аналітика', icon: ChartArea, route: '/analytics' },
   { title: 'Домогосподарство', icon: Users, route: '/household' },
 ];
