@@ -3,10 +3,16 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { refreshTokens, users } from '../../../db/schema.ts';
 import { setupTestApp } from '../../../test/harness.ts';
-import { LOGIN_MAX_FAILURES, LOGIN_WINDOW_MS } from '../rate-limiter.ts';
+import {
+  LOGIN_MAX_FAILURES,
+  LOGIN_WINDOW_MS,
+  PASSWORD_CHANGE_MAX_FAILURES,
+  PASSWORD_CHANGE_WINDOW_MS,
+} from '../rate-limiter.ts';
 import { ACCESS_TOKEN_TTL_SECONDS, createTokenService, hashRefreshToken } from '../tokens.ts';
 
-const { app, db, tokens, clock, client, createActor } = setupTestApp();
+const { app, db, tokens, clock, client, createActor, lockUser, waitForLockWaiters } =
+  setupTestApp();
 
 const credentials = { email: 'olena@example.com', password: 'correct-horse-battery' };
 const registration = { ...credentials, name: 'Олена' };
@@ -281,5 +287,414 @@ describe('вихід', () => {
 
   it('завжди відповідає 204, навіть для невідомого токена', async () => {
     expect((await post('/api/auth/logout', { refreshToken: 'unknown' })).status).toBe(204);
+  });
+});
+
+describe('зміна пароля', () => {
+  const newPassword = 'new-staple-horse-battery';
+  const wrongPassword = 'wrong-password-123';
+  const refresh = (refreshToken: string) => post('/api/auth/refresh', { refreshToken });
+  const changePassword = (accessToken: string, body: object) =>
+    client(accessToken).post('/api/auth/password', body);
+  const change = (accessToken: string, override: object = {}) =>
+    changePassword(accessToken, {
+      currentPassword: credentials.password,
+      newPassword,
+      ...override,
+    });
+  const passwordHashOf = async (email = credentials.email) => {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user!.passwordHash;
+  };
+
+  it('AC1: видає нову пару токенів; access-токен дійсний', async () => {
+    const { body: session } = await register();
+    const res = await change(session.accessToken);
+
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.body).sort()).toEqual(['accessToken', 'expiresIn', 'refreshToken']);
+    expect(res.body.expiresIn).toBe(900);
+    expect(res.body.refreshToken).not.toBe(session.refreshToken);
+    expect((await me(res.body.accessToken)).status).toBe(200);
+  });
+
+  it('AC2: після зміни входить лише новий пароль; у БД — хеш argon2id', async () => {
+    const { body: session } = await register();
+    expect((await change(session.accessToken)).status).toBe(200);
+
+    expect((await login()).status).toBe(401);
+    expect((await login({ password: newPassword })).status).toBe(200);
+    const hash = await passwordHashOf();
+    expect(hash).toMatch(/^\$argon2id\$/);
+    expect(hash).not.toContain(newPassword);
+  });
+
+  it('AC3: невірний поточний пароль — 422, нічого не змінюється', async () => {
+    const { body: session } = await register();
+    const hashBefore = await passwordHashOf();
+
+    const res = await change(session.accessToken, { currentPassword: wrongPassword });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('CURRENT_PASSWORD_INVALID');
+    expect(res.body.error.message).toBe('Поточний пароль невірний');
+
+    expect(await passwordHashOf()).toBe(hashBefore);
+    const tokens = await db.select().from(refreshTokens);
+    expect(tokens.every((row) => row.revokedAt === null)).toBe(true);
+    expect((await refresh(session.refreshToken)).status).toBe(200);
+  });
+
+  it.each([
+    ['новий із 9 символів', { newPassword: '123456789' }, 400],
+    ['новий із 10 символів', { newPassword: '1234567890' }, 200],
+    ['новий із 128 символів', { newPassword: 'x'.repeat(128) }, 200],
+    ['новий із 129 символів', { newPassword: 'x'.repeat(129) }, 400],
+    ['порожній поточний', { currentPassword: '' }, 400],
+    ['відсутній поточний', { currentPassword: undefined }, 400],
+    ['відсутній новий', { newPassword: undefined }, 400],
+    ['пароль не рядком', { newPassword: 12345678901 }, 400],
+  ])('AC4: %s → %i', async (_name, override, status) => {
+    const { body: session } = await register();
+    const res = await change(session.accessToken, override);
+
+    expect(res.status).toBe(status);
+    if (status === 400) expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('AC5: новий пароль, що збігається з поточним, — 400 з path newPassword', async () => {
+    const { body: session } = await register();
+    const res = await change(session.accessToken, { newPassword: credentials.password });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(JSON.stringify(res.body)).toContain('newPassword');
+    expect(JSON.stringify(res.body)).toContain('Новий пароль має відрізнятися від поточного');
+  });
+
+  it('AC6: без access-токена або з недійсним — 401, пароль не змінено', async () => {
+    const { body: session } = await register();
+    const hashBefore = await passwordHashOf();
+    const expired = await tokens.signAccessToken(
+      session.user.id,
+      new Date(Date.now() - (ACCESS_TOKEN_TTL_SECONDS + 1) * 1000),
+    );
+    const body = { currentPassword: credentials.password, newPassword };
+
+    expect((await post('/api/auth/password', body)).status).toBe(401);
+    expect((await changePassword('not.a.jwt', body)).status).toBe(401);
+    expect((await changePassword(expired, body)).status).toBe(401);
+    expect(await passwordHashOf()).toBe(hashBefore);
+    expect((await login()).status).toBe(200);
+  });
+
+  it(`AC7: після ${PASSWORD_CHANGE_MAX_FAILURES} невдач — 429 навіть із вірним паролем; з часом знімається`, async () => {
+    const { body: session } = await register();
+    for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_FAILURES; attempt++) {
+      expect((await change(session.accessToken, { currentPassword: wrongPassword })).status).toBe(
+        422,
+      );
+    }
+    const hashBefore = await passwordHashOf();
+
+    const blocked = await change(session.accessToken);
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error.code).toBe('TOO_MANY_REQUESTS');
+    expect(await passwordHashOf()).toBe(hashBefore);
+
+    clock.now += PASSWORD_CHANGE_WINDOW_MS;
+    expect((await change(session.accessToken)).status).toBe(200);
+  });
+
+  it('AC8: успіх скидає лічильник; помилки валідації його не збільшують', async () => {
+    const { body: session } = await register();
+    let access = session.accessToken as string;
+    let current = credentials.password;
+    for (let round = 0; round < 2; round++) {
+      for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_FAILURES - 1; attempt++) {
+        expect((await change(access, { currentPassword: wrongPassword })).status).toBe(422);
+      }
+      // 400 не рахується: інакше наступна спроба була б п'ятою невдачею.
+      expect(
+        (await change(access, { currentPassword: current, newPassword: 'short' })).status,
+      ).toBe(400);
+      const next = `${newPassword}-${round}`;
+      const res = await change(access, { currentPassword: current, newPassword: next });
+      expect(res.status).toBe(200);
+      access = res.body.accessToken;
+      current = next;
+    }
+  });
+
+  it('AC9: лічильник окремий для кожного користувача і не пов’язаний із входом', async () => {
+    const { body: olena } = await register();
+    const { body: ivan } = await register({ email: 'ivan@example.com' });
+    for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_FAILURES; attempt++) {
+      await change(olena.accessToken, { currentPassword: wrongPassword });
+    }
+    expect((await change(olena.accessToken)).status).toBe(429);
+
+    expect((await change(ivan.accessToken)).status).toBe(200);
+    expect((await login()).status).toBe(200);
+
+    // і навпаки: заблокований вхід не блокує зміну пароля
+    for (let attempt = 0; attempt < LOGIN_MAX_FAILURES; attempt++) {
+      await login({ email: 'ivan@example.com', password: wrongPassword });
+    }
+    expect((await login({ email: 'ivan@example.com', password: newPassword })).status).toBe(429);
+    const ivanChange = await change(ivan.accessToken, {
+      currentPassword: newPassword,
+      newPassword: 'third-password-value',
+    });
+    expect(ivanChange.status).toBe(200);
+  });
+
+  it('AC10: старі refresh-токени всіх пристроїв відкликано, новий діє', async () => {
+    await register();
+    const { body: device1 } = await login();
+    const { body: device2 } = await login();
+
+    const res = await change(device1.accessToken);
+    expect(res.status).toBe(200);
+
+    expect((await refresh(device1.refreshToken)).status).toBe(401);
+    expect((await refresh(device2.refreshToken)).status).toBe(401);
+    expect((await refresh(res.body.refreshToken)).status).toBe(200);
+  });
+
+  it('AC11: виданий раніше access-токен іншого пристрою діє до кінця свого строку', async () => {
+    const { body: device1 } = await register();
+    const userId = device1.user.id as string;
+    const device2Access = await tokens.signAccessToken(userId);
+    const device2AlmostExpired = await tokens.signAccessToken(
+      userId,
+      new Date(Date.now() - (ACCESS_TOKEN_TTL_SECONDS - 30) * 1000),
+    );
+    expect((await change(device1.accessToken)).status).toBe(200);
+
+    expect((await me(device2Access)).status).toBe(200);
+    expect((await me(device2AlmostExpired)).status).toBe(200);
+    const expired = await tokens.signAccessToken(
+      userId,
+      new Date(Date.now() - (ACCESS_TOKEN_TTL_SECONDS + 1) * 1000),
+    );
+    expect((await me(expired)).status).toBe(401);
+  });
+
+  it('AC12: не зачіпає токени й пароль іншого користувача, навіть з того самого домогосподарства', async () => {
+    const { body: owner } = await register();
+    const invite = await client(owner.accessToken).post('/api/household/invites', {});
+    expect(invite.status).toBe(201);
+    const memberCredentials = { email: 'ivan@example.com', password: 'member-password-1' };
+    const { body: member } = await register({
+      ...memberCredentials,
+      name: 'Іван',
+      inviteToken: invite.body.token,
+    });
+    expect(member.household.id).toBe(owner.household.id);
+    const memberHash = await passwordHashOf(memberCredentials.email);
+
+    // userId у тілі ігнорується: змінюється пароль лише власника access-токена
+    const res = await change(owner.accessToken, { userId: member.user.id });
+    expect(res.status).toBe(200);
+
+    expect(await passwordHashOf(memberCredentials.email)).toBe(memberHash);
+    expect((await login(memberCredentials)).status).toBe(200);
+    expect((await refresh(member.refreshToken)).status).toBe(200);
+    expect((await login({ password: newPassword })).status).toBe(200);
+  });
+
+  it('AC13: учасник домогосподарства змінює свій пароль', async () => {
+    const { body: owner } = await register();
+    const invite = await client(owner.accessToken).post('/api/household/invites', {});
+    const { body: member } = await register({
+      email: 'ivan@example.com',
+      name: 'Іван',
+      inviteToken: invite.body.token,
+    });
+    expect(member.household.role).toBe('member');
+
+    const res = await change(member.accessToken);
+    expect(res.status).toBe(200);
+    expect((await login({ email: 'ivan@example.com', password: newPassword })).status).toBe(200);
+  });
+
+  it('AC14: тіла помилок не містять надісланих паролів', async () => {
+    const { body: session } = await register();
+    const secretCurrent = 'secret-current-value-1';
+    const secretNew = 'secret-new-value-2';
+    const bodies: string[] = [];
+
+    const invalid = await change(session.accessToken, {
+      currentPassword: secretCurrent,
+      newPassword: 'short-pw',
+    });
+    expect(invalid.status).toBe(400);
+    bodies.push(invalid.text);
+    const same = await change(session.accessToken, {
+      currentPassword: secretCurrent,
+      newPassword: secretCurrent,
+    });
+    expect(same.status).toBe(400);
+    bodies.push(same.text);
+    for (let attempt = 0; attempt < PASSWORD_CHANGE_MAX_FAILURES; attempt++) {
+      const wrong = await change(session.accessToken, {
+        currentPassword: secretCurrent,
+        newPassword: secretNew,
+      });
+      expect(wrong.status).toBe(422);
+      bodies.push(wrong.text);
+    }
+    const blocked = await change(session.accessToken, {
+      currentPassword: secretCurrent,
+      newPassword: secretNew,
+    });
+    expect(blocked.status).toBe(429);
+    bodies.push(blocked.text);
+
+    for (const text of bodies) {
+      expect(text).not.toContain(secretCurrent);
+      expect(text).not.toContain(secretNew);
+      expect(text).not.toContain('short-pw');
+    }
+  });
+
+  it('AC14a: користувач без пароля отримує 422, пароль не встановлюється', async () => {
+    const actor = await createActor();
+    const res = await change(actor.accessToken, { currentPassword: 'anything-goes' });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('CURRENT_PASSWORD_INVALID');
+    const [user] = await db.select().from(users).where(eq(users.id, actor.userId));
+    expect(user!.passwordHash).toBeNull();
+  });
+
+  it('AC14b: з двох одночасних змін з тим самим поточним паролем успішна не більше одна', async () => {
+    const { body: session } = await register();
+    const results = await Promise.all([
+      change(session.accessToken, { newPassword: 'first-new-password' }),
+      change(session.accessToken, { newPassword: 'second-new-password' }),
+    ]);
+    const statuses = results.map((res) => res.status).sort();
+
+    expect(statuses).toEqual([200, 422]);
+    const winner = results.find((res) => res.status === 200)!;
+    const winnerPassword = winner === results[0] ? 'first-new-password' : 'second-new-password';
+    expect((await login({ password: winnerPassword })).status).toBe(200);
+  });
+
+  describe('одночасно з входом і оновленням токена', () => {
+    // Тест тримає рядок користувача сам і відпускає його, коли обидва запити стали в чергу.
+    // Черга на рядок у PostgreSQL — у порядку надходження, тож порядок задає тест, а не таймінг.
+    const start = (test: request.Test) => test.then((res) => res);
+
+    it('вхід старим паролем, що чекає за зміною пароля, — 401', async () => {
+      const { body: session } = await register();
+      const lock = await lockUser(session.user.id);
+
+      const changing = start(change(session.accessToken));
+      await waitForLockWaiters(1);
+      // Вхід уже прочитав і перевірив старий хеш, але токен видає лише під блокуванням.
+      const loggingIn = start(login());
+      await waitForLockWaiters(2);
+      await lock.release();
+
+      const [changed, loggedIn] = await Promise.all([changing, loggingIn]);
+      expect(changed.status).toBe(200);
+      expect(loggedIn.status).toBe(401);
+      expect((await refresh(changed.body.refreshToken)).status).toBe(200);
+    });
+
+    it('вхід, що встиг до зміни пароля, — його refresh-токен зміна відкликає', async () => {
+      const { body: session } = await register();
+      const lock = await lockUser(session.user.id);
+
+      const loggingIn = start(login());
+      await waitForLockWaiters(1);
+      const changing = start(change(session.accessToken));
+      await waitForLockWaiters(2);
+      await lock.release();
+
+      const [loggedIn, changed] = await Promise.all([loggingIn, changing]);
+      expect(loggedIn.status).toBe(200);
+      expect(changed.status).toBe(200);
+      expect((await refresh(loggedIn.body.refreshToken)).status).toBe(401);
+      expect((await refresh(changed.body.refreshToken)).status).toBe(200);
+    });
+
+    it('оновлення токена, що чекає за зміною пароля, — 401', async () => {
+      const { body: session } = await register();
+      const { body: device2 } = await login();
+      const lock = await lockUser(session.user.id);
+
+      const changing = start(change(session.accessToken));
+      await waitForLockWaiters(1);
+      const refreshing = start(post('/api/auth/refresh', { refreshToken: device2.refreshToken }));
+      await waitForLockWaiters(2);
+      await lock.release();
+
+      const [changed, refreshed] = await Promise.all([changing, refreshing]);
+      expect(changed.status).toBe(200);
+      expect(refreshed.status).toBe(401);
+      expect((await refresh(device2.refreshToken)).status).toBe(401);
+      expect((await refresh(changed.body.refreshToken)).status).toBe(200);
+    });
+
+    it('оновлення, що встигло до зміни пароля, — виданий ним токен зміна відкликає', async () => {
+      const { body: session } = await register();
+      const { body: device2 } = await login();
+      const lock = await lockUser(session.user.id);
+
+      const refreshing = start(post('/api/auth/refresh', { refreshToken: device2.refreshToken }));
+      await waitForLockWaiters(1);
+      const changing = start(change(session.accessToken));
+      await waitForLockWaiters(2);
+      await lock.release();
+
+      const [refreshed, changed] = await Promise.all([refreshing, changing]);
+      expect(refreshed.status).toBe(200);
+      expect(changed.status).toBe(200);
+      expect((await refresh(refreshed.body.refreshToken)).status).toBe(401);
+      expect((await refresh(changed.body.refreshToken)).status).toBe(200);
+    });
+
+    it('без зовнішнього блокування: жоден виданий токен не переживає зміну пароля', async () => {
+      const { body: session } = await register();
+      const { body: device2 } = await login();
+      const results = await Promise.all([
+        change(session.accessToken),
+        login(),
+        login(),
+        refresh(device2.refreshToken),
+      ]);
+      const [changed, ...others] = results;
+
+      expect(changed!.status).toBe(200);
+      for (const res of others.filter((other) => other.status === 200)) {
+        expect((await refresh(res.body.refreshToken)).status).toBe(401);
+      }
+      expect((await refresh(changed!.body.refreshToken)).status).toBe(200);
+    });
+
+    it('паралельні оновлення різних входів не блокують одне одного', async () => {
+      await register();
+      const { body: first } = await login();
+      const { body: second } = await login();
+      const [a, b] = await Promise.all([refresh(first.refreshToken), refresh(second.refreshToken)]);
+      expect([a.status, b.status]).toEqual([200, 200]);
+    });
+
+    it('паралельні невдалі спроби не обходять ліміт', async () => {
+      const { body: session } = await register();
+      const attempts = await Promise.all(
+        Array.from({ length: PASSWORD_CHANGE_MAX_FAILURES + 3 }, () =>
+          change(session.accessToken, { currentPassword: wrongPassword }),
+        ),
+      );
+      const statuses = attempts.map((res) => res.status);
+      expect(statuses.filter((status) => status === 422)).toHaveLength(
+        PASSWORD_CHANGE_MAX_FAILURES,
+      );
+      expect(statuses.filter((status) => status === 429)).toHaveLength(3);
+    });
   });
 });

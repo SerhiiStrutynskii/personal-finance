@@ -4,7 +4,7 @@ import { afterAll, beforeEach } from 'vitest';
 import { createApp } from '../app.ts';
 import { createDb } from '../db/client.ts';
 import { householdMembers, households, transactions, users } from '../db/schema.ts';
-import { createLoginLimiter } from '../modules/auth/rate-limiter.ts';
+import { createLoginLimiter, createPasswordChangeLimiter } from '../modules/auth/rate-limiter.ts';
 import { createTokenService } from '../modules/auth/tokens.ts';
 import { testDatabaseUrl } from './database-url.ts';
 
@@ -34,12 +34,13 @@ export function setupTestApp() {
     corsOrigin: 'http://localhost',
     jwtSecret: TEST_JWT_SECRET,
     loginLimiter: createLoginLimiter(() => clock.now),
+    passwordChangeLimiter: createPasswordChangeLimiter(() => clock.now),
     now: () => time.fixed ?? new Date(),
   });
 
   beforeEach(async () => {
     await db.execute(sql`TRUNCATE users, households RESTART IDENTITY CASCADE`);
-    // Зсув часу скидає лічильник невдалих входів між тестами.
+    // Зсув часу скидає лічильники невдалих входів і змін пароля між тестами.
     clock.now += 24 * 60 * 60 * 1000;
     time.fixed = undefined;
   });
@@ -98,5 +99,49 @@ export function setupTestApp() {
     return row!;
   }
 
-  return { app, db, tokens, clock, client, createActor, setNow, insertTransaction };
+  /**
+   * Тримає рядок користувача FOR UPDATE в окремому з'єднанні, доки не викличуть release, — щоб
+   * тест сам визначав, у якому порядку одночасні запити отримають блокування.
+   */
+  async function lockUser(userId: string) {
+    const connection = await pool.connect();
+    await connection.query('BEGIN');
+    await connection.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    return {
+      async release() {
+        await connection.query('COMMIT');
+        connection.release();
+      },
+    };
+  }
+
+  /**
+   * Чекає, доки щонайменше `count` інших з'єднань цієї бази стануть у чергу на блокування.
+   * Перевіряє стан, а не час, тож не ламається під навантаженням.
+   */
+  async function waitForLockWaiters(count: number, timeoutMs = 20_000) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const { rows } = await pool.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM pg_stat_activity
+         WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()`,
+      );
+      if (rows[0]!.n >= count) return;
+      if (Date.now() > deadline) throw new Error(`Не дочекалися ${count} очікувань блокування`);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  return {
+    app,
+    db,
+    tokens,
+    clock,
+    client,
+    createActor,
+    setNow,
+    insertTransaction,
+    lockUser,
+    waitForLockWaiters,
+  };
 }

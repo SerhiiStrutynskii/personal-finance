@@ -47,3 +47,14 @@ export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 export const createLoginLimiter = (now?: () => number) =>
   createRateLimiter({ max: LOGIN_MAX_FAILURES, windowMs: LOGIN_WINDOW_MS, ...(now && { now }) });
+
+export const PASSWORD_CHANGE_MAX_FAILURES = 5;
+export const PASSWORD_CHANGE_WINDOW_MS = 15 * 60 * 1000;
+
+/** Невдалі спроби ввести поточний пароль під час зміни пароля; ключ — id користувача. */
+export const createPasswordChangeLimiter = (now?: () => number) =>
+  createRateLimiter({
+    max: PASSWORD_CHANGE_MAX_FAILURES,
+    windowMs: PASSWORD_CHANGE_WINDOW_MS,
+    ...(now && { now }),
+  });

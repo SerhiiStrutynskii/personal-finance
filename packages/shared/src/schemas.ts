@@ -217,6 +217,21 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+/**
+ * Зміна пароля. Поточний пароль перевіряється лише на розумні межі (його могли встановити за
+ * іншими правилами), новий — за правилами реєстрації.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+    newPassword: passwordSchema,
+  })
+  .refine((value) => value.newPassword !== value.currentPassword, {
+    message: 'Новий пароль має відрізнятися від поточного',
+    path: ['newPassword'],
+  });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 export const refreshSchema = z.object({ refreshToken: z.string().min(1).max(200) });
 export type RefreshInput = z.infer<typeof refreshSchema>;
 

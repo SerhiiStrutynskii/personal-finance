@@ -1,4 +1,4 @@
-import type { CurrentUser, LoginInput, RegisterInput } from '@hf/shared';
+import type { ChangePasswordInput, CurrentUser, LoginInput, RegisterInput } from '@hf/shared';
 import { createContext, useContext } from 'react';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error';
@@ -9,6 +9,8 @@ export interface AuthState {
   login(input: LoginInput): Promise<void>;
   register(input: RegisterInput): Promise<void>;
   logout(): void;
+  /** Змінює пароль; поточна сесія лишається з новою парою токенів, інші сервер завершує. */
+  changePassword(input: ChangePasswordInput): Promise<void>;
   retry(): void;
   /** Перечитує користувача й домогосподарство: після виходу з нього чи перейменування. */
   reloadCurrentUser(): Promise<void>;
