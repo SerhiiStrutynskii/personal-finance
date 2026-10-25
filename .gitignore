@@ -10,3 +10,7 @@ coverage/
 test-results/
 playwright-report/
 backups/
+
+# Фабрика коду: стан задач локальний (board.json, jobs/), у git лише інструменти
+factory/board.json
+factory/jobs/
