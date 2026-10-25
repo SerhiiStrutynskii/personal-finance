@@ -1,11 +1,14 @@
 import type {
   CreateDishInput,
+  CreateMenuShoppingListInput,
   CreateMenuEntryInput,
   Dish,
   DishSummary,
   MealType,
   MenuEntry,
   MenuPeriod,
+  MenuShopping,
+  ShoppingList,
   UpdateDishInput,
 } from '@hf/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -104,4 +107,21 @@ export function useUpdateMenuEntry() {
 
 export function useDeleteMenuEntry() {
   return useMutation({ mutationFn: (id: string) => api.delete(`/api/menu/entries/${id}`) });
+}
+
+/** Продукти для меню періоду [from, to) і бюджет на них за поточними цінами. */
+export function useMenuShopping(from: string, to: string) {
+  return useQuery({
+    queryKey: ['menu', 'shopping', from, to],
+    queryFn: () =>
+      api.get<MenuShopping>(`/api/menu/shopping?${new URLSearchParams({ from, to }).toString()}`),
+  });
+}
+
+/** Звичайний список покупок із продуктів меню періоду. */
+export function useCreateShoppingListFromMenu() {
+  return useMutation({
+    mutationFn: (input: CreateMenuShoppingListInput) =>
+      api.post<ShoppingList>('/api/menu/shopping-list', input),
+  });
 }

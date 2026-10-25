@@ -62,7 +62,8 @@ async function requireList(db: DbOrTx, auth: AuthContext, id: string, lock = fal
   return row;
 }
 
-async function loadList(db: DbOrTx, row: lists.ShoppingListRow): Promise<ShoppingList> {
+/** Список з рядками й підсумками; рядок списку вже перевірено на належність домогосподарству. */
+export async function loadList(db: DbOrTx, row: lists.ShoppingListRow): Promise<ShoppingList> {
   return toList(row, await lists.listItems(db, [row.id]));
 }
 

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_SERVINGS,
   createMenuEntrySchema,
+  createMenuShoppingListSchema,
   menuPeriodQuerySchema,
+  menuShoppingQuerySchema,
+  menuShoppingSchema,
   servingsSchema,
   updateMenuEntrySchema,
 } from '../schemas.ts';
@@ -48,5 +51,73 @@ describe('servingsSchema', () => {
     expect(createMenuEntrySchema.parse(entry).servings).toBe(1);
     expect(createMenuEntrySchema.safeParse({ ...entry, date: '2026-13-01' }).success).toBe(false);
     expect(updateMenuEntrySchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('menuShoppingQuerySchema', () => {
+  it('той самий період, що й у календарі', () => {
+    expect(
+      menuShoppingQuerySchema.safeParse({ from: '2026-10-26', to: '2026-11-02' }).success,
+    ).toBe(true);
+    for (const query of [
+      { from: '2026-10-26', to: '2026-10-26' },
+      { from: '2026-10-01', to: '2026-12-03' },
+      { from: '2026-02-30', to: '2026-03-02' },
+      { to: '2026-11-02' },
+    ]) {
+      expect(menuShoppingQuerySchema.safeParse(query).success).toBe(false);
+    }
+  });
+});
+
+describe('createMenuShoppingListSchema', () => {
+  const week = { from: '2026-10-26', to: '2026-11-02' };
+
+  it('назва необов’язкова; передана — обрізається', () => {
+    expect(createMenuShoppingListSchema.parse(week)).toEqual(week);
+    expect(createMenuShoppingListSchema.parse({ ...week, name: '  На дачу ' }).name).toBe(
+      'На дачу',
+    );
+  });
+
+  it('відхиляє порожню чи задовгу назву й невалідний період', () => {
+    for (const body of [
+      { ...week, name: '' },
+      { ...week, name: '   ' },
+      { ...week, name: 'а'.repeat(101) },
+      { from: '2026-10-26', to: '2026-10-25' },
+      { from: '2026-10-01', to: '2026-12-03' },
+      { from: '2026-10-26' },
+      {},
+    ]) {
+      expect(createMenuShoppingListSchema.safeParse(body).success).toBe(false);
+    }
+    expect(createMenuShoppingListSchema.safeParse({ ...week, name: 'а'.repeat(100) }).success).toBe(
+      true,
+    );
+  });
+});
+
+describe('menuShoppingSchema', () => {
+  it('приймає перелік з продуктом без ціни', () => {
+    const result = menuShoppingSchema.safeParse({
+      from: '2026-10-26',
+      to: '2026-11-02',
+      currency: 'UAH',
+      entryCount: 1,
+      items: [
+        {
+          productId: '00000000-0000-4000-8000-000000000001',
+          name: 'Сіль',
+          unit: 'kg',
+          isArchived: false,
+          quantityMilli: 5,
+          unitPrice: null,
+          lineTotal: null,
+        },
+      ],
+      total: { cost: 0, isPriceComplete: false, unpricedCount: 1 },
+    });
+    expect(result.success).toBe(true);
   });
 });

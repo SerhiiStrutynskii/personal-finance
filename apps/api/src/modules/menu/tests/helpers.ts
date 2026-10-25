@@ -61,3 +61,28 @@ export async function addEntry(
   expect(res.status).toBe(status);
   return res.body as { id: string; servings: number; cost: number };
 }
+
+/** Продукт у довіднику; повертає id. */
+export async function createProduct(actor: Client, body: object): Promise<string> {
+  const res = await actor.post('/api/products', body);
+  expect(res.status).toBe(201);
+  return res.body.id as string;
+}
+
+/** Страва зі складом [{ productId, quantityMilli }]; повертає id. */
+export async function createDish(
+  actor: Client,
+  name: string,
+  ingredients: object[] = [],
+): Promise<string> {
+  const res = await actor.post('/api/dishes', { name, ingredients });
+  expect(res.status).toBe(201);
+  return res.body.id as string;
+}
+
+/** Id прийомів їжі в порядку position. */
+export async function mealTypeIds(actor: Client): Promise<string[]> {
+  const res = await actor.get('/api/meal-types');
+  expect(res.status).toBe(200);
+  return res.body.items.map((item: { id: string }) => item.id);
+}

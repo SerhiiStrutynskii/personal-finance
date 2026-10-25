@@ -57,7 +57,8 @@ export const productsQuerySchema = z.object({
 /** Кількість у тисячних одиниці: 1,5 кг = 1500. */
 export const quantityMilliSchema = z.number().int().positive().max(MAX_QUANTITY_MILLI);
 
-const listNameSchema = z.string().trim().min(1).max(100);
+/** Назва списку покупок. */
+export const listNameSchema = z.string().trim().min(1).max(100);
 
 export const createShoppingListSchema = z.object({ name: listNameSchema });
 export type CreateShoppingListInput = z.infer<typeof createShoppingListSchema>;

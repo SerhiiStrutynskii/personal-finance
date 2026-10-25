@@ -8,6 +8,7 @@ describe('currentNavItem', () => {
     expect(currentNavItem('/shopping/products')?.title).toBe('Покупки');
     expect(currentNavItem('/debts/42')?.title).toBe('Борги');
     expect(currentNavItem('/menu')?.title).toBe('Меню');
+    expect(currentNavItem('/menu/shopping')?.title).toBe('Меню');
   });
 
   it('не плутає схожі префікси й невідомі сторінки', () => {

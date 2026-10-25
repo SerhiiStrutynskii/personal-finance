@@ -2,8 +2,10 @@ import {
   createDishSchema,
   createMealTypeSchema,
   createMenuEntrySchema,
+  createMenuShoppingListSchema,
   idParamsSchema,
   menuPeriodQuerySchema,
+  menuShoppingQuerySchema,
   reorderMealTypesSchema,
   updateDishSchema,
   updateMealTypeSchema,
@@ -15,6 +17,7 @@ import { getAuth } from '../../http/auth.ts';
 import * as dishes from './dishes.service.ts';
 import * as entries from './entries.service.ts';
 import * as mealTypes from './mealTypes.service.ts';
+import * as shopping from './shopping.service.ts';
 
 export function mealTypesRouter(db: Db): Router {
   const router = Router();
@@ -106,6 +109,17 @@ export function menuRouter(db: Db): Router {
     const { id } = idParamsSchema.parse(req.params);
     await entries.deleteEntry(db, getAuth(res), id);
     res.status(204).end();
+  });
+
+  // Покупки за меню: перелік продуктів і бюджет періоду; звичайний список покупок з переліку.
+  router.get('/shopping', async (req, res) => {
+    const query = menuShoppingQuerySchema.parse(req.query);
+    res.json(await shopping.getMenuShopping(db, getAuth(res), query));
+  });
+
+  router.post('/shopping-list', async (req, res) => {
+    const input = createMenuShoppingListSchema.parse(req.body);
+    res.status(201).json(await shopping.createShoppingListFromMenu(db, getAuth(res), input));
   });
 
   return router;

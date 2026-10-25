@@ -3,7 +3,7 @@ import { currencySchema } from '../money.ts';
 import { dateStringSchema } from '../incomes/schemas.ts';
 import { addDays, isValidDateString } from '../incomes/recurrence.ts';
 import { idSchema } from '../schemas.ts';
-import { productUnitSchema, quantityMilliSchema } from '../shopping/schemas.ts';
+import { listNameSchema, productUnitSchema, quantityMilliSchema } from '../shopping/schemas.ts';
 
 export const mealTypeNameSchema = z.string().trim().min(1).max(100);
 export const dishNameSchema = z.string().trim().min(1).max(100);
@@ -114,20 +114,26 @@ export const servingsSchema = z.number().int().min(1).max(MAX_SERVINGS);
 const validDates = ({ from, to }: { from: string; to: string }) =>
   isValidDateString(from) && isValidDateString(to);
 
-/** Період [from, to): from включно, to виключно, не довше 62 днів. */
-export const menuPeriodQuerySchema = z
-  .object({ from: dateStringSchema, to: dateStringSchema })
-  .refine((period) => !validDates(period) || period.to > period.from, {
-    message: 'Кінець періоду має бути пізніше за початок',
-    path: ['to'],
-  })
-  .refine(
-    (period) => !validDates(period) || period.to <= addDays(period.from, MAX_MENU_PERIOD_DAYS),
-    {
-      message: `Період не може бути довшим за ${MAX_MENU_PERIOD_DAYS} дні`,
+/** Перевірки періоду [from, to): to пізніше за from, не довше 62 днів. */
+function withPeriodChecks<T extends z.ZodType<{ from: string; to: string }>>(schema: T): T {
+  return schema
+    .refine((period) => !validDates(period) || period.to > period.from, {
+      message: 'Кінець періоду має бути пізніше за початок',
       path: ['to'],
-    },
-  );
+    })
+    .refine(
+      (period) => !validDates(period) || period.to <= addDays(period.from, MAX_MENU_PERIOD_DAYS),
+      {
+        message: `Період не може бути довшим за ${MAX_MENU_PERIOD_DAYS} дні`,
+        path: ['to'],
+      },
+    );
+}
+
+/** Період [from, to): from включно, to виключно, не довше 62 днів. */
+export const menuPeriodQuerySchema = withPeriodChecks(
+  z.object({ from: dateStringSchema, to: dateStringSchema }),
+);
 export type MenuPeriodQuery = z.infer<typeof menuPeriodQuerySchema>;
 
 export const createMenuEntrySchema = z.object({
@@ -180,3 +186,50 @@ export const menuPeriodSchema = z.object({
   }),
 });
 export type MenuPeriod = z.infer<typeof menuPeriodSchema>;
+
+// --- Покупки за меню ---
+
+/** Той самий період [from, to), що й у календарі. */
+export const menuShoppingQuerySchema = menuPeriodQuerySchema;
+export type MenuShoppingQuery = MenuPeriodQuery;
+
+/** Звичайний список покупок із переліку продуктів меню; name — замість типової назви. */
+export const createMenuShoppingListSchema = withPeriodChecks(
+  z.object({ from: dateStringSchema, to: dateStringSchema, name: listNameSchema.optional() }),
+);
+export type CreateMenuShoppingListInput = z.infer<typeof createMenuShoppingListSchema>;
+
+export const menuShoppingItemSchema = z.object({
+  productId: idSchema,
+  name: z.string(),
+  unit: productUnitSchema,
+  isArchived: z.boolean(),
+  /** Сумарна кількість на всі записи періоду, у тисячних одиниці. */
+  quantityMilli: amountSchema,
+  /** Поточна ціна продукту за одиницю; null — невідома. */
+  unitPrice: amountSchema.nullable(),
+  /** Сумарна кількість × ціна, округлена до копійки; null — ціни немає. */
+  lineTotal: amountSchema.nullable(),
+});
+export type MenuShoppingItem = z.infer<typeof menuShoppingItemSchema>;
+
+export const menuShoppingTotalSchema = z.object({
+  /** Бюджет на продукти: сума рядків з ціною; продукти без ціни дають 0. */
+  cost: amountSchema,
+  isPriceComplete: z.boolean(),
+  /** Кількість продуктів (рядків переліку) без ціни. */
+  unpricedCount: amountSchema,
+});
+export type MenuShoppingTotal = z.infer<typeof menuShoppingTotalSchema>;
+
+export const menuShoppingSchema = z.object({
+  from: dateStringSchema,
+  to: dateStringSchema,
+  currency: currencySchema,
+  /** Кількість записів меню в періоді. */
+  entryCount: amountSchema,
+  /** За назвою продукту. */
+  items: z.array(menuShoppingItemSchema),
+  total: menuShoppingTotalSchema,
+});
+export type MenuShopping = z.infer<typeof menuShoppingSchema>;

@@ -577,3 +577,227 @@ test.describe('календар меню, телефон', () => {
     await expect(meal(page, 'Обід')).toContainText('Нічого не заплановано');
   });
 });
+
+const shoppingItems = (page: Page) => page.getByTestId('menu-shopping-item');
+const shoppingItem = (page: Page, name: string) =>
+  shoppingItems(page).filter({ has: page.getByTestId('menu-shopping-name').getByText(name) });
+const periodButton = (page: Page, name: string) =>
+  page.getByRole('group', { name: 'Період' }).getByRole('button', { name, exact: true });
+
+test.describe('покупки за меню, десктоп', () => {
+  test('перелік і бюджет за тиждень, день і місяць; створення списку', async ({ page }) => {
+    await register(page);
+    await addDishes(page);
+    // Тиждень 26.10–01.11: гречка варена 2 порції в середу, гречка з сіллю ввечері в неділю.
+    await page.goto('/menu?date=2026-10-28');
+    await addEntry(page, 'Обід', 'Гречка варена', '2');
+    await page.goto('/menu?date=2026-11-01');
+    await addEntry(page, 'Вечеря', 'Гречка з сіллю');
+    // Наступний тиждень: одна порція гречки вареної.
+    await page.goto('/menu?date=2026-11-03');
+    await addEntry(page, 'Сніданок', 'Гречка варена');
+
+    // AC15: з календаря — тиждень пн–нд вибраного дня, пункт «Меню» активний.
+    await page.goto('/menu?date=2026-10-28');
+    await page.getByRole('link', { name: 'Покупки за меню' }).click();
+    await expect(page).toHaveURL(/\/menu\/shopping\?period=week&date=2026-10-28$/);
+    await expect(page.getByRole('heading', { name: 'Покупки за меню', level: 1 })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Меню', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(periodButton(page, 'Тиждень')).toHaveAttribute('aria-pressed', 'true');
+    await expect(periodButton(page, 'День')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText(
+      '26 жовтня – 1 листопада 2026',
+    );
+
+    // AC17: сумарні кількості, продукт без ціни, бюджет із позначкою.
+    await expect(shoppingItems(page).getByTestId('menu-shopping-name')).toHaveText([
+      'Гречка',
+      'Олія',
+      'Сіль',
+    ]);
+    const buckwheat = shoppingItem(page, 'Гречка');
+    await expect(buckwheat.getByTestId('menu-shopping-quantity')).toHaveText('0,45 кг');
+    await expect(buckwheat.getByTestId('menu-shopping-unit-price')).toHaveText(/^40,00.* \/ кг$/);
+    await expect(buckwheat.getByTestId('menu-shopping-line-total')).toHaveText(/^18,00/);
+    await expect(shoppingItem(page, 'Олія').getByTestId('menu-shopping-quantity')).toHaveText(
+      '0,02 л',
+    );
+    const salt = shoppingItem(page, 'Сіль');
+    await expect(salt.getByTestId('menu-shopping-quantity')).toHaveText('0,005 кг');
+    await expect(salt.getByTestId('menu-shopping-unit-price')).toHaveText('немає ціни');
+    await expect(salt.getByTestId('menu-shopping-line-total')).toHaveText('—');
+    const budget = page.getByTestId('menu-shopping-budget');
+    await expect(budget).toContainText('Бюджет на продукти');
+    await expect(budget).toContainText('19,80');
+    await expect(budget.getByTestId('incomplete-price')).toContainText('Ціна неповна');
+    await expect(page.getByTestId('menu-shopping-unpriced')).toHaveText(
+      'Без ціни: 1 продукт — пораховано як 0',
+    );
+
+    // AC16: «›» — наступний тиждень; перезавантаження зберігає період.
+    await page.getByRole('button', { name: 'Наступний період' }).click();
+    await expect(page).toHaveURL(/period=week&date=2026-11-02$/);
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText(
+      '2 листопада – 8 листопада 2026',
+    );
+    await expect(shoppingItems(page).getByTestId('menu-shopping-name')).toHaveText([
+      'Гречка',
+      'Олія',
+    ]);
+    await expect(budget).toContainText('6,90');
+    await expect(page.getByTestId('menu-shopping-unpriced')).toHaveCount(0);
+    await expect(budget.getByTestId('incomplete-price')).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText(
+      '2 листопада – 8 листопада 2026',
+    );
+    await expect(budget).toContainText('6,90');
+
+    // День: 2 листопада меню порожнє (AC19) — кнопки створення немає.
+    await periodButton(page, 'День').click();
+    await expect(page).toHaveURL(/period=day&date=2026-11-02$/);
+    await expect(periodButton(page, 'День')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText(
+      'понеділок, 2 листопада 2026',
+    );
+    await expect(page.getByText('За цей період у меню немає продуктів')).toBeVisible();
+    await expect(shoppingItems(page)).toHaveCount(0);
+    await expect(budget).toContainText('0,00');
+    await expect(page.getByRole('button', { name: 'Створити список покупок' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Наступний період' }).click();
+    await expect(page).toHaveURL(/period=day&date=2026-11-03$/);
+    await expect(budget).toContainText('6,90');
+
+    // Місяць і «‹».
+    await periodButton(page, 'Місяць').click();
+    await expect(page).toHaveURL(/period=month&date=2026-11-03$/);
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText('листопад 2026');
+    await expect(budget).toContainText('Ціна неповна');
+    await expect(budget).toContainText('12,90');
+    await page.getByRole('button', { name: 'Попередній період' }).click();
+    await expect(page).toHaveURL(/period=month&date=2026-10-01$/);
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText('жовтень 2026');
+    await expect(budget).toContainText('13,80');
+
+    // AC18: створення списку; кнопка неактивна, поки запит виконується.
+    await page.goto('/menu/shopping?period=week&date=2026-10-28');
+    await expect(shoppingItems(page)).toHaveCount(3);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/api/menu/shopping-list', async (route) => {
+      await held;
+      await route.continue();
+    });
+    const createButton = page.getByRole('button', { name: 'Створити список покупок' });
+    await createButton.click();
+    await expect(createButton).toBeDisabled();
+    release();
+    await expect(page).toHaveURL(/\/shopping\/[0-9a-f-]{36}$/);
+    await expect(page.getByRole('heading', { name: 'Меню 26.10.2026–01.11.2026' })).toBeVisible();
+    const items = page.getByTestId('shopping-item');
+    await expect(items).toHaveCount(3);
+    await expect(items.nth(0)).toContainText('Гречка');
+    await expect(items.nth(0)).toContainText('0,45 кг');
+    await expect(items.nth(1)).toContainText('Олія');
+    await expect(items.nth(1)).toContainText('0,02 л');
+    await expect(items.nth(2)).toContainText('Сіль');
+    await expect(items.nth(2)).toContainText('0,005 кг');
+    await expect(page.getByTestId('shopping-totals')).toContainText('19,80');
+
+    // Список видно серед списків покупок; «До календаря» повертає на /menu.
+    await goTo(page, 'Покупки');
+    await expect(page.getByText('Меню 26.10.2026–01.11.2026')).toBeVisible();
+    await page.goto('/menu/shopping?period=week&date=2026-10-28');
+    await page.getByRole('link', { name: 'До календаря' }).click();
+    await expect(page).toHaveURL(/\/menu\?date=2026-10-26$/);
+    await expect(day(page, '2026-10-26')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('порожнє меню: текст із посиланням на календар, без кнопки створення', async ({ page }) => {
+    await register(page);
+    await page.goto('/menu/shopping');
+    // Без параметрів — тиждень, у який входить сьогодні.
+    await expect(periodButton(page, 'Тиждень')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText('За цей період у меню немає продуктів')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Створити список покупок' })).toHaveCount(0);
+    await expect(page.getByTestId('menu-shopping-budget')).toContainText('0,00');
+    await page.getByRole('link', { name: 'Відкрити календар' }).click();
+    // Календар відкривається на понеділку поточного тижня.
+    await expect(page).toHaveURL(/\/menu\?date=\d{4}-\d{2}-\d{2}$/);
+    await expect(page.getByRole('heading', { name: 'Меню', level: 1 })).toBeVisible();
+  });
+});
+
+test.describe('покупки за меню, телефон', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('покупки за меню на 390px: без прокрутки вбік, кнопки 40px, створення', async ({ page }) => {
+    await register(page);
+    await addPantry(page);
+    await openDictionaries(page);
+    await addDish(page, 'Гречка з сіллю', [
+      ['Гречка', '0,15'],
+      ['Сіль', '0,005'],
+    ]);
+    await page.goto('/menu?date=2026-10-26');
+    await addEntry(page, 'Обід', 'Гречка з сіллю', '2');
+
+    await page.getByRole('link', { name: 'Покупки за меню' }).click();
+    await expect(page).toHaveURL(/\/menu\/shopping\?period=week&date=2026-10-26$/);
+    await expect(shoppingItems(page)).toHaveCount(2);
+    const noHorizontalScroll = () =>
+      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(await noHorizontalScroll()).toBe(true);
+
+    const createButton = page.getByRole('button', { name: 'Створити список покупок' });
+    for (const control of [
+      periodButton(page, 'День'),
+      periodButton(page, 'Тиждень'),
+      periodButton(page, 'Місяць'),
+      page.getByRole('button', { name: 'Попередній період' }),
+      page.getByRole('button', { name: 'Наступний період' }),
+      page.getByRole('link', { name: 'До календаря' }),
+      createButton,
+    ]) {
+      const box = (await control.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(40);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(390);
+    }
+
+    // Рядок продукту: назва, під нею кількість і сума.
+    const buckwheat = shoppingItem(page, 'Гречка');
+    const name = (await buckwheat.getByTestId('menu-shopping-name').boundingBox())!;
+    const quantity = (await buckwheat.getByTestId('menu-shopping-quantity').boundingBox())!;
+    const lineTotal = (await buckwheat.getByTestId('menu-shopping-line-total').boundingBox())!;
+    expect(quantity.y).toBeGreaterThan(name.y + name.height - 1);
+    expect(lineTotal.y).toBeGreaterThan(quantity.y + quantity.height - 1);
+    await expect(buckwheat.getByTestId('menu-shopping-line-total')).toHaveText(/^12,00/);
+    await expect(page.getByTestId('menu-shopping-budget')).toContainText('12,00');
+    await expect(page.getByTestId('menu-shopping-unpriced')).toHaveText(
+      'Без ціни: 1 продукт — пораховано як 0',
+    );
+
+    // Кнопка створення — на всю ширину вмісту.
+    const main = (await page.locator('main').boundingBox())!;
+    const createBox = (await createButton.boundingBox())!;
+    expect(createBox.width).toBeGreaterThan(main.width - 64);
+
+    // Перемикання періоду на телефоні.
+    await periodButton(page, 'Місяць').click();
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText('жовтень 2026');
+    expect(await noHorizontalScroll()).toBe(true);
+    await periodButton(page, 'Тиждень').click();
+    await expect(page.getByTestId('menu-shopping-period')).toHaveText(
+      '26 жовтня – 1 листопада 2026',
+    );
+
+    await createButton.click();
+    await expect(page).toHaveURL(/\/shopping\/[0-9a-f-]{36}$/);
+    await expect(page.getByTestId('shopping-item')).toHaveCount(2);
+    await expect(page.getByTestId('shopping-totals')).toContainText('12,00');
+  });
+});
