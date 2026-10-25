@@ -115,9 +115,11 @@ function AddEntryForm({
       <ErrorText>{add.isError && errorMessage(add.error)}</ErrorText>
       <DialogFooter>
         <DialogClose asChild>
-          <Button variant="outline">Скасувати</Button>
+          <Button variant="outline" className="max-sm:h-10">
+            Скасувати
+          </Button>
         </DialogClose>
-        <Button type="submit" disabled={add.isPending}>
+        <Button type="submit" className="max-sm:h-10" disabled={add.isPending}>
           Додати
         </Button>
       </DialogFooter>

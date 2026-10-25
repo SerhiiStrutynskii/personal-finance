@@ -548,6 +548,17 @@ test.describe('календар меню, телефон', () => {
     const buckwheat = entry(page, 'Гречка варена');
     const name = await buckwheat.getByText('Гречка варена').boundingBox();
     const plus = buckwheat.getByRole('button', { name: 'Більше порцій' });
+    // Кнопки панелі дня на телефоні — 40px.
+    for (const button of [
+      buckwheat.getByRole('button', { name: 'Менше порцій' }),
+      buckwheat.getByRole('button', { name: 'Більше порцій' }),
+      buckwheat.getByRole('button', { name: 'Прибрати' }),
+      meal(page, 'Обід').getByRole('button', { name: 'Додати страву' }),
+      page.getByRole('link', { name: 'Друк' }),
+    ]) {
+      expect((await button.boundingBox())!.height).toBe(40);
+    }
+    expect((await plus.boundingBox())!.width).toBe(40);
     expect((await plus.boundingBox())!.y).toBeGreaterThan(name!.y + name!.height - 1);
     await plus.click();
     await expect(buckwheat.getByTestId('servings')).toHaveText('3 порції');

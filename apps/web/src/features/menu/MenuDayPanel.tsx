@@ -44,7 +44,7 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
             {day && !day.isPriceComplete && <IncompletePriceBadge hint="Ціна неповна" />}
           </div>
         </div>
-        <Button variant="outline" asChild>
+        <Button variant="outline" className="max-sm:h-10" asChild>
           <Link to={`/menu/print/${date}`}>
             <Printer />
             Друк
@@ -72,7 +72,12 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
         >
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-medium">{mealType.name}</h3>
-            <Button variant="ghost" size="sm" onClick={() => setDialog({ open: true, mealType })}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="max-sm:h-10"
+              onClick={() => setDialog({ open: true, mealType })}
+            >
               <Plus />
               Додати страву
             </Button>
@@ -96,6 +101,7 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
                     <Button
                       variant="outline"
                       size="icon-sm"
+                      className="max-sm:size-10"
                       aria-label="Менше порцій"
                       disabled={entry.servings <= 1 || update.isPending}
                       onClick={() => update.mutate({ id: entry.id, servings: entry.servings - 1 })}
@@ -108,6 +114,7 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
                     <Button
                       variant="outline"
                       size="icon-sm"
+                      className="max-sm:size-10"
                       aria-label="Більше порцій"
                       disabled={entry.servings >= MAX_SERVINGS || update.isPending}
                       onClick={() => update.mutate({ id: entry.id, servings: entry.servings + 1 })}
@@ -124,6 +131,7 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="max-sm:h-10"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate(entry.id)}
                   >

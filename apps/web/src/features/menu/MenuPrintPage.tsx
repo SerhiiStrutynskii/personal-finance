@@ -32,7 +32,7 @@ export function MenuPrintPage() {
 
   if (!isValid) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 bg-white p-6">
+      <div className="mx-auto max-w-3xl space-y-4 bg-white p-6 text-black">
         <ErrorText>Невірна дата</ErrorText>
         <Link className="text-sm text-muted-foreground hover:underline" to="/menu">
           До меню
@@ -46,7 +46,7 @@ export function MenuPrintPage() {
   );
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 bg-white p-6 print:max-w-none print:p-0">
+    <div className="mx-auto max-w-3xl space-y-6 bg-white p-6 text-black print:max-w-none print:p-0">
       <div className="flex flex-wrap items-center gap-3 print:hidden" data-testid="print-toolbar">
         <Link
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"
