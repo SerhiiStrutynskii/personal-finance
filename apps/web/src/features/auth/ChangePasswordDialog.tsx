@@ -164,7 +164,6 @@ function PasswordField({
           type="password"
           autoComplete={autoComplete}
           autoFocus={autoFocus}
-          maxLength={256}
           value={value}
           aria-invalid={error ? true : undefined}
           aria-describedby={showHint ? hintId : undefined}

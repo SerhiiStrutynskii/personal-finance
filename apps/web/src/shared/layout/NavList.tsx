@@ -33,7 +33,7 @@ export function NavList({ isOpen, onNavigate }: { isOpen: boolean; onNavigate?: 
         )}
         <ChangePasswordDialog
           trigger={
-            <button className="block w-full text-left" title="Змінити пароль">
+            <button type="button" className="block w-full text-left" title="Змінити пароль">
               <SidebarItem title="Змінити пароль" icon={KeyRound} isOpen={isOpen} />
             </button>
           }
