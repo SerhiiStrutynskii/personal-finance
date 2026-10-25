@@ -1,13 +1,17 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { parseMoney, parseQuantity, productNameKey } from '@hf/shared';
 import { loadEnv } from '../config/env.ts';
 import { hashPassword } from '../modules/auth/password.ts';
+import { insertDefaultMealTypes } from '../modules/menu/mealTypes.repo.ts';
 import { createDb, type DbOrTx } from './client.ts';
 import {
   accounts,
   categories,
+  dishIngredients,
+  dishes,
   householdMembers,
   households,
+  mealTypes,
   products,
   shoppingListItems,
   shoppingLists,
@@ -137,6 +141,81 @@ async function seedShopping(tx: DbOrTx, householdId: string): Promise<boolean> {
   return true;
 }
 
+// Страви демо-меню: продукт і кількість на одну порцію в одиниці продукту.
+// «Спеції» без ціни, тож ціна омлету неповна.
+const MENU_PRODUCTS: [name: string, unit: Unit][] = [['Спеції', 'pack']];
+const DISHES: { name: string; lines: [product: string, quantity: string][] }[] = [
+  {
+    name: 'Омлет',
+    lines: [
+      ['Яйця', '2'],
+      ['Молоко', '0.05'],
+      ['Олія соняшникова', '0.01'],
+      ['Спеції', '0.02'],
+    ],
+  },
+  {
+    name: 'Рис з куркою',
+    lines: [
+      ['Рис', '0.08'],
+      ['Куряче філе', '0.15'],
+      ['Олія соняшникова', '0.01'],
+    ],
+  },
+  {
+    name: 'Бутерброд з сиром',
+    lines: [
+      ['Хліб', '0.1'],
+      ['Сир твердий', '0.03'],
+    ],
+  },
+];
+
+/** Прийоми їжі й страви демо-домогосподарства; кожне — лише якщо його ще немає. */
+async function seedMenu(tx: DbOrTx, householdId: string): Promise<boolean> {
+  let added = false;
+  if ((await tx.$count(mealTypes, eq(mealTypes.householdId, householdId))) === 0) {
+    await insertDefaultMealTypes(tx, householdId);
+    added = true;
+  }
+  if ((await tx.$count(dishes, eq(dishes.householdId, householdId))) > 0) return added;
+
+  await tx
+    .insert(products)
+    .values(
+      MENU_PRODUCTS.map(([name, unit]) => ({
+        householdId,
+        name,
+        nameKey: productNameKey(name),
+        unit,
+      })),
+    )
+    .onConflictDoNothing();
+  const names = DISHES.flatMap((dish) => dish.lines.map(([name]) => productNameKey(name)));
+  const rows = await tx
+    .select({ id: products.id, nameKey: products.nameKey })
+    .from(products)
+    .where(and(eq(products.householdId, householdId), inArray(products.nameKey, names)));
+  const productId = new Map(rows.map((row) => [row.nameKey, row.id]));
+
+  for (const spec of DISHES) {
+    const [dish] = await tx
+      .insert(dishes)
+      .values({ householdId, name: spec.name, nameKey: productNameKey(spec.name) })
+      .returning();
+    const lines = spec.lines.flatMap(([name, quantity]) => {
+      const id = productId.get(productNameKey(name));
+      return id ? [{ productId: id, quantityMilli: parseQuantity(quantity) }] : [];
+    });
+    if (lines.length > 0) {
+      await tx
+        .insert(dishIngredients)
+        .values(lines.map((line, position) => ({ ...line, dishId: dish!.id, position })));
+    }
+  }
+  return true;
+}
+
 try {
   const [existing] = await db.select().from(users).where(eq(users.id, DEMO_USER_ID));
   if (existing) {
@@ -149,8 +228,13 @@ try {
       .from(householdMembers)
       .where(eq(householdMembers.userId, DEMO_USER_ID));
     const added =
-      membership && (await db.transaction((tx) => seedShopping(tx, membership.householdId)));
-    console.log(added ? 'Додано демо-продукти й списки покупок' : 'Демо-дані вже є, пропускаю');
+      membership &&
+      (await db.transaction(async (tx) => {
+        const shopping = await seedShopping(tx, membership.householdId);
+        const menu = await seedMenu(tx, membership.householdId);
+        return shopping || menu;
+      }));
+    console.log(added ? 'Додано демо-покупки чи меню' : 'Демо-дані вже є, пропускаю');
   } else {
     const passwordHash = await hashPassword(DEMO_PASSWORD);
     await db.transaction(async (tx) => {
@@ -258,6 +342,7 @@ try {
         },
       ]);
       await seedShopping(tx, householdId);
+      await seedMenu(tx, householdId);
     });
     console.log('Демо-дані створено');
   }
