@@ -50,3 +50,14 @@ export async function mealTypeNames(actor: Client): Promise<string[]> {
   expect(res.status).toBe(200);
   return res.body.items.map((item: { name: string }) => item.name);
 }
+
+/** Додає страву в меню дня й перевіряє, що запис створено або порції додано. */
+export async function addEntry(
+  actor: Client,
+  body: { date: string; mealTypeId: string; dishId: string; servings?: number },
+  status: 200 | 201 = 201,
+) {
+  const res = await actor.post('/api/menu/entries', body);
+  expect(res.status).toBe(status);
+  return res.body as { id: string; servings: number; cost: number };
+}

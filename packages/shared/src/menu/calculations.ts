@@ -33,3 +33,33 @@ export function dishPortionPrice(lines: readonly DishPortionLine[]): DishPortion
   }
   return { price, isPriceComplete: unpricedCount === 0, unpricedCount };
 }
+
+/** Вартість запису меню: ціна порції × порції. Множення без втрати точності через BigInt. */
+export function menuEntryCost(portionPrice: number, servings: number): number {
+  const cost = BigInt(portionPrice) * BigInt(servings);
+  if (cost > BigInt(Number.MAX_SAFE_INTEGER) || cost < BigInt(Number.MIN_SAFE_INTEGER)) {
+    throw new MoneyRangeError();
+  }
+  return Number(cost);
+}
+
+export interface MenuCostTotal {
+  cost: number;
+  /** false — хоча б в одному записі ціна страви неповна. */
+  isPriceComplete: boolean;
+  incompleteEntryCount: number;
+}
+
+/** Підсумок вартості записів (дня чи періоду). Порожній список — нуль і повна ціна. */
+export function menuCostTotal(
+  entries: readonly { cost: number; isPriceComplete: boolean }[],
+): MenuCostTotal {
+  let cost = 0;
+  let incompleteEntryCount = 0;
+  for (const entry of entries) {
+    cost += entry.cost;
+    if (!Number.isSafeInteger(cost)) throw new MoneyRangeError();
+    if (!entry.isPriceComplete) incompleteEntryCount += 1;
+  }
+  return { cost, isPriceComplete: incompleteEntryCount === 0, incompleteEntryCount };
+}

@@ -19,15 +19,21 @@ const owned = (householdId: string, id: string) =>
   and(eq(dishes.householdId, householdId), eq(dishes.id, id));
 
 /**
- * Страви домогосподарства (або одна страва за id) з рядками складу в порядку position.
- * Без сортування страв: порядок за українським алфавітом задає сервіс.
+ * Страви домогосподарства (одна страва за id або набір за масивом id) з рядками складу в порядку
+ * position. Без сортування страв: порядок за українським алфавітом задає сервіс.
  */
 export async function listWithIngredients(
   db: DbOrTx,
   householdId: string,
-  dishId?: string,
+  dishId?: string | readonly string[],
 ): Promise<{ dishes: DishRow[]; ingredients: IngredientWithProduct[] }> {
-  const filter = dishId ? owned(householdId, dishId) : eq(dishes.householdId, householdId);
+  if (Array.isArray(dishId) && dishId.length === 0) return { dishes: [], ingredients: [] };
+  const filter =
+    dishId === undefined
+      ? eq(dishes.householdId, householdId)
+      : typeof dishId === 'string'
+        ? owned(householdId, dishId)
+        : and(eq(dishes.householdId, householdId), inArray(dishes.id, [...dishId]));
   const rows = await db.select().from(dishes).where(filter);
   if (rows.length === 0) return { dishes: [], ingredients: [] };
 
@@ -47,6 +53,11 @@ export async function listWithIngredients(
     .where(filter)
     .orderBy(asc(dishIngredients.position));
   return { dishes: rows, ingredients };
+}
+
+export async function findDish(db: DbOrTx, householdId: string, id: string) {
+  const [row] = await db.select().from(dishes).where(owned(householdId, id));
+  return row;
 }
 
 /** Блокує страву до кінця транзакції, щоб паралельні зміни складу йшли по черзі. */

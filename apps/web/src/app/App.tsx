@@ -15,7 +15,9 @@ import { DebtPage } from '../features/debts/DebtPage.tsx';
 import { GoalsPage } from '../features/goals/GoalsPage.tsx';
 import { HouseholdPage } from '../features/household/HouseholdPage.tsx';
 import { InvitePage } from '../features/household/InvitePage.tsx';
+import { MenuDictionariesPage } from '../features/menu/MenuDictionariesPage.tsx';
 import { MenuPage } from '../features/menu/MenuPage.tsx';
+import { MenuPrintPage } from '../features/menu/MenuPrintPage.tsx';
 import { PayoffPlanPage } from '../features/goals/PayoffPlanPage.tsx';
 import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { ProductsPage } from '../features/shopping/ProductsPage.tsx';
@@ -45,6 +47,7 @@ export function App() {
             <Route element={<RequireAuth />}>
               {/* Сторінка друку — без меню застосунку. */}
               <Route path="shopping/:id/print" element={<PrintListPage />} />
+              <Route path="menu/print/:date" element={<MenuPrintPage />} />
               <Route element={<Layout />}>
                 <Route index element={<DashboardPage />} />
                 <Route path="expenses" element={<TransactionsPage type="expense" />} />
@@ -61,6 +64,7 @@ export function App() {
                 <Route path="shopping/products" element={<ProductsPage />} />
                 <Route path="shopping/:id" element={<ShoppingListPage />} />
                 <Route path="menu" element={<MenuPage />} />
+                <Route path="menu/dictionaries" element={<MenuDictionariesPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="household" element={<HouseholdPage />} />
                 <Route path="*" element={<NotFoundPage />} />

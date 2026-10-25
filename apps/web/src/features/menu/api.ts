@@ -1,4 +1,13 @@
-import type { CreateDishInput, Dish, DishSummary, MealType, UpdateDishInput } from '@hf/shared';
+import type {
+  CreateDishInput,
+  CreateMenuEntryInput,
+  Dish,
+  DishSummary,
+  MealType,
+  MenuEntry,
+  MenuPeriod,
+  UpdateDishInput,
+} from '@hf/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
 
@@ -68,4 +77,31 @@ export function useSaveDish() {
 
 export function useDeleteDish() {
   return useMutation({ mutationFn: (id: string) => api.delete(`/api/dishes/${id}`) });
+}
+
+/** Меню за період [from, to): записи, підсумки днів і всього періоду. */
+export function useMenuPeriod(from: string, to: string, enabled = true) {
+  return useQuery({
+    queryKey: ['menu', from, to],
+    queryFn: () => api.get<MenuPeriod>(`/api/menu?${new URLSearchParams({ from, to }).toString()}`),
+    enabled,
+  });
+}
+
+/** Додає страву в прийом їжі дня; повторне додавання збільшує порції наявного запису. */
+export function useAddMenuEntry() {
+  return useMutation({
+    mutationFn: (input: CreateMenuEntryInput) => api.post<MenuEntry>('/api/menu/entries', input),
+  });
+}
+
+export function useUpdateMenuEntry() {
+  return useMutation({
+    mutationFn: ({ id, servings }: { id: string; servings: number }) =>
+      api.patch<MenuEntry>(`/api/menu/entries/${id}`, { servings }),
+  });
+}
+
+export function useDeleteMenuEntry() {
+  return useMutation({ mutationFn: (id: string) => api.delete(`/api/menu/entries/${id}`) });
 }
