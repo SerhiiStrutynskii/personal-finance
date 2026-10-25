@@ -109,22 +109,43 @@ export async function login(
 
   const user = await repo.findUserByEmail(db, input.email);
   const passwordOk = await verifyPassword(user?.passwordHash, input.password);
-  const household = user && passwordOk ? await repo.findMembership(db, user.id) : undefined;
-  if (!user || !household) {
+  const session =
+    user && passwordOk
+      ? await db.transaction(async (tx) => {
+          // Пароль могли змінити, поки ми його перевіряли: токен видаємо лише під блокуванням
+          // користувача і лише якщо хеш той самий, що перевірено.
+          const locked = await repo.findUserByIdForShare(tx, user.id);
+          if (!locked || locked.passwordHash !== user.passwordHash) return undefined;
+          const household = await repo.findMembership(tx, user.id);
+          if (!household) return undefined;
+          return {
+            ...toCurrentUser(locked, household),
+            ...(await issueTokens(tx, tokens, user.id)),
+          };
+        })
+      : undefined;
+  if (!session) {
     loginLimiter.recordFailure(limiterKey);
     // Одна відповідь для невідомого email і невірного пароля.
     throw unauthorized('Невірний email або пароль');
   }
 
   loginLimiter.reset(limiterKey);
-  return { ...toCurrentUser(user, household), ...(await issueTokens(db, tokens, user.id)) };
+  return session;
 }
 
 /** Видає нову пару токенів і відкликає використаний refresh-токен. */
 export async function refresh({ db, tokens }: AuthDeps, refreshToken: string): Promise<AuthTokens> {
   const issued = await db.transaction(async (tx) => {
     const now = new Date();
-    const row = await repo.findRefreshTokenForUpdate(tx, hashRefreshToken(refreshToken));
+    const tokenHash = hashRefreshToken(refreshToken);
+    // Порядок блокувань — users, потім refresh_tokens (див. repo): так оновлення, що йде одночасно
+    // зі зміною пароля, або завершується до неї (і новий токен вона відкликає), або бачить уже
+    // відкликаний токен.
+    const found = await repo.findRefreshToken(tx, tokenHash);
+    if (!found) return undefined;
+    if (!(await repo.findUserByIdForShare(tx, found.userId))) return undefined;
+    const row = await repo.findRefreshTokenForUpdate(tx, tokenHash);
     if (!row) return undefined;
     if (row.revokedAt) {
       // Токен уже використано: його могли вкрасти, тому завершуємо всі сесії цього входу.
@@ -155,24 +176,33 @@ export async function changePassword(
   input: ChangePasswordInput,
 ): Promise<AuthTokens> {
   if (passwordChangeLimiter.isBlocked(auth.userId)) throw tooManyRequests();
+  // Спроба рахується одразу, а не після перевірки: інакше паралельні запити обійшли б ліміт.
+  // Успіх скидає лічильник.
+  passwordChangeLimiter.recordFailure(auth.userId);
 
-  // Дорогий хеш рахуємо до транзакції, щоб не тримати з'єднання й блокування.
-  const passwordHash = await hashPassword(input.newPassword);
-  const issued = await db.transaction(async (tx) => {
-    const user = await repo.findUserByIdForUpdate(tx, auth.userId);
-    if (!user) throw unauthorized();
-    if (!(await verifyPassword(user.passwordHash, input.currentPassword))) return undefined;
-
-    await repo.updatePasswordHash(tx, user.id, passwordHash);
-    await repo.revokeAllForUser(tx, user.id, new Date());
-    return issueTokens(tx, tokens, user.id);
-  });
-
-  if (!issued) {
-    passwordChangeLimiter.recordFailure(auth.userId);
+  const invalid = () =>
     // Не 401: клієнт сприйняв би помилку введення як завершену сесію.
-    throw unprocessable('CURRENT_PASSWORD_INVALID', 'Поточний пароль невірний');
-  }
+    unprocessable('CURRENT_PASSWORD_INVALID', 'Поточний пароль невірний');
+
+  // Перевірка й хеш — поза транзакцією, щоб не тримати з'єднання й блокування на час argon2;
+  // новий пароль хешується лише після вірного поточного.
+  const user = await repo.findUserById(db, auth.userId);
+  if (!user) throw unauthorized();
+  if (!(await verifyPassword(user.passwordHash, input.currentPassword))) throw invalid();
+  const passwordHash = await hashPassword(input.newPassword);
+
+  const issued = await db.transaction(async (tx) => {
+    const locked = await repo.findUserByIdForUpdate(tx, auth.userId);
+    if (!locked) throw unauthorized();
+    // Пароль змінив паралельний запит: перевірений поточний пароль уже не дійсний.
+    if (locked.passwordHash !== user.passwordHash) return undefined;
+
+    await repo.updatePasswordHash(tx, locked.id, passwordHash);
+    await repo.revokeAllForUser(tx, locked.id, new Date());
+    return issueTokens(tx, tokens, locked.id);
+  });
+  if (!issued) throw invalid();
+
   passwordChangeLimiter.reset(auth.userId);
   return issued;
 }

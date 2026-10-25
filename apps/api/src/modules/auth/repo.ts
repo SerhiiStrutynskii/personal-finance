@@ -16,9 +16,22 @@ export async function findUserById(db: DbOrTx, id: string) {
   return row;
 }
 
+/*
+ * Порядок блокувань в auth: спершу рядок users, потім рядки refresh_tokens. Зміна пароля бере
+ * рядок користувача FOR UPDATE, вхід і оновлення токена — FOR SHARE: між собою вони не
+ * заважають, а зі зміною пароля йдуть по черзі, тож токен, виданий одночасно зі зміною, або
+ * відкликається нею, або не видається зовсім.
+ */
+
 /** Блокує рядок користувача до кінця транзакції: одночасні зміни пароля йдуть по черзі. */
 export async function findUserByIdForUpdate(db: DbOrTx, id: string) {
   const [row] = await db.select().from(users).where(eq(users.id, id)).for('update');
+  return row;
+}
+
+/** Спільне блокування рядка користувача: чекає на зміну пароля, що вже йде, і не дає почати нову. */
+export async function findUserByIdForShare(db: DbOrTx, id: string) {
+  const [row] = await db.select().from(users).where(eq(users.id, id)).for('share');
   return row;
 }
 
