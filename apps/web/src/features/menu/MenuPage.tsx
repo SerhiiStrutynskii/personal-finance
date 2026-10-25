@@ -1,5 +1,5 @@
 import { DEFAULT_CURRENCY, formatMoney, localDateKey } from '@hf/shared';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, ShoppingCart } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -35,12 +35,20 @@ export function MenuPage() {
       <PageHeader
         title="Меню"
         action={
-          <Button variant="outline" asChild>
-            <Link to="/menu/dictionaries">
-              <BookOpen />
-              Страви й прийоми їжі
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="max-sm:h-10" asChild>
+              <Link to={`/menu/shopping?period=week&date=${selected}`}>
+                <ShoppingCart />
+                Покупки за меню
+              </Link>
+            </Button>
+            <Button variant="outline" className="max-sm:h-10" asChild>
+              <Link to="/menu/dictionaries">
+                <BookOpen />
+                Страви й прийоми їжі
+              </Link>
+            </Button>
+          </div>
         }
       />
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
