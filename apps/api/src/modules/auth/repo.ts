@@ -16,6 +16,16 @@ export async function findUserById(db: DbOrTx, id: string) {
   return row;
 }
 
+/** Блокує рядок користувача до кінця транзакції: одночасні зміни пароля йдуть по черзі. */
+export async function findUserByIdForUpdate(db: DbOrTx, id: string) {
+  const [row] = await db.select().from(users).where(eq(users.id, id)).for('update');
+  return row;
+}
+
+export async function updatePasswordHash(db: DbOrTx, userId: string, passwordHash: string) {
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+}
+
 export async function insertUser(
   db: DbOrTx,
   values: { email: string; name: string; passwordHash: string },
@@ -75,4 +85,12 @@ export async function revokeFamily(db: DbOrTx, familyId: string, now: Date) {
 export async function findRefreshToken(db: DbOrTx, tokenHash: string) {
   const [row] = await db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash));
   return row;
+}
+
+/** Відкликає всі ще дійсні refresh-токени користувача: усі його входи, у всіх родинах. */
+export async function revokeAllForUser(db: DbOrTx, userId: string, now: Date) {
+  await db
+    .update(refreshTokens)
+    .set({ revokedAt: now })
+    .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
 }

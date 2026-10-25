@@ -1,12 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import type { Db, DbOrTx } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
-import { conflict, isUniqueViolation, tooManyRequests, unauthorized } from '../../http/errors.ts';
+import {
+  conflict,
+  isUniqueViolation,
+  tooManyRequests,
+  unauthorized,
+  unprocessable,
+} from '../../http/errors.ts';
 import { hashPassword, verifyPassword } from './password.ts';
 import type { RateLimiter } from './rate-limiter.ts';
 import { joinByInvite } from '../household/service.ts';
 import * as repo from './repo.ts';
-import type { AuthSession, AuthTokens, CurrentUser, LoginInput, RegisterInput } from './schema.ts';
+import type {
+  AuthSession,
+  AuthTokens,
+  ChangePasswordInput,
+  CurrentUser,
+  LoginInput,
+  RegisterInput,
+} from './schema.ts';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TOKEN_TTL_MS,
@@ -19,6 +32,8 @@ export interface AuthDeps {
   db: Db;
   tokens: TokenService;
   loginLimiter: RateLimiter;
+  /** Невдалі спроби поточного пароля під час зміни пароля, за id користувача. */
+  passwordChangeLimiter: RateLimiter;
   /** false — нові користувачі реєструються лише за запрошенням. */
   registrationEnabled: boolean;
   now: () => Date;
@@ -128,6 +143,38 @@ export async function refresh({ db, tokens }: AuthDeps, refreshToken: string): P
 export async function logout({ db }: AuthDeps, refreshToken: string): Promise<void> {
   const row = await repo.findRefreshToken(db, hashRefreshToken(refreshToken));
   if (row) await repo.revokeFamily(db, row.familyId, new Date());
+}
+
+/**
+ * Змінює пароль власника access-токена. Відкликає всі його refresh-токени (інші пристрої вийдуть,
+ * щойно сплине їхній access-токен) і видає поточній сесії нову пару в новій родині.
+ */
+export async function changePassword(
+  { db, tokens, passwordChangeLimiter }: AuthDeps,
+  auth: AuthContext,
+  input: ChangePasswordInput,
+): Promise<AuthTokens> {
+  if (passwordChangeLimiter.isBlocked(auth.userId)) throw tooManyRequests();
+
+  // Дорогий хеш рахуємо до транзакції, щоб не тримати з'єднання й блокування.
+  const passwordHash = await hashPassword(input.newPassword);
+  const issued = await db.transaction(async (tx) => {
+    const user = await repo.findUserByIdForUpdate(tx, auth.userId);
+    if (!user) throw unauthorized();
+    if (!(await verifyPassword(user.passwordHash, input.currentPassword))) return undefined;
+
+    await repo.updatePasswordHash(tx, user.id, passwordHash);
+    await repo.revokeAllForUser(tx, user.id, new Date());
+    return issueTokens(tx, tokens, user.id);
+  });
+
+  if (!issued) {
+    passwordChangeLimiter.recordFailure(auth.userId);
+    // Не 401: клієнт сприйняв би помилку введення як завершену сесію.
+    throw unprocessable('CURRENT_PASSWORD_INVALID', 'Поточний пароль невірний');
+  }
+  passwordChangeLimiter.reset(auth.userId);
+  return issued;
 }
 
 export async function getCurrentUser({ db }: AuthDeps, auth: AuthContext): Promise<CurrentUser> {

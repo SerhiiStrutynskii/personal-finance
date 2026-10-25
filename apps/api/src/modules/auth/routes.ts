@@ -2,7 +2,13 @@ import { Router } from 'express';
 import { getAuth, requireAuth } from '../../http/auth.ts';
 import { registrationClosed } from '../../http/errors.ts';
 import { previewInvite } from '../household/service.ts';
-import { inviteTokenParamsSchema, loginSchema, refreshSchema, registerSchema } from './schema.ts';
+import {
+  changePasswordSchema,
+  inviteTokenParamsSchema,
+  loginSchema,
+  refreshSchema,
+  registerSchema,
+} from './schema.ts';
 import * as service from './service.ts';
 
 export function authRouter(deps: service.AuthDeps): Router {
@@ -48,6 +54,12 @@ export function authRouter(deps: service.AuthDeps): Router {
 
   router.get('/me', requireAuth(deps.db, deps.tokens), async (_req, res) => {
     res.json(await service.getCurrentUser(deps, getAuth(res)));
+  });
+
+  // Лише власний пароль: id користувача береться з access-токена, а не з тіла.
+  router.post('/password', requireAuth(deps.db, deps.tokens), async (req, res) => {
+    const input = changePasswordSchema.parse(req.body);
+    res.json(await service.changePassword(deps, getAuth(res), input));
   });
 
   return router;

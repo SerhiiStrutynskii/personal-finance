@@ -4,7 +4,7 @@ import { afterAll, beforeEach } from 'vitest';
 import { createApp } from '../app.ts';
 import { createDb } from '../db/client.ts';
 import { householdMembers, households, transactions, users } from '../db/schema.ts';
-import { createLoginLimiter } from '../modules/auth/rate-limiter.ts';
+import { createLoginLimiter, createPasswordChangeLimiter } from '../modules/auth/rate-limiter.ts';
 import { createTokenService } from '../modules/auth/tokens.ts';
 import { testDatabaseUrl } from './database-url.ts';
 
@@ -34,12 +34,13 @@ export function setupTestApp() {
     corsOrigin: 'http://localhost',
     jwtSecret: TEST_JWT_SECRET,
     loginLimiter: createLoginLimiter(() => clock.now),
+    passwordChangeLimiter: createPasswordChangeLimiter(() => clock.now),
     now: () => time.fixed ?? new Date(),
   });
 
   beforeEach(async () => {
     await db.execute(sql`TRUNCATE users, households RESTART IDENTITY CASCADE`);
-    // Зсув часу скидає лічильник невдалих входів між тестами.
+    // Зсув часу скидає лічильники невдалих входів і змін пароля між тестами.
     clock.now += 24 * 60 * 60 * 1000;
     time.fixed = undefined;
   });

@@ -5,7 +5,11 @@ import { requireAuth } from './http/auth.ts';
 import { errorHandler, notFoundHandler } from './http/error-handler.ts';
 import { accountsRouter } from './modules/accounts/routes.ts';
 import { analyticsRouter } from './modules/analytics/routes.ts';
-import { createLoginLimiter, type RateLimiter } from './modules/auth/rate-limiter.ts';
+import {
+  createLoginLimiter,
+  createPasswordChangeLimiter,
+  type RateLimiter,
+} from './modules/auth/rate-limiter.ts';
 import { authRouter } from './modules/auth/routes.ts';
 import { createTokenService } from './modules/auth/tokens.ts';
 import { budgetsRouter } from './modules/budgets/routes.ts';
@@ -28,6 +32,7 @@ export interface AppOptions {
   corsOrigin: string;
   jwtSecret: string;
   loginLimiter?: RateLimiter;
+  passwordChangeLimiter?: RateLimiter;
   /** Поточний момент; підміняється в тестах, щоб перевіряти правила про періоди. */
   now?: () => Date;
   /** false закриває реєстрацію нових користувачів. */
@@ -43,6 +48,7 @@ export function createApp({
   corsOrigin,
   jwtSecret,
   loginLimiter,
+  passwordChangeLimiter,
   now = () => new Date(),
   registrationEnabled = true,
   webDistDir,
@@ -66,6 +72,7 @@ export function createApp({
       db,
       tokens,
       loginLimiter: loginLimiter ?? createLoginLimiter(),
+      passwordChangeLimiter: passwordChangeLimiter ?? createPasswordChangeLimiter(),
       registrationEnabled,
       now,
     }),
