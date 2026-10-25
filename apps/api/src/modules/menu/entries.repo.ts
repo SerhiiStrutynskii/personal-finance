@@ -16,15 +16,28 @@ const owned = (householdId: string, id: string) =>
   and(eq(menuEntries.householdId, householdId), eq(menuEntries.id, id));
 
 function selectWithNames(db: DbOrTx) {
-  return db
-    .select({
-      ...getTableColumns(menuEntries),
-      dishName: dishes.name,
-      mealTypePosition: mealTypes.position,
-    })
-    .from(menuEntries)
-    .innerJoin(dishes, eq(dishes.id, menuEntries.dishId))
-    .innerJoin(mealTypes, eq(mealTypes.id, menuEntries.mealTypeId));
+  return (
+    db
+      .select({
+        ...getTableColumns(menuEntries),
+        dishName: dishes.name,
+        mealTypePosition: mealTypes.position,
+      })
+      .from(menuEntries)
+      // Умова за домогосподарством і в join — захист у глибину: FK не гарантує, що страва й прийом
+      // їжі того самого домогосподарства (це перевіряє сервіс під час додавання).
+      .innerJoin(
+        dishes,
+        and(eq(dishes.id, menuEntries.dishId), eq(dishes.householdId, menuEntries.householdId)),
+      )
+      .innerJoin(
+        mealTypes,
+        and(
+          eq(mealTypes.id, menuEntries.mealTypeId),
+          eq(mealTypes.householdId, menuEntries.householdId),
+        ),
+      )
+  );
 }
 
 /**

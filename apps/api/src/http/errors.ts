@@ -52,4 +52,12 @@ function pgCode(error: unknown): string | undefined {
 export const isForeignKeyViolation = (error: unknown) =>
   PG_FOREIGN_KEY_VIOLATIONS.includes(pgCode(error) ?? '');
 export const isUniqueViolation = (error: unknown) => pgCode(error) === PG_UNIQUE_VIOLATION;
-export const isCheckViolation = (error: unknown) => pgCode(error) === PG_CHECK_VIOLATION;
+/** Порушення check-обмеження; з назвою — лише цього обмеження. */
+export function isCheckViolation(error: unknown, constraint?: string): boolean {
+  if (pgCode(error) !== PG_CHECK_VIOLATION) return false;
+  if (constraint === undefined) return true;
+  for (let e: unknown = error; e instanceof Error; e = e.cause) {
+    if ('constraint' in e && e.constraint === constraint) return true;
+  }
+  return false;
+}

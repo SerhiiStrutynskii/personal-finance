@@ -122,7 +122,7 @@ export async function createEntry(
   try {
     result = await repo.insertOrAddServings(db, auth.householdId, input);
   } catch (error) {
-    if (isCheckViolation(error)) throw tooManyServings();
+    if (isCheckViolation(error, 'menu_entries_servings_range')) throw tooManyServings();
     // Прийом їжі чи страву видалили між перевіркою й вставкою.
     if (isForeignKeyViolation(error)) throw notFound('Страва чи прийом їжі');
     throw error;

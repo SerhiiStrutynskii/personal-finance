@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import {
+  DEFAULT_TIME_ZONE,
   addDays,
   isoWeekday,
   localDateKey,
@@ -238,7 +239,7 @@ const MENU_PLAN: [day: number, meal: number, dish: string, servings: number][] =
 /** Меню на 4 дні поточного тижня — лише якщо в домогосподарства ще немає записів меню. */
 async function seedMenuEntries(tx: DbOrTx, householdId: string): Promise<boolean> {
   if ((await tx.$count(menuEntries, eq(menuEntries.householdId, householdId))) > 0) return false;
-  const today = localDateKey(new Date());
+  const today = localDateKey(new Date(), DEFAULT_TIME_ZONE);
   const monday = addDays(today, 1 - isoWeekday(today));
   const meals = await tx
     .select({ id: mealTypes.id })
