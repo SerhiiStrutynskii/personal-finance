@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MoneyRangeError } from '../../money.ts';
-import { dishPortionPrice } from '../calculations.ts';
+import { dishPortionPrice, menuCostTotal, menuEntryCost } from '../calculations.ts';
 
 describe('dishPortionPrice', () => {
   it('додає суми рядків: 0,15 кг × 40 грн + 0,01 л × 90 грн = 6,90 грн', () => {
@@ -64,5 +64,60 @@ describe('dishPortionPrice', () => {
     expect(
       dishPortionPrice([{ quantityMilli: 1000, unitPrice: Number.MAX_SAFE_INTEGER }]).price,
     ).toBe(Number.MAX_SAFE_INTEGER);
+  });
+});
+
+describe('menuEntryCost', () => {
+  it('ціна порції × порції', () => {
+    expect(menuEntryCost(690, 1)).toBe(690);
+    expect(menuEntryCost(690, 2)).toBe(1380);
+    expect(menuEntryCost(1250, 3)).toBe(3750);
+    expect(menuEntryCost(0, 99)).toBe(0);
+  });
+
+  it('кидає MoneyRangeError понад безпечне ціле', () => {
+    expect(menuEntryCost(Number.MAX_SAFE_INTEGER, 1)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(() => menuEntryCost(Number.MAX_SAFE_INTEGER, 2)).toThrow(MoneyRangeError);
+    expect(() => menuEntryCost(Math.floor(Number.MAX_SAFE_INTEGER / 99) + 1, 99)).toThrow(
+      MoneyRangeError,
+    );
+  });
+});
+
+describe('menuCostTotal', () => {
+  it('порожній список — нуль і повна ціна', () => {
+    expect(menuCostTotal([])).toEqual({ cost: 0, isPriceComplete: true, incompleteEntryCount: 0 });
+  });
+
+  it('сумує вартість записів: 690 × 2 + 1 250 × 3 = 5 130, з іншим днем 500 — 5 630', () => {
+    const day = [
+      { cost: menuEntryCost(690, 2), isPriceComplete: true },
+      { cost: menuEntryCost(1250, 3), isPriceComplete: true },
+    ];
+    expect(menuCostTotal(day)).toEqual({
+      cost: 5130,
+      isPriceComplete: true,
+      incompleteEntryCount: 0,
+    });
+    expect(menuCostTotal([...day, { cost: 500, isPriceComplete: true }]).cost).toBe(5630);
+  });
+
+  it('неповна ціна хоча б одного запису робить підсумок неповним і рахує такі записи', () => {
+    expect(
+      menuCostTotal([
+        { cost: 500, isPriceComplete: false },
+        { cost: 100, isPriceComplete: true },
+        { cost: 0, isPriceComplete: false },
+      ]),
+    ).toEqual({ cost: 600, isPriceComplete: false, incompleteEntryCount: 2 });
+  });
+
+  it('кидає MoneyRangeError, коли сума виходить за безпечне ціле', () => {
+    expect(() =>
+      menuCostTotal([
+        { cost: Number.MAX_SAFE_INTEGER, isPriceComplete: true },
+        { cost: 1, isPriceComplete: true },
+      ]),
+    ).toThrow(MoneyRangeError);
   });
 });
