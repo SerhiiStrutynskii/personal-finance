@@ -620,3 +620,64 @@ export const shoppingListItems = pgTable(
     check('shopping_list_items_bought_at', sql`${t.isBought} = (${t.boughtAt} IS NOT NULL)`),
   ],
 );
+
+// Прийом їжі (сніданок, обід…) — довідник домогосподарства для меню.
+export const mealTypes = pgTable(
+  'meal_types',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    // Назва в нижньому регістрі для унікальності, як у продуктів.
+    nameKey: text('name_key').notNull(),
+    // Порядок у довіднику; важливе лише відносне значення.
+    position: integer().notNull(),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    unique('meal_types_household_name_unique').on(t.householdId, t.nameKey),
+    index().on(t.householdId, t.position),
+  ],
+);
+
+// Страва зі складом однієї порції. Ціна порції не зберігається: рахується з цін продуктів.
+export const dishes = pgTable(
+  'dishes',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    nameKey: text('name_key').notNull(),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [unique('dishes_household_name_unique').on(t.householdId, t.nameKey)],
+);
+
+// Продукт у складі однієї порції страви.
+export const dishIngredients = pgTable(
+  'dish_ingredients',
+  {
+    id: id(),
+    dishId: uuid('dish_id')
+      .notNull()
+      .references(() => dishes.id, { onDelete: 'cascade' }),
+    // Продукт зі складу страви видалити не можна, лише заархівувати.
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    // Кількість у тисячних одиниці продукту, як у shopping_list_items.
+    quantityMilli: integer('quantity_milli').notNull(),
+    position: integer().notNull(),
+  },
+  (t) => [
+    unique('dish_ingredients_product_unique').on(t.dishId, t.productId),
+    index().on(t.productId),
+    check('dish_ingredients_quantity_positive', sql`${t.quantityMilli} > 0`),
+  ],
+);

@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import { householdMembers, households, refreshTokens, users } from '../../db/schema.ts';
+import { insertDefaultMealTypes } from '../menu/mealTypes.repo.ts';
 
 export type UserRow = typeof users.$inferSelect;
 export type RefreshTokenRow = typeof refreshTokens.$inferSelect;
@@ -23,9 +24,11 @@ export async function insertUser(
   return row!;
 }
 
+/** Нове домогосподарство з власником і типовими прийомами їжі для меню. */
 export async function insertHouseholdWithOwner(db: DbOrTx, name: string, userId: string) {
   const [household] = await db.insert(households).values({ name }).returning();
   await db.insert(householdMembers).values({ householdId: household!.id, userId, role: 'owner' });
+  await insertDefaultMealTypes(db, household!.id);
   return household!;
 }
 

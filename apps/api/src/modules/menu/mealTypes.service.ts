@@ -1,0 +1,81 @@
+import {
+  type CreateMealTypeInput,
+  type MealType,
+  type ReorderMealTypesInput,
+  type UpdateMealTypeInput,
+} from '@hf/shared';
+import type { Db } from '../../db/client.ts';
+import type { AuthContext } from '../../http/auth.ts';
+import { badRequest, conflict, isUniqueViolation, notFound } from '../../http/errors.ts';
+import * as repo from './mealTypes.repo.ts';
+
+// Довідник ведуть усі учасники домогосподарства, як продукти й списки покупок.
+
+const toDto = (row: repo.MealTypeRow): MealType => ({
+  id: row.id,
+  name: row.name,
+  position: row.position,
+});
+
+/** Назва унікальна без урахування регістру й пробілів по краях. */
+function rethrowDuplicate(error: unknown): never {
+  if (isUniqueViolation(error)) throw conflict('Прийом їжі з такою назвою вже існує');
+  throw error;
+}
+
+export async function listMealTypes(db: Db, auth: AuthContext): Promise<MealType[]> {
+  return (await repo.listMealTypes(db, auth.householdId)).map(toDto);
+}
+
+export async function createMealType(
+  db: Db,
+  auth: AuthContext,
+  input: CreateMealTypeInput,
+): Promise<MealType> {
+  try {
+    return toDto(await repo.insertMealType(db, auth.householdId, input.name));
+  } catch (error) {
+    rethrowDuplicate(error);
+  }
+}
+
+export async function renameMealType(
+  db: Db,
+  auth: AuthContext,
+  id: string,
+  input: UpdateMealTypeInput,
+): Promise<MealType> {
+  let row: repo.MealTypeRow | undefined;
+  try {
+    row = await repo.renameMealType(db, auth.householdId, id, input.name);
+  } catch (error) {
+    rethrowDuplicate(error);
+  }
+  if (!row) throw notFound('Прийом їжі');
+  return toDto(row);
+}
+
+/**
+ * Новий порядок: ids мають збігатися з усіма прийомами їжі домогосподарства, інакше 400 і
+ * порядок не змінюється. Позиції стають 0..n-1.
+ */
+export async function reorderMealTypes(
+  db: Db,
+  auth: AuthContext,
+  input: ReorderMealTypesInput,
+): Promise<MealType[]> {
+  return db.transaction(async (tx) => {
+    const rows = await repo.listMealTypes(tx, auth.householdId, true);
+    const known = new Set(rows.map((row) => row.id));
+    if (rows.length !== input.ids.length || !input.ids.every((id) => known.has(id))) {
+      throw badRequest('Потрібно передати всі прийоми їжі, кожен один раз');
+    }
+    await repo.reorderMealTypes(tx, auth.householdId, input.ids);
+    return (await repo.listMealTypes(tx, auth.householdId)).map(toDto);
+  });
+}
+
+/** Видалення остаточне; позиції решти не перераховуються. */
+export async function deleteMealType(db: Db, auth: AuthContext, id: string): Promise<void> {
+  if (!(await repo.deleteMealType(db, auth.householdId, id))) throw notFound('Прийом їжі');
+}

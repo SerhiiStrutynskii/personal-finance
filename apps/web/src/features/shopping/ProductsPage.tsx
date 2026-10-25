@@ -29,7 +29,7 @@ import { ProductDialog } from './ProductDialog.tsx';
 import { PRODUCT_UNIT_LABELS, formatUnitPrice } from './productForm.ts';
 
 const DELETE_DESCRIPTION =
-  'Продукт, який уже є в списках покупок, видалити не можна — лише заархівувати.';
+  'Продукт, який уже є в списках покупок або в складі страв, видалити не можна — лише заархівувати.';
 
 /** Довідник продуктів зі збереженими цінами за одиницю. */
 export function ProductsPage() {

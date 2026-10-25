@@ -68,14 +68,19 @@ export async function updateProduct(
   return toDto(row);
 }
 
-/** Продукт, який уже є в списках покупок, не видаляється: історія цін лишається цілою. */
+/**
+ * Продукт, який уже є в списках покупок або в складі страв, не видаляється: історія цін і склад
+ * страв лишаються цілими.
+ */
 export async function deleteProduct(db: Db, auth: AuthContext, id: string): Promise<void> {
   let deleted: boolean;
   try {
     deleted = await repo.deleteProduct(db, auth.householdId, id);
   } catch (error) {
     if (isForeignKeyViolation(error)) {
-      throw conflict('Продукт є в списках покупок. Заархівуйте його, щоб приховати з довідника');
+      throw conflict(
+        'Продукт використовується в списках покупок або стравах. Заархівуйте його, щоб приховати з довідника',
+      );
     }
     throw error;
   }
