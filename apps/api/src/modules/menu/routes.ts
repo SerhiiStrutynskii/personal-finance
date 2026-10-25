@@ -1,15 +1,19 @@
 import {
   createDishSchema,
   createMealTypeSchema,
+  createMenuEntrySchema,
   idParamsSchema,
+  menuPeriodQuerySchema,
   reorderMealTypesSchema,
   updateDishSchema,
   updateMealTypeSchema,
+  updateMenuEntrySchema,
 } from '@hf/shared';
 import { Router } from 'express';
 import type { Db } from '../../db/client.ts';
 import { getAuth } from '../../http/auth.ts';
 import * as dishes from './dishes.service.ts';
+import * as entries from './entries.service.ts';
 import * as mealTypes from './mealTypes.service.ts';
 
 export function mealTypesRouter(db: Db): Router {
@@ -71,6 +75,36 @@ export function dishesRouter(db: Db): Router {
   router.delete('/:id', async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
     await dishes.deleteDish(db, getAuth(res), id);
+    res.status(204).end();
+  });
+
+  return router;
+}
+
+/** Календар меню: період [from, to) і записи «страва в прийомі їжі дня». */
+export function menuRouter(db: Db): Router {
+  const router = Router();
+
+  router.get('/', async (req, res) => {
+    const query = menuPeriodQuerySchema.parse(req.query);
+    res.json(await entries.getMenuPeriod(db, getAuth(res), query));
+  });
+
+  router.post('/entries', async (req, res) => {
+    const input = createMenuEntrySchema.parse(req.body);
+    const { entry, created } = await entries.createEntry(db, getAuth(res), input);
+    res.status(created ? 201 : 200).json(entry);
+  });
+
+  router.patch('/entries/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = updateMenuEntrySchema.parse(req.body);
+    res.json(await entries.updateEntry(db, getAuth(res), id, input));
+  });
+
+  router.delete('/entries/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    await entries.deleteEntry(db, getAuth(res), id);
     res.status(204).end();
   });
 

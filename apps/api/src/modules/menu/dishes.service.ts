@@ -1,46 +1,19 @@
 import {
-  DEFAULT_CURRENCY,
   compareProductNames,
-  dishPortionPrice,
-  lineTotal,
   type CreateDishInput,
   type Dish,
-  type DishIngredient,
   type DishIngredientInput,
   type DishSummary,
   type UpdateDishInput,
 } from '@hf/shared';
 import type { Db, DbOrTx } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
-import { conflict, isUniqueViolation, notFound } from '../../http/errors.ts';
+import { conflict, isForeignKeyViolation, isUniqueViolation, notFound } from '../../http/errors.ts';
+import { toIngredientDto, toSummaries, toSummary } from './dishes.pricing.ts';
 import * as repo from './dishes.repo.ts';
 
 // Страви ведуть усі учасники домогосподарства. Ціна порції рахується при кожному читанні
 // з поточних цін продуктів і ніде не зберігається.
-
-const toIngredientDto = (row: repo.IngredientWithProduct): DishIngredient => ({
-  productId: row.productId,
-  name: row.name,
-  unit: row.unit,
-  isArchived: row.isArchived,
-  quantityMilli: row.quantityMilli,
-  unitPrice: row.priceMinor,
-  lineTotal: row.priceMinor === null ? null : lineTotal(row.quantityMilli, row.priceMinor),
-});
-
-function toSummary(row: repo.DishRow, lines: readonly DishIngredient[]): DishSummary {
-  const { price, isPriceComplete, unpricedCount } = dishPortionPrice(lines);
-  return {
-    id: row.id,
-    name: row.name,
-    currency: DEFAULT_CURRENCY,
-    portionPrice: price,
-    isPriceComplete,
-    unpricedCount,
-    ingredientCount: lines.length,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
 
 function toDish(row: repo.DishRow, ingredients: repo.IngredientWithProduct[]): Dish {
   const lines = ingredients.map(toIngredientDto);
@@ -73,11 +46,7 @@ async function assertOwnProducts(
 /** Страви за українським алфавітом, з ціною порції. */
 export async function listDishes(db: Db, auth: AuthContext): Promise<DishSummary[]> {
   const { dishes, ingredients } = await repo.listWithIngredients(db, auth.householdId);
-  return dishes
-    .map((row) =>
-      toSummary(row, ingredients.filter((line) => line.dishId === row.id).map(toIngredientDto)),
-    )
-    .sort((a, b) => compareProductNames(a.name, b.name));
+  return toSummaries(dishes, ingredients).sort((a, b) => compareProductNames(a.name, b.name));
 }
 
 export async function getDish(db: Db, auth: AuthContext, id: string): Promise<Dish> {
@@ -119,7 +88,19 @@ export async function updateDish(
   }
 }
 
-/** Видаляє страву разом зі складом; продукти довідника лишаються. */
+/**
+ * Видаляє страву разом зі складом; продукти довідника лишаються. Страву, що є в календарі меню,
+ * видалити не можна (409): спершу її прибирають з усіх днів.
+ */
 export async function deleteDish(db: Db, auth: AuthContext, id: string): Promise<void> {
-  if (!(await repo.deleteDish(db, auth.householdId, id))) throw notFound('Страва');
+  let deleted: boolean;
+  try {
+    deleted = await repo.deleteDish(db, auth.householdId, id);
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      throw conflict('Страва є в меню. Приберіть її з календаря, щоб видалити');
+    }
+    throw error;
+  }
+  if (!deleted) throw notFound('Страва');
 }

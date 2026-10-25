@@ -4,7 +4,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { dishIngredients } from '../../../db/schema.ts';
 import { setupTestApp } from '../../../test/harness.ts';
-import { ownerWithMember, type Client } from './helpers.ts';
+import { addEntry, ownerWithMember, type Client } from './helpers.ts';
 
 const harness = setupTestApp();
 const { app, db, createActor } = harness;
@@ -267,6 +267,34 @@ describe('страви', () => {
     expect(products.sort()).toEqual([buckwheat, oil].sort());
     // Продукт без складу тепер можна видалити.
     expect((await actor.delete(`/api/products/${buckwheat}`)).status).toBe(204);
+  });
+
+  it('AC13: страву з меню не видалити (409), а після очищення календаря — можна', async () => {
+    const actor = await createActor();
+    const { buckwheat } = await pantry(actor);
+    const lunch = (await actor.post('/api/meal-types', { name: 'Обід' })).body.id as string;
+    const { body: dish } = await actor.post('/api/dishes', {
+      name: 'Каша',
+      ingredients: [{ productId: buckwheat, quantityMilli: 150 }],
+    });
+    const entries = [
+      await addEntry(actor, { date: '2026-10-26', mealTypeId: lunch, dishId: dish.id }),
+      await addEntry(actor, { date: '2020-01-01', mealTypeId: lunch, dishId: dish.id }),
+    ];
+
+    const res = await actor.delete(`/api/dishes/${dish.id}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Страва є в меню. Приберіть її з календаря, щоб видалити');
+    expect((await actor.get(`/api/dishes/${dish.id}`)).body.ingredientCount).toBe(1);
+    expect((await actor.get('/api/menu?from=2026-10-01&to=2026-11-01')).body.entries).toHaveLength(
+      1,
+    );
+
+    // Один запис лишився — усе ще 409.
+    expect((await actor.delete(`/api/menu/entries/${entries[0]!.id}`)).status).toBe(204);
+    expect((await actor.delete(`/api/dishes/${dish.id}`)).status).toBe(409);
+    expect((await actor.delete(`/api/menu/entries/${entries[1]!.id}`)).status).toBe(204);
+    expect((await actor.delete(`/api/dishes/${dish.id}`)).status).toBe(204);
   });
 
   it('сортує страви за українським алфавітом без урахування регістру', async () => {

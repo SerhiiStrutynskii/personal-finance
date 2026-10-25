@@ -6,7 +6,13 @@ import {
 } from '@hf/shared';
 import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
-import { badRequest, conflict, isUniqueViolation, notFound } from '../../http/errors.ts';
+import {
+  badRequest,
+  conflict,
+  isForeignKeyViolation,
+  isUniqueViolation,
+  notFound,
+} from '../../http/errors.ts';
 import * as repo from './mealTypes.repo.ts';
 
 // Довідник ведуть усі учасники домогосподарства, як продукти й списки покупок.
@@ -75,7 +81,21 @@ export async function reorderMealTypes(
   });
 }
 
-/** Видалення остаточне; позиції решти не перераховуються. */
+/**
+ * Видалення остаточне; позиції решти не перераховуються. Прийом їжі, у якому є страви календаря
+ * меню, видалити не можна (409).
+ */
 export async function deleteMealType(db: Db, auth: AuthContext, id: string): Promise<void> {
-  if (!(await repo.deleteMealType(db, auth.householdId, id))) throw notFound('Прийом їжі');
+  let deleted: boolean;
+  try {
+    deleted = await repo.deleteMealType(db, auth.householdId, id);
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      throw conflict(
+        'Прийом їжі використовується в меню. Приберіть його страви з календаря, щоб видалити',
+      );
+    }
+    throw error;
+  }
+  if (!deleted) throw notFound('Прийом їжі');
 }

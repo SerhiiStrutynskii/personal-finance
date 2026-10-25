@@ -39,6 +39,7 @@ export const conflict = (message: string) => new AppError(409, 'CONFLICT', messa
 // ON DELETE RESTRICT повідомляє 23001, звичайний зовнішній ключ — 23503
 const PG_FOREIGN_KEY_VIOLATIONS = ['23001', '23503'];
 const PG_UNIQUE_VIOLATION = '23505';
+const PG_CHECK_VIOLATION = '23514';
 
 function pgCode(error: unknown): string | undefined {
   // drizzle загортає помилку драйвера в cause
@@ -51,3 +52,4 @@ function pgCode(error: unknown): string | undefined {
 export const isForeignKeyViolation = (error: unknown) =>
   PG_FOREIGN_KEY_VIOLATIONS.includes(pgCode(error) ?? '');
 export const isUniqueViolation = (error: unknown) => pgCode(error) === PG_UNIQUE_VIOLATION;
+export const isCheckViolation = (error: unknown) => pgCode(error) === PG_CHECK_VIOLATION;

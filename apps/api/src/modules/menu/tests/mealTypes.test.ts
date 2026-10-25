@@ -5,7 +5,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { households, mealTypes } from '../../../db/schema.ts';
 import { setupTestApp } from '../../../test/harness.ts';
-import { mealTypeNames, ownerWithMember, registerUser } from './helpers.ts';
+import { addEntry, mealTypeNames, ownerWithMember, registerUser } from './helpers.ts';
 
 const harness = setupTestApp();
 const { app, db, createActor } = harness;
@@ -169,6 +169,32 @@ describe('прийоми їжі', () => {
     }
     expect((await user.get('/api/meal-types')).body.items).toEqual([]);
     expect((await user.delete(`/api/meal-types/${items[0].id}`)).status).toBe(404);
+  });
+});
+
+describe('прийоми їжі в календарі меню', () => {
+  it('AC14: прийом їжі з записами меню не видалити (409), а після очищення — можна', async () => {
+    const user = await registerUser(harness);
+    const [, lunch] = (await user.get('/api/meal-types')).body.items;
+    const dish = await user.post('/api/dishes', { name: 'Борщ' });
+    const other = await user.post('/api/dishes', { name: 'Хліб' });
+    const entries = [
+      await addEntry(user, { date: '2026-10-26', mealTypeId: lunch.id, dishId: dish.body.id }),
+      await addEntry(user, { date: '2026-10-26', mealTypeId: lunch.id, dishId: other.body.id }),
+    ];
+
+    const res = await user.delete(`/api/meal-types/${lunch.id}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe(
+      'Прийом їжі використовується в меню. Приберіть його страви з календаря, щоб видалити',
+    );
+    expect(await mealTypeNames(user)).toEqual(DEFAULTS);
+
+    for (const entry of entries) {
+      expect((await user.delete(`/api/menu/entries/${entry.id}`)).status).toBe(204);
+    }
+    expect((await user.delete(`/api/meal-types/${lunch.id}`)).status).toBe(204);
+    expect(await mealTypeNames(user)).toEqual(['Сніданок', 'Вечеря']);
   });
 });
 

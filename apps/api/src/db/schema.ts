@@ -681,3 +681,34 @@ export const dishIngredients = pgTable(
     check('dish_ingredients_quantity_positive', sql`${t.quantityMilli} > 0`),
   ],
 );
+
+// Страва в прийомі їжі одного дня меню. Дата — календарна дата домогосподарства, без часу.
+// Ціна не зберігається: вартість рахується з поточних цін продуктів страви.
+// Страву чи прийом їжі з записами в меню видалити не можна (no action → 23503 → 409); перевірка
+// no action іде в кінці оператора, тому каскадне видалення домогосподарства не падає.
+export const menuEntries = pgTable(
+  'menu_entries',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    date: calendarDate('date').notNull(),
+    mealTypeId: uuid('meal_type_id')
+      .notNull()
+      .references(() => mealTypes.id),
+    dishId: uuid('dish_id')
+      .notNull()
+      .references(() => dishes.id),
+    servings: integer().notNull(),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    unique('menu_entries_dish_unique').on(t.householdId, t.date, t.mealTypeId, t.dishId),
+    index().on(t.householdId, t.date),
+    index().on(t.dishId),
+    index().on(t.mealTypeId),
+    check('menu_entries_servings_range', sql`${t.servings} between 1 and 99`),
+  ],
+);

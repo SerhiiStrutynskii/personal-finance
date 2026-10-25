@@ -19,7 +19,7 @@ import {
   incomesRouter,
 } from './modules/incomes/routes.ts';
 import { categoriesRouter } from './modules/categories/routes.ts';
-import { dishesRouter, mealTypesRouter } from './modules/menu/routes.ts';
+import { dishesRouter, mealTypesRouter, menuRouter } from './modules/menu/routes.ts';
 import { productsRouter, shoppingListsRouter, shoppingRouter } from './modules/shopping/routes.ts';
 import { transactionsRouter } from './modules/transactions/routes.ts';
 
@@ -86,6 +86,7 @@ export function createApp({
   api.use('/income-sources', incomeSourcesRouter(db, now));
   api.use('/incomes', incomesRouter(db, now));
   api.use('/meal-types', mealTypesRouter(db));
+  api.use('/menu', menuRouter(db));
   api.use('/products', productsRouter(db));
   api.use('/shopping-lists', shoppingListsRouter(db, now));
   api.use('/shopping', shoppingRouter(db, now));
