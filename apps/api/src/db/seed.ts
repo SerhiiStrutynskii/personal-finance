@@ -1,5 +1,12 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import { parseMoney, parseQuantity, productNameKey } from '@hf/shared';
+import {
+  addDays,
+  isoWeekday,
+  localDateKey,
+  parseMoney,
+  parseQuantity,
+  productNameKey,
+} from '@hf/shared';
 import { loadEnv } from '../config/env.ts';
 import { hashPassword } from '../modules/auth/password.ts';
 import { insertDefaultMealTypes } from '../modules/menu/mealTypes.repo.ts';
@@ -12,6 +19,7 @@ import {
   householdMembers,
   households,
   mealTypes,
+  menuEntries,
   products,
   shoppingListItems,
   shoppingLists,
@@ -216,6 +224,44 @@ async function seedMenu(tx: DbOrTx, householdId: string): Promise<boolean> {
   return true;
 }
 
+// Демо-меню поточного тижня: [день від понеділка, прийом їжі за порядком, страва, порції].
+const MENU_PLAN: [day: number, meal: number, dish: string, servings: number][] = [
+  [0, 0, 'Омлет', 2],
+  [0, 1, 'Рис з куркою', 3],
+  [1, 0, 'Бутерброд з сиром', 2],
+  [1, 2, 'Рис з куркою', 2],
+  [2, 0, 'Омлет', 1],
+  [2, 1, 'Рис з куркою', 4],
+  [3, 2, 'Бутерброд з сиром', 3],
+];
+
+/** Меню на 4 дні поточного тижня — лише якщо в домогосподарства ще немає записів меню. */
+async function seedMenuEntries(tx: DbOrTx, householdId: string): Promise<boolean> {
+  if ((await tx.$count(menuEntries, eq(menuEntries.householdId, householdId))) > 0) return false;
+  const today = localDateKey(new Date());
+  const monday = addDays(today, 1 - isoWeekday(today));
+  const meals = await tx
+    .select({ id: mealTypes.id })
+    .from(mealTypes)
+    .where(eq(mealTypes.householdId, householdId))
+    .orderBy(mealTypes.position, mealTypes.id);
+  const dishRows = await tx
+    .select({ id: dishes.id, nameKey: dishes.nameKey })
+    .from(dishes)
+    .where(eq(dishes.householdId, householdId));
+  const dishId = new Map(dishRows.map((row) => [row.nameKey, row.id]));
+  const values = MENU_PLAN.flatMap(([day, meal, dish, servings]) => {
+    const mealTypeId = meals[meal]?.id;
+    const id = dishId.get(productNameKey(dish));
+    return mealTypeId && id
+      ? [{ householdId, date: addDays(monday, day), mealTypeId, dishId: id, servings }]
+      : [];
+  });
+  if (values.length === 0) return false;
+  await tx.insert(menuEntries).values(values);
+  return true;
+}
+
 try {
   const [existing] = await db.select().from(users).where(eq(users.id, DEMO_USER_ID));
   if (existing) {
@@ -232,7 +278,8 @@ try {
       (await db.transaction(async (tx) => {
         const shopping = await seedShopping(tx, membership.householdId);
         const menu = await seedMenu(tx, membership.householdId);
-        return shopping || menu;
+        const calendar = await seedMenuEntries(tx, membership.householdId);
+        return shopping || menu || calendar;
       }));
     console.log(added ? 'Додано демо-покупки чи меню' : 'Демо-дані вже є, пропускаю');
   } else {
@@ -343,6 +390,7 @@ try {
       ]);
       await seedShopping(tx, householdId);
       await seedMenu(tx, householdId);
+      await seedMenuEntries(tx, householdId);
     });
     console.log('Демо-дані створено');
   }
