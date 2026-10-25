@@ -1,0 +1,78 @@
+import {
+  createDishSchema,
+  createMealTypeSchema,
+  idParamsSchema,
+  reorderMealTypesSchema,
+  updateDishSchema,
+  updateMealTypeSchema,
+} from '@hf/shared';
+import { Router } from 'express';
+import type { Db } from '../../db/client.ts';
+import { getAuth } from '../../http/auth.ts';
+import * as dishes from './dishes.service.ts';
+import * as mealTypes from './mealTypes.service.ts';
+
+export function mealTypesRouter(db: Db): Router {
+  const router = Router();
+
+  router.get('/', async (_req, res) => {
+    res.json({ items: await mealTypes.listMealTypes(db, getAuth(res)) });
+  });
+
+  router.post('/', async (req, res) => {
+    const input = createMealTypeSchema.parse(req.body);
+    res.status(201).json(await mealTypes.createMealType(db, getAuth(res), input));
+  });
+
+  // До /:id, щоб «order» не розбирався як id.
+  router.put('/order', async (req, res) => {
+    const input = reorderMealTypesSchema.parse(req.body);
+    res.json({ items: await mealTypes.reorderMealTypes(db, getAuth(res), input) });
+  });
+
+  router.patch('/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = updateMealTypeSchema.parse(req.body);
+    res.json(await mealTypes.renameMealType(db, getAuth(res), id, input));
+  });
+
+  router.delete('/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    await mealTypes.deleteMealType(db, getAuth(res), id);
+    res.status(204).end();
+  });
+
+  return router;
+}
+
+export function dishesRouter(db: Db): Router {
+  const router = Router();
+
+  router.get('/', async (_req, res) => {
+    res.json({ items: await dishes.listDishes(db, getAuth(res)) });
+  });
+
+  router.post('/', async (req, res) => {
+    const input = createDishSchema.parse(req.body);
+    res.status(201).json(await dishes.createDish(db, getAuth(res), input));
+  });
+
+  router.get('/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    res.json(await dishes.getDish(db, getAuth(res), id));
+  });
+
+  router.patch('/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = updateDishSchema.parse(req.body);
+    res.json(await dishes.updateDish(db, getAuth(res), id, input));
+  });
+
+  router.delete('/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    await dishes.deleteDish(db, getAuth(res), id);
+    res.status(204).end();
+  });
+
+  return router;
+}

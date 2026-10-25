@@ -63,6 +63,27 @@ describe('products', () => {
     expect((await actor.patch(`/api/products/${kefir.id}`, { name: 'МОЛОКО' })).status).toBe(409);
   });
 
+  it('продукт зі складу страви не видаляється: 409 з поясненням, лише архівування', async () => {
+    const actor = await createActor();
+    const { body: rice } = await actor.post('/api/products', { name: 'Рис', unit: 'kg' });
+    const { body: dish } = await actor.post('/api/dishes', {
+      name: 'Рис варений',
+      ingredients: [{ productId: rice.id, quantityMilli: 100 }],
+    });
+
+    const deleted = await actor.delete(`/api/products/${rice.id}`);
+    expect(deleted.status).toBe(409);
+    expect(deleted.body.error.message).toBe(
+      'Продукт використовується в списках покупок або стравах. Заархівуйте його, щоб приховати з довідника',
+    );
+
+    expect((await actor.patch(`/api/products/${rice.id}`, { isArchived: true })).status).toBe(200);
+    const { body } = await actor.get(`/api/dishes/${dish.id}`);
+    expect(body.ingredients).toEqual([
+      expect.objectContaining({ productId: rice.id, isArchived: true }),
+    ]);
+  });
+
   it('ізолює продукти між домогосподарствами', async () => {
     const owner = await createActor();
     const stranger = await createActor();
