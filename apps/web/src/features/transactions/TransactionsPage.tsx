@@ -4,6 +4,7 @@ import {
   localMonthKey,
   type Transaction,
 } from '@hf/shared';
+import { Download } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -13,7 +14,7 @@ import { activeAccounts, useAccounts } from '../accounts/api.ts';
 import { defaultEntryDate } from '../budget/month.ts';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useCategories } from '../categories/api.ts';
-import { useTransactions } from './api.ts';
+import { useExportExpenses, useTransactions } from './api.ts';
 import { ENTRY_CONFIG, type EntryType } from './config.ts';
 import { TransactionDialog } from './TransactionDialog.tsx';
 import { TransactionTable } from './TransactionTable.tsx';
@@ -42,7 +43,9 @@ export function TransactionsPage({ type }: { type: EntryType }) {
     offset,
   });
 
-  const error = transactions.error ?? accounts.error ?? categories.error;
+  const exportExpenses = useExportExpenses();
+
+  const error = transactions.error ?? accounts.error ?? categories.error ?? exportExpenses.error;
   const page = transactions.data;
   const usableAccounts = activeAccounts(accounts.data);
   const hasAccounts = usableAccounts.length > 0;
@@ -56,15 +59,32 @@ export function TransactionsPage({ type }: { type: EntryType }) {
       <PageHeader
         title={config.title}
         action={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <MonthSwitcher
               month={month}
               max={currentMonth}
               onChange={(next) => {
                 setMonth(next);
                 setOffset(0);
+                exportExpenses.reset();
               }}
             />
+            {type === 'expense' && (
+              <Button
+                variant="outline"
+                // Експортується саме те, що показано: не під час завантаження й не з порожнього місяця.
+                disabled={
+                  !page ||
+                  transactions.isPlaceholderData ||
+                  page.total === 0 ||
+                  exportExpenses.isPending
+                }
+                onClick={() => exportExpenses.mutate(month)}
+              >
+                <Download />
+                {exportExpenses.isPending ? 'Експорт…' : 'Експорт CSV'}
+              </Button>
+            )}
             {hasAccounts && <Button onClick={() => setDialog({ open: true })}>Додати</Button>}
           </div>
         }

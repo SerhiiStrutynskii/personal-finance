@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, NetworkError, createApiClient } from './client.ts';
+import { ApiError, NetworkError, createApiClient, filenameFromDisposition } from './client.ts';
 import { createTokenStore } from './tokenStore.ts';
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -272,6 +272,97 @@ describe('запити без авторизації', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.authorization).toBeUndefined();
     expect(tokenStore.hasSession()).toBe(true);
+  });
+});
+
+describe('download', () => {
+  const CSV = '\uFEFFДата;Сума\r\n2026-03-01;1284,50\r\n';
+  const csvResponse = () =>
+    new Response(CSV, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="expenses-2026-03.csv"',
+      },
+    });
+
+  it('повертає вміст файлу й назву з Content-Disposition, передає параметри й токен', async () => {
+    const { api, calls } = setup(() => csvResponse());
+
+    const file = await api.download('/api/transactions/export.csv', { month: '2026-03' });
+
+    expect(file.filename).toBe('expenses-2026-03.csv');
+    expect(new Uint8Array(await file.blob.arrayBuffer())).toEqual(new TextEncoder().encode(CSV));
+    expect(calls).toEqual([
+      expect.objectContaining({
+        method: 'GET',
+        path: '/api/transactions/export.csv',
+        search: '?month=2026-03',
+        authorization: 'Bearer access-1',
+      }),
+    ]);
+  });
+
+  it('AC23: з простроченим токеном спершу оновлює його, потім повторює завантаження', async () => {
+    const server = rotatingServer();
+    const { api, calls, tokenStore } = setup(
+      async (call) => {
+        if (call.path === '/api/auth/refresh') return server.handler(call);
+        return call.authorization === 'Bearer access-2' ? csvResponse() : unauthorized();
+      },
+      { accessToken: 'stale' },
+    );
+
+    const file = await api.download('/api/transactions/export.csv', { month: '2026-03' });
+
+    expect(file.filename).toBe('expenses-2026-03.csv');
+    expect(calls.map((call) => call.path)).toEqual([
+      '/api/transactions/export.csv',
+      '/api/auth/refresh',
+      '/api/transactions/export.csv',
+    ]);
+    expect(calls[2]!.authorization).toBe('Bearer access-2');
+    expect(tokenStore.getAccessToken()).toBe('access-2');
+  });
+
+  it('якщо оновити токен не вдалося, завершує сесію', async () => {
+    const { api, tokenStore } = setup(() => unauthorized(), { accessToken: 'stale' });
+
+    await expect(api.download('/api/transactions/export.csv')).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(tokenStore.hasSession()).toBe(false);
+  });
+
+  it('помилку API розбирає як ApiError', async () => {
+    const { api } = setup(() =>
+      json(400, { error: { code: 'VALIDATION_ERROR', message: 'Некоректні дані' } }),
+    );
+
+    const error = await api
+      .download('/api/transactions/export.csv', { month: 'abc' })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 400, code: 'VALIDATION_ERROR' });
+  });
+
+  it('збій мережі — NetworkError', async () => {
+    const { api } = setup(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    await expect(api.download('/api/transactions/export.csv')).rejects.toBeInstanceOf(NetworkError);
+  });
+});
+
+describe('filenameFromDisposition', () => {
+  it.each([
+    ['attachment; filename="expenses-2026-03.csv"', 'expenses-2026-03.csv'],
+    ['attachment; filename=expenses-2026-03.csv', 'expenses-2026-03.csv'],
+    ['attachment; filename=report.csv; size=10', 'report.csv'],
+    ['attachment', undefined],
+    [null, undefined],
+  ])('%j -> %j', (header, expected) => {
+    expect(filenameFromDisposition(header)).toBe(expected);
   });
 });
 

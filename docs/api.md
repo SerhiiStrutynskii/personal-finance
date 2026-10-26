@@ -279,13 +279,14 @@
 `occurredAt` — ISO 8601 із часовим поясом. `currency` за замовчуванням `UAH` і має збігатися з
 валютою рахунку. Решта правил — у `docs/domain.md`.
 
-| Метод  | Шлях                    | Відповідь                                            |
-| ------ | ----------------------- | ---------------------------------------------------- |
-| GET    | `/api/transactions`     | `200 { items: Transaction[], total, limit, offset }` |
-| POST   | `/api/transactions`     | `201 Transaction`                                    |
-| GET    | `/api/transactions/:id` | `200 Transaction`                                    |
-| PUT    | `/api/transactions/:id` | `200 Transaction` (повна заміна)                     |
-| DELETE | `/api/transactions/:id` | `204`                                                |
+| Метод  | Шлях                                         | Відповідь                                            |
+| ------ | -------------------------------------------- | ---------------------------------------------------- |
+| GET    | `/api/transactions`                          | `200 { items: Transaction[], total, limit, offset }` |
+| POST   | `/api/transactions`                          | `201 Transaction`                                    |
+| GET    | `/api/transactions/export.csv?month=YYYY-MM` | `200` CSV-файл витрат місяця (див. нижче)            |
+| GET    | `/api/transactions/:id`                      | `200 Transaction`                                    |
+| PUT    | `/api/transactions/:id`                      | `200 Transaction` (повна заміна)                     |
+| DELETE | `/api/transactions/:id`                      | `204`                                                |
 
 Параметри `GET /api/transactions`:
 
@@ -300,6 +301,27 @@
 | `offset`       | За замовчуванням 0                                                            |
 
 Сортування — від новіших до старіших.
+
+### Експорт витрат у CSV
+
+`GET /api/transactions/export.csv?month=YYYY-MM` віддає файл з усіма витратами (`type = expense`)
+домогосподарства за місяць, без пагінації. Прибутки, перекази, `debt_payment` і
+`balance_adjustment` не входять — як на сторінці «Витрати». Доступно всім учасникам (`owner` і
+`member`). Невалідний або відсутній `month` — `400 VALIDATION_ERROR`.
+
+- Заголовки відповіді: `Content-Type: text/csv; charset=utf-8`,
+  `Content-Disposition: attachment; filename="expenses-YYYY-MM.csv"`, `Cache-Control: no-store`.
+- Формат для Excel з українською локаллю: UTF-8 з BOM, роздільник `;`, рядки через `\r\n`
+  (і наприкінці файлу), екранування за RFC 4180.
+- Колонки: `Дата;Сума;Валюта;Категорія;Рахунок;Опис`.
+  - Дата — `YYYY-MM-DD` у часовому поясі домогосподарства; межі місяця — там само, `[початок, кінець)`.
+  - Сума — десяткова кома без розділювача тисяч і символу валюти (`1284,50`, `500` для JPY);
+    валюта — окремою колонкою (ISO 4217). Підсумків і конвертації немає.
+  - Категорія — повна назва (`Комунальні › Вода`), без категорії — `Без категорії`.
+  - Текстові поля, що починаються з `=`, `+`, `-`, `@`, табуляції чи `\r`, отримують префікс `'`
+    (захист від формул).
+- Порядок — від старіших до новіших (`occurredAt`, потім `id`). Місяць без витрат — лише BOM і
+  заголовок.
 
 ### Обмеження дати видатку
 

@@ -1,6 +1,7 @@
 import type { ListTransactionsQuery, Transaction, TransactionInput } from '@hf/shared';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
+import { saveFile } from '../../shared/lib/saveFile.ts';
 
 export const TRANSACTIONS_KEY = ['transactions'];
 
@@ -32,5 +33,15 @@ export function useSaveTransaction() {
 export function useDeleteTransaction() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/transactions/${id}`),
+  });
+}
+
+/** Завантажує CSV з усіма витратами місяця (YYYY-MM) і зберігає файл. */
+export function useExportExpenses() {
+  return useMutation({
+    mutationFn: async (month: string) => {
+      const { blob, filename } = await api.download('/api/transactions/export.csv', { month });
+      saveFile(blob, filename ?? `expenses-${month}.csv`);
+    },
   });
 }

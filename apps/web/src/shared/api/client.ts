@@ -62,6 +62,17 @@ async function toError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, 'UNKNOWN', 'Сталася помилка. Спробуйте ще раз');
 }
 
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string | undefined;
+}
+
+/** Назва файлу з `Content-Disposition: attachment; filename="…"`; undefined, якщо її немає. */
+export function filenameFromDisposition(header: string | null): string | undefined {
+  const match = header?.match(/filename="([^"]+)"|filename=([^;\s]+)/i);
+  return match?.[1] ?? match?.[2];
+}
+
 async function parse<T>(res: Response): Promise<T> {
   if (!res.ok) throw await toError(res);
   if (res.status === 204) return undefined as T;
@@ -128,12 +139,13 @@ export function createApiClient({
     return refreshing;
   }
 
-  async function request<T>(
+  /** Запит із токеном: за 401 один раз оновлює токен і повторює. Повертає сиру відповідь. */
+  async function sendAuthorized(
     method: string,
     path: string,
-    options: RequestOptions = {},
-  ): Promise<T> {
-    if (options.auth === false) return parse<T>(await send(method, path, options));
+    options: RequestOptions,
+  ): Promise<Response> {
+    if (options.auth === false) return send(method, path, options);
 
     let token = tokenStore.getAccessToken();
     if (!token) {
@@ -141,16 +153,32 @@ export function createApiClient({
       token = tokenStore.getAccessToken();
     }
 
-    let res = await send(method, path, options, token);
-    if (res.status === 401) {
-      // Якщо токен уже оновив паралельний запит, достатньо повторити з новим.
-      const alreadyRefreshed = tokenStore.getAccessToken() !== token;
-      if (!alreadyRefreshed && !(await refresh())) throw sessionExpired();
-      const fresh = tokenStore.getAccessToken();
-      if (!fresh) throw sessionExpired();
-      res = await send(method, path, options, fresh);
-    }
-    return parse<T>(res);
+    const res = await send(method, path, options, token);
+    if (res.status !== 401) return res;
+    // Якщо токен уже оновив паралельний запит, достатньо повторити з новим.
+    const alreadyRefreshed = tokenStore.getAccessToken() !== token;
+    if (!alreadyRefreshed && !(await refresh())) throw sessionExpired();
+    const fresh = tokenStore.getAccessToken();
+    if (!fresh) throw sessionExpired();
+    return send(method, path, options, fresh);
+  }
+
+  async function request<T>(
+    method: string,
+    path: string,
+    options: RequestOptions = {},
+  ): Promise<T> {
+    return parse<T>(await sendAuthorized(method, path, options));
+  }
+
+  /** GET файлу (не JSON): вміст і назва з Content-Disposition. Помилки — як у request. */
+  async function download(path: string, query?: Query): Promise<DownloadedFile> {
+    const res = await sendAuthorized('GET', path, query ? { query } : {});
+    if (!res.ok) throw await toError(res);
+    return {
+      blob: await res.blob(),
+      filename: filenameFromDisposition(res.headers.get('Content-Disposition')),
+    };
   }
 
   return {
@@ -161,6 +189,7 @@ export function createApiClient({
     put: <T>(path: string, body: unknown) => request<T>('PUT', path, { body }),
     patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, { body }),
     delete: <T = void>(path: string) => request<T>('DELETE', path),
+    download,
   };
 }
 

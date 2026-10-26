@@ -1,4 +1,4 @@
-import { isExpenseDateAllowed } from '@hf/shared';
+import { budgetPeriod, isExpenseDateAllowed } from '@hf/shared';
 import type { Db } from '../../db/client.ts';
 import type { AuthContext } from '../../http/auth.ts';
 import { badRequest, expenseDateInFuture, notFound } from '../../http/errors.ts';
@@ -6,8 +6,14 @@ import { findAccountsByIds } from '../accounts/repo.ts';
 import { findHouseholdTimeZone } from '../budgets/repo.ts';
 import { findCategory } from '../categories/repo.ts';
 import { findOccurrenceForLink } from '../incomes/repo.ts';
+import { buildExpensesCsv } from './csv.ts';
 import * as repo from './repo.ts';
-import type { ListTransactionsQuery, Transaction, TransactionInput } from './schema.ts';
+import type {
+  ExportExpensesQuery,
+  ListTransactionsQuery,
+  Transaction,
+  TransactionInput,
+} from './schema.ts';
 
 export const toTransactionDto = (row: repo.TransactionRow): Transaction => ({
   id: row.id,
@@ -104,6 +110,22 @@ export async function getTransaction(db: Db, auth: AuthContext, id: string): Pro
   const row = await repo.findTransaction(db, auth.householdId, id);
   if (!row) throw notFound('Транзакція');
   return toTransactionDto(row);
+}
+
+/**
+ * CSV з усіма витратами місяця (лише type=expense) для всіх учасників домогосподарства.
+ * Межі місяця й дати рядків — у часовому поясі домогосподарства. Вміст і суми не логуються.
+ */
+export async function exportExpensesCsv(
+  db: Db,
+  auth: AuthContext,
+  query: ExportExpensesQuery,
+): Promise<{ filename: string; body: string }> {
+  const timeZone = await findHouseholdTimeZone(db, auth.householdId);
+  if (!timeZone) throw notFound('Домогосподарство');
+  const period = budgetPeriod(query.month, timeZone);
+  const rows = await repo.listExpensesForExport(db, auth.householdId, period);
+  return { filename: `expenses-${query.month}.csv`, body: buildExpensesCsv(rows, timeZone) };
 }
 
 /**

@@ -59,7 +59,8 @@ export function createApp({
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', trustProxy);
-  app.use(cors({ origin: corsOrigin }));
+  // Content-Disposition потрібен фронтенду на іншому домені (розробка, e2e), щоб узяти назву файлу.
+  app.use(cors({ origin: corsOrigin, exposedHeaders: ['Content-Disposition'] }));
   app.use(express.json({ limit: '100kb' }));
 
   app.get('/health', (_req, res) => {
