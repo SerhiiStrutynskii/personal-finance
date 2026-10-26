@@ -232,6 +232,13 @@ describe('GET /api/transactions/export.csv', () => {
     );
   });
 
+  it('відкриває Content-Disposition для фронтенду з іншого домену (CORS)', async () => {
+    const actor = await createActor();
+    const res = await actor.get(MARCH).set('Origin', 'http://localhost');
+    expect(res.status).toBe(200);
+    expect(res.headers['access-control-expose-headers']).toBe('Content-Disposition');
+  });
+
   it('AC11: місяць без витрат — 200 і лише BOM із заголовком', async () => {
     const actor = await createActor();
     const { card } = await createFixtures(actor);
