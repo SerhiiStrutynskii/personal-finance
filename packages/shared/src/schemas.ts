@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { monthSchema } from './budget/month.ts';
 import {
   DEFAULT_CURRENCY,
   amountMinorSchema,
@@ -172,6 +173,10 @@ export const listTransactionsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;
+
+/** Експорт витрат місяця в CSV: GET /api/transactions/export.csv?month=YYYY-MM. */
+export const exportExpensesQuerySchema = z.object({ month: monthSchema });
+export type ExportExpensesQuery = z.infer<typeof exportExpensesQuerySchema>;
 
 export const transactionSchema = z.object({
   id: idSchema,

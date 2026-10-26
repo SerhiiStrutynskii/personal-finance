@@ -1,6 +1,8 @@
-import { and, count, desc, eq, gte, lt, or } from 'drizzle-orm';
+import type { Period } from '@hf/shared';
+import { and, asc, count, desc, eq, gte, lt, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { DbOrTx } from '../../db/client.ts';
-import { transactions } from '../../db/schema.ts';
+import { accounts, categories, transactions } from '../../db/schema.ts';
 import type { ListTransactionsQuery } from './schema.ts';
 
 export type TransactionRow = typeof transactions.$inferSelect;
@@ -54,6 +56,53 @@ export async function listTransactions(
     db.select({ total: count() }).from(transactions).where(where),
   ]);
   return { items, total: totals?.total ?? 0 };
+}
+
+/** Батьківська категорія — для повної назви підкатегорії в експорті. */
+const parentCategories = alias(categories, 'parent_categories');
+
+export type ExpenseExportRow = Awaited<ReturnType<typeof listExpensesForExport>>[number];
+
+/**
+ * Усі витрати домогосподарства за період [start, end), без пагінації, від старіших до новіших.
+ * Умова household_id стоїть і в join-ах, щоб чужі назви не потрапили навіть за битих посилань.
+ */
+export function listExpensesForExport(db: DbOrTx, householdId: string, period: Period) {
+  return db
+    .select({
+      occurredAt: transactions.occurredAt,
+      amountMinor: transactions.amountMinor,
+      currency: transactions.currency,
+      description: transactions.description,
+      accountName: accounts.name,
+      categoryName: categories.name,
+      parentCategoryName: parentCategories.name,
+    })
+    .from(transactions)
+    .innerJoin(
+      accounts,
+      and(eq(accounts.id, transactions.accountId), eq(accounts.householdId, householdId)),
+    )
+    .leftJoin(
+      categories,
+      and(eq(categories.id, transactions.categoryId), eq(categories.householdId, householdId)),
+    )
+    .leftJoin(
+      parentCategories,
+      and(
+        eq(parentCategories.id, categories.parentId),
+        eq(parentCategories.householdId, householdId),
+      ),
+    )
+    .where(
+      and(
+        eq(transactions.householdId, householdId),
+        eq(transactions.type, 'expense'),
+        gte(transactions.occurredAt, period.start),
+        lt(transactions.occurredAt, period.end),
+      ),
+    )
+    .orderBy(asc(transactions.occurredAt), asc(transactions.id));
 }
 
 export async function findTransaction(db: DbOrTx, householdId: string, id: string) {
