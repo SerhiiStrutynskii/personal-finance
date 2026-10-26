@@ -20,6 +20,17 @@ export async function goTo(page: Page, section: string) {
   await page.getByRole('link', { name: section, exact: true }).click();
 }
 
+/** Таб «Покупки» модуля «Меню»: списки покупок. */
+export async function openShopping(page: Page) {
+  await goTo(page, 'Меню');
+  await page
+    .getByRole('navigation', { name: 'Розділи меню' })
+    .getByRole('link', { name: 'Покупки', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/menu\/lists$/);
+  await expect(page.getByRole('heading', { name: 'Списки покупок' })).toBeVisible();
+}
+
 export async function addAccount(page: Page, name: string) {
   await goTo(page, 'Рахунки');
   await page.getByRole('button', { name: 'Додати рахунок' }).click();

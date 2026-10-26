@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { addAccount, addExpenseCategory, goTo, register } from './helpers.ts';
+import { addAccount, addExpenseCategory, goTo, openShopping, register } from './helpers.ts';
 
 test.describe('телефон', () => {
   test.use({ viewport: { width: 390, height: 844 } });
@@ -117,7 +117,7 @@ test.describe('телефон', () => {
 
   test('покупки: продукти через меню «⋯», список із ціною в рядку', async ({ page }) => {
     await register(page);
-    await goTo(page, 'Покупки');
+    await openShopping(page);
     await page.getByRole('link', { name: 'Продукти', exact: true }).click();
     await page.getByRole('button', { name: 'Додати продукт' }).click();
     const dialog = page.getByRole('dialog');
@@ -134,7 +134,7 @@ test.describe('телефон', () => {
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
 
-    await goTo(page, 'Покупки');
+    await openShopping(page);
     await page.getByRole('button', { name: 'Список', exact: true }).click();
     await dialog.getByLabel('Назва').fill('Субота');
     await dialog.getByRole('button', { name: 'Створити' }).click();
