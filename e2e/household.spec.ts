@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 import { addAccount, goTo, register } from './helpers.ts';
 
 test('спільний доступ: запрошення за посиланням, права учасника, вилучення', async ({
@@ -82,4 +82,140 @@ test('спільний доступ: запрошення за посиланн�
   await expect(member.getByText('Рахунків ще немає')).toBeVisible();
   await expect(member.getByRole('button', { name: 'Додати рахунок' })).toBeVisible();
   await memberContext.close();
+});
+
+/** Власник створює посилання, а нова людина реєструється за ним в окремому браузері. */
+async function inviteMember(page: Page, browser: Browser, name: string) {
+  await goTo(page, 'Домогосподарство');
+  await page.getByRole('button', { name: 'Запросити' }).click();
+  const link = await page.getByRole('dialog').getByLabel('Посилання-запрошення').inputValue();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+
+  const context = await browser.newContext({ viewport: page.viewportSize() });
+  const member = await context.newPage();
+  await member.goto(link);
+  await member.getByLabel('Імʼя').fill(name);
+  await member.getByLabel('Email').fill(`e2e-member-${Date.now()}@example.com`);
+  await member.getByLabel('Пароль').fill('e2e-password-123');
+  await member.getByRole('button', { name: 'Зареєструватися' }).click();
+  await expect(member.getByRole('heading', { name: /Вітаємо/ })).toBeVisible();
+  return { context, member };
+}
+
+const crown = (name: string) => ({ name: `Зробити «${name}» власником` });
+
+test('передача ролі власника учаснику', async ({ page, browser }) => {
+  await register(page);
+  await addAccount(page, 'Картка');
+
+  // Без інших учасників передавати нікому.
+  await goTo(page, 'Домогосподарство');
+  await expect(page.getByTestId('household-member')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /власником/ })).toHaveCount(0);
+
+  const { context, member } = await inviteMember(page, browser, 'Олена');
+  await page.reload();
+  const members = page.getByTestId('household-member');
+  await expect(members).toHaveCount(2);
+  await expect(page.getByTestId('household-invite')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Запросити' }).click();
+  await expect(page.getByRole('dialog').getByLabel('Посилання-запрошення')).toHaveValue(/invite/);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(page.getByTestId('household-invite')).toHaveCount(1);
+
+  // Кнопка передачі — лише біля іншого учасника.
+  await expect(page.getByRole('button', crown('Олена'))).toBeVisible();
+  await expect(page.getByRole('button', crown('Тест'))).toHaveCount(0);
+  await expect(members.first().getByRole('button')).toHaveCount(0);
+
+  // Учасник кнопки передачі не бачить ні в кого.
+  await goTo(member, 'Домогосподарство');
+  await expect(member.getByTestId('household-member')).toHaveCount(2);
+  await expect(member.getByRole('button', { name: /власником/ })).toHaveCount(0);
+
+  // «Скасувати» нічого не змінює.
+  await page.getByRole('button', crown('Олена')).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm).toContainText('Передати роль власника «Олена»?');
+  await expect(confirm).toContainText('Ви станете учасником');
+  await confirm.getByRole('button', { name: 'Скасувати' }).click();
+  await expect(confirm).toBeHidden();
+  await expect(members.first()).toContainText('власник');
+  await expect(page.getByRole('button', { name: 'Запросити' })).toBeVisible();
+
+  // Передача: сторінка одразу показує нові ролі й ховає дії власника.
+  await page.getByRole('button', crown('Олена')).click();
+  await confirm.getByRole('button', { name: 'Передати' }).click();
+  await expect(confirm).toBeHidden();
+  await expect(members.first()).toContainText('(ви)');
+  await expect(members.first()).toContainText('учасник');
+  await expect(members.last()).toContainText('Олена');
+  await expect(members.last()).toContainText('власник');
+  await expect(page.getByRole('button', { name: 'Запросити' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Перейменувати домогосподарство' })).toHaveCount(0);
+  await expect(page.getByText('Активні запрошення')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Вилучити/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /власником/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Вийти з домогосподарства' })).toBeVisible();
+
+  // Права на інших сторінках змінились без перезавантаження.
+  await goTo(page, 'Рахунки');
+  await expect(page.getByText('Картка').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Додати рахунок' })).toHaveCount(0);
+
+  // Новий власник після перезавантаження керує домогосподарством.
+  await member.reload();
+  await goTo(member, 'Домогосподарство');
+  await expect(member.getByRole('button', { name: 'Запросити' })).toBeVisible();
+  await expect(member.getByTestId('household-invite')).toHaveCount(1);
+  await expect(member.getByRole('button', crown('Тест'))).toBeVisible();
+  await expect(
+    member.getByRole('button', { name: 'Вилучити «Тест» з домогосподарства' }),
+  ).toBeVisible();
+  await expect(member.getByRole('button', { name: 'Вийти з домогосподарства' })).toHaveCount(0);
+  await goTo(member, 'Рахунки');
+  await expect(member.getByRole('button', { name: 'Додати рахунок' })).toBeVisible();
+  await context.close();
+});
+
+test.describe('телефон', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('передача ролі власника на 390px без прокрутки вбік', async ({ page, browser }) => {
+    await register(page);
+    const { context } = await inviteMember(page, browser, 'Олександра-Вікторія');
+    await page.reload();
+    await expect(page.getByTestId('household-member')).toHaveCount(2);
+
+    const row = page.getByTestId('household-member').last();
+    await expect(row.getByRole('button', crown('Олександра-Вікторія'))).toBeVisible();
+    await expect(row.getByRole('button', { name: /Вилучити/ })).toBeVisible();
+    for (const button of await row.getByRole('button').all()) {
+      const box = await button.boundingBox();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
+
+    await row.getByRole('button', crown('Олександра-Вікторія')).click();
+    const confirm = page.getByRole('alertdialog');
+    await expect(confirm).toBeVisible();
+    const box = await confirm.boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+    await expect(confirm.getByRole('button', { name: 'Передати' })).toBeInViewport();
+    await confirm.getByRole('button', { name: 'Передати' }).click();
+    await expect(confirm).toBeHidden();
+
+    await expect(row).toContainText('власник');
+    await expect(page.getByRole('button', { name: 'Вийти з домогосподарства' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
+    await context.close();
+  });
 });

@@ -1,3 +1,4 @@
+import type { MemberRole } from '@hf/shared';
 import { and, asc, count, desc, eq, gt, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import { householdInvites, householdMembers, households, users } from '../../db/schema.ts';
@@ -32,6 +33,33 @@ export async function findMember(db: DbOrTx, householdId: string, userId: string
     .from(householdMembers)
     .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)));
   return row;
+}
+
+/**
+ * Блокує рядок домогосподарства до кінця транзакції: зміни ролей і членства в одному
+ * домогосподарстві виконуються по черзі.
+ */
+export async function lockHousehold(tx: DbOrTx, householdId: string) {
+  await tx
+    .select({ id: households.id })
+    .from(households)
+    .where(eq(households.id, householdId))
+    .for('update');
+}
+
+/** Змінює роль учасника; false — такого учасника в домогосподарстві немає. */
+export async function setMemberRole(
+  db: DbOrTx,
+  householdId: string,
+  userId: string,
+  role: MemberRole,
+) {
+  const rows = await db
+    .update(householdMembers)
+    .set({ role })
+    .where(and(eq(householdMembers.householdId, householdId), eq(householdMembers.userId, userId)))
+    .returning({ userId: householdMembers.userId });
+  return rows.length > 0;
 }
 
 export async function insertMember(db: DbOrTx, householdId: string, userId: string) {

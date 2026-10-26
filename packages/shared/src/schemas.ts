@@ -292,6 +292,10 @@ export type Household = z.infer<typeof householdSchema>;
 export const updateHouseholdSchema = z.object({ name: nameSchema });
 export type UpdateHouseholdInput = z.infer<typeof updateHouseholdSchema>;
 
+/** Передача ролі власника іншому учаснику свого домогосподарства. */
+export const transferOwnershipSchema = z.object({ userId: idSchema });
+export type TransferOwnershipInput = z.infer<typeof transferOwnershipSchema>;
+
 /** Нове запрошення; токен повертається лише тут, у БД зберігається його хеш. */
 export const createdInviteSchema = householdInviteSchema.extend({ token: z.string() });
 export type CreatedInvite = z.infer<typeof createdInviteSchema>;

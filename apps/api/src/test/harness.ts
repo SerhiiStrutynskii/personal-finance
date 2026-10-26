@@ -104,9 +104,18 @@ export function setupTestApp() {
    * тест сам визначав, у якому порядку одночасні запити отримають блокування.
    */
   async function lockUser(userId: string) {
+    return lockRow('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', userId);
+  }
+
+  /** Те саме для рядка домогосподарства: зміни ролей і членства стають у чергу за тестом. */
+  async function lockHousehold(householdId: string) {
+    return lockRow('SELECT 1 FROM households WHERE id = $1 FOR UPDATE', householdId);
+  }
+
+  async function lockRow(query: string, id: string) {
     const connection = await pool.connect();
     await connection.query('BEGIN');
-    await connection.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    await connection.query(query, [id]);
     return {
       async release() {
         await connection.query('COMMIT');
@@ -142,6 +151,7 @@ export function setupTestApp() {
     setNow,
     insertTransaction,
     lockUser,
+    lockHousehold,
     waitForLockWaiters,
   };
 }

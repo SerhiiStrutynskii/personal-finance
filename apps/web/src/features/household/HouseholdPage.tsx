@@ -1,5 +1,10 @@
-import { INVITE_TTL_DAYS, type CreatedInvite, type Household } from '@hf/shared';
-import { Check, Copy, Pencil, Share2, UserPlus } from 'lucide-react';
+import {
+  INVITE_TTL_DAYS,
+  type CreatedInvite,
+  type Household,
+  type HouseholdMember,
+} from '@hf/shared';
+import { Check, Copy, Crown, Pencil, Share2, UserPlus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -27,6 +32,7 @@ import {
   useRemoveMember,
   useRenameHousehold,
   useRevokeInvite,
+  useTransferOwnership,
 } from './api.ts';
 
 const ROLE_LABELS = { owner: 'власник', member: 'учасник' } as const;
@@ -92,6 +98,8 @@ export function HouseholdPage() {
 function Members({ household }: { household: Household }) {
   const { user } = useCurrentUser();
   const remove = useRemoveMember();
+  const transfer = useTransferOwnership();
+  const { reloadCurrentUser } = useAuth();
   const isOwner = household.role === 'owner';
 
   return (
@@ -102,6 +110,7 @@ function Members({ household }: { household: Household }) {
         бюджет, борги й цілі змінює власник.
       </p>
       <ErrorText>{remove.isError && errorMessage(remove.error)}</ErrorText>
+      <ErrorText>{transfer.isError && errorMessage(transfer.error)}</ErrorText>
       <ul className="divide-y text-sm" data-testid="household-members">
         {household.members.map((member) => (
           <ListRow
@@ -113,13 +122,25 @@ function Members({ household }: { household: Household }) {
             actions={
               isOwner &&
               member.userId !== user.id && (
-                <ConfirmButton
-                  title={`Вилучити «${member.name}» з домогосподарства?`}
-                  description="Учасник одразу втратить доступ до цих даних. Його акаунт лишиться з власним порожнім домогосподарством; повернутися можна лише за новим запрошенням на інший email."
-                  label="Вилучити"
-                  disabled={remove.isPending}
-                  onConfirm={() => remove.mutate(member.userId)}
-                />
+                <div className="flex gap-1">
+                  <TransferOwnershipButton
+                    member={member}
+                    disabled={transfer.isPending}
+                    onConfirm={() =>
+                      transfer.mutate(member.userId, {
+                        // Роль у меню й права на інших сторінках бере сесія.
+                        onSuccess: () => reloadCurrentUser(),
+                      })
+                    }
+                  />
+                  <ConfirmButton
+                    title={`Вилучити «${member.name}» з домогосподарства?`}
+                    description="Учасник одразу втратить доступ до цих даних. Його акаунт лишиться з власним порожнім домогосподарством; повернутися можна лише за новим запрошенням на інший email."
+                    label="Вилучити"
+                    disabled={remove.isPending}
+                    onConfirm={() => remove.mutate(member.userId)}
+                  />
+                </div>
               )
             }
           >
@@ -129,6 +150,43 @@ function Members({ household }: { household: Household }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Іконка-кнопка «Зробити власником» із підтвердженням. */
+function TransferOwnershipButton({
+  member,
+  disabled,
+  onConfirm,
+}: {
+  member: HouseholdMember;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const name = `Зробити «${member.name}» власником`;
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={name}
+        title={name}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        <Crown />
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Передати роль власника «${member.name}»?`}
+        description={`${member.name} зможе змінювати рахунки, категорії, бюджет, борги, цілі й керувати домогосподарством. Ви станете учасником; повернути роль може лише новий власник.`}
+        label="Передати"
+        onConfirm={onConfirm}
+      />
+    </>
   );
 }
 

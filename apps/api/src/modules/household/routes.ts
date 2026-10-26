@@ -1,4 +1,9 @@
-import { idParamsSchema, idSchema, updateHouseholdSchema } from '@hf/shared';
+import {
+  idParamsSchema,
+  idSchema,
+  transferOwnershipSchema,
+  updateHouseholdSchema,
+} from '@hf/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Db } from '../../db/client.ts';
@@ -33,6 +38,11 @@ export function householdRouter(db: Db, now: () => Date): Router {
     const { userId } = memberParamsSchema.parse(req.params);
     await service.removeMember(db, getAuth(res), userId);
     res.status(204).end();
+  });
+
+  router.post('/owner', async (req, res) => {
+    const input = transferOwnershipSchema.parse(req.body);
+    res.json(await service.transferOwnership(db, getAuth(res), input, now()));
   });
 
   router.post('/leave', async (_req, res) => {
