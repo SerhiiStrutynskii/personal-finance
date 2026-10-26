@@ -253,3 +253,176 @@ describe('доступ до прийомів їжі', () => {
     expect(await mealTypeNames(owner)).toEqual(['Пізня вечеря']);
   });
 });
+
+type Item = { id: string; name: string; position: number };
+
+async function items(actor: { get: (url: string) => Promise<{ body: { items: Item[] } }> }) {
+  return (await actor.get('/api/meal-types')).body.items;
+}
+
+const layout = (list: Item[]) => list.map((item) => [item.name, item.position]);
+
+describe('новий прийом їжі після обраного (afterId)', () => {
+  it('AC1: без afterId — у кінці, як і раніше', async () => {
+    const user = await registerUser(harness);
+    const res = await user.post('/api/meal-types', { name: 'Перекус' });
+    expect(res.status).toBe(201);
+    expect(layout(await items(user))).toEqual([
+      ['Сніданок', 0],
+      ['Обід', 1],
+      ['Вечеря', 2],
+      ['Перекус', 3],
+    ]);
+  });
+
+  it('AC2: після першого — другий, позиції 0..n-1', async () => {
+    const user = await registerUser(harness);
+    const [breakfast] = await items(user);
+    const res = await user.post('/api/meal-types', { name: 'Сніданок 2', afterId: breakfast!.id });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ id: expect.any(String), name: 'Сніданок 2', position: 1 });
+    const list = await items(user);
+    expect(layout(list)).toEqual([
+      ['Сніданок', 0],
+      ['Сніданок 2', 1],
+      ['Обід', 2],
+      ['Вечеря', 3],
+    ]);
+    expect(list[1]!.id).toBe(res.body.id);
+  });
+
+  it('AC3: після середнього й після останнього', async () => {
+    const user = await registerUser(harness);
+    const [, lunch, dinner] = await items(user);
+    const middle = await user.post('/api/meal-types', { name: 'Новий', afterId: lunch!.id });
+    expect(middle.status).toBe(201);
+    expect(middle.body.position).toBe(2);
+    expect(layout(await items(user))).toEqual([
+      ['Сніданок', 0],
+      ['Обід', 1],
+      ['Новий', 2],
+      ['Вечеря', 3],
+    ]);
+
+    const last = await user.post('/api/meal-types', { name: 'Пізня вечеря', afterId: dinner!.id });
+    expect(last.status).toBe(201);
+    expect(last.body.position).toBe(4);
+    expect(layout(await items(user))).toEqual([
+      ['Сніданок', 0],
+      ['Обід', 1],
+      ['Новий', 2],
+      ['Вечеря', 3],
+      ['Пізня вечеря', 4],
+    ]);
+  });
+
+  it('AC4: позиції з пропуском після видалення стають 0..n-1', async () => {
+    const user = await registerUser(harness);
+    const [breakfast, lunch] = await items(user);
+    expect((await user.delete(`/api/meal-types/${lunch!.id}`)).status).toBe(204);
+    expect(layout(await items(user))).toEqual([
+      ['Сніданок', 0],
+      ['Вечеря', 2],
+    ]);
+    const res = await user.post('/api/meal-types', { name: 'Ланч', afterId: breakfast!.id });
+    expect(res.status).toBe(201);
+    expect(layout(await items(user))).toEqual([
+      ['Сніданок', 0],
+      ['Ланч', 1],
+      ['Вечеря', 2],
+    ]);
+  });
+
+  it('AC5: неіснуючий чи чужий afterId — 404, нічого не змінюється', async () => {
+    const user = await registerUser(harness);
+    const stranger = await registerUser(harness);
+    // Пропуск у позиціях, щоб помітити будь-яке перенумерування.
+    const [, strangerLunch] = await items(stranger);
+    await stranger.delete(`/api/meal-types/${strangerLunch!.id}`);
+    const [, userLunch] = await items(user);
+    await user.delete(`/api/meal-types/${userLunch!.id}`);
+    const before = await items(user);
+    const strangerBefore = await items(stranger);
+
+    for (const afterId of [randomUUID(), strangerBefore[0]!.id]) {
+      const res = await user.post('/api/meal-types', { name: 'Перекус', afterId });
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('NOT_FOUND');
+    }
+    expect(await items(user)).toEqual(before);
+    expect(await items(stranger)).toEqual(strangerBefore);
+    // Назва не зайнята: запис справді не створено.
+    expect((await user.post('/api/meal-types', { name: 'Перекус' })).status).toBe(201);
+  });
+
+  it('AC6: afterId не uuid — 400, запис не створюється', async () => {
+    const user = await registerUser(harness);
+    for (const afterId of ['not-a-uuid', '', 42, null]) {
+      expect((await user.post('/api/meal-types', { name: 'Перекус', afterId })).status).toBe(400);
+    }
+    expect(await mealTypeNames(user)).toEqual(DEFAULTS);
+  });
+
+  it('AC7: дублікат назви з afterId — 409, порядок і позиції не змінюються', async () => {
+    const user = await registerUser(harness);
+    const [breakfast, lunch] = await items(user);
+    await user.delete(`/api/meal-types/${lunch!.id}`);
+    const before = await items(user);
+    const res = await user.post('/api/meal-types', { name: '  вечеря ', afterId: breakfast!.id });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CONFLICT');
+    expect(await items(user)).toEqual(before);
+  });
+
+  it('AC8: учасник (member) вставляє після обраного нарівні з власником', async () => {
+    const { owner, member } = await ownerWithMember(harness);
+    const first = await owner.post('/api/meal-types', { name: 'Сніданок' });
+    await owner.post('/api/meal-types', { name: 'Обід' });
+    const res = await member.post('/api/meal-types', {
+      name: 'Сніданок 2',
+      afterId: first.body.id,
+    });
+    expect(res.status).toBe(201);
+    expect(await mealTypeNames(owner)).toEqual(['Сніданок', 'Сніданок 2', 'Обід']);
+    expect(
+      (await request(app).post('/api/meal-types').send({ name: 'Х', afterId: first.body.id }))
+        .status,
+    ).toBe(401);
+    expect(await mealTypeNames(owner)).toEqual(['Сніданок', 'Сніданок 2', 'Обід']);
+  });
+
+  it('AC9: PATCH ігнорує afterId — назва змінюється, позиція ні', async () => {
+    const user = await registerUser(harness);
+    const [breakfast, , dinner] = await items(user);
+    const res = await user.patch(`/api/meal-types/${dinner!.id}`, {
+      name: 'Вечеря пізня',
+      afterId: breakfast!.id,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: dinner!.id, name: 'Вечеря пізня', position: 2 });
+    expect(layout(await items(user))).toEqual([
+      ['Сніданок', 0],
+      ['Обід', 1],
+      ['Вечеря пізня', 2],
+    ]);
+  });
+
+  it('AC10: записи меню наявних прийомів не змінюються після вставки', async () => {
+    const user = await registerUser(harness);
+    const [breakfast, lunch] = await items(user);
+    const dish = await user.post('/api/dishes', { name: 'Каша' });
+    await addEntry(user, { date: '2026-10-26', mealTypeId: breakfast!.id, dishId: dish.body.id });
+    await addEntry(user, {
+      date: '2026-10-26',
+      mealTypeId: lunch!.id,
+      dishId: dish.body.id,
+      servings: 2,
+    });
+    const url = '/api/menu?from=2026-10-01&to=2026-11-01';
+    const before = (await user.get(url)).body;
+
+    const res = await user.post('/api/meal-types', { name: 'Сніданок 2', afterId: breakfast!.id });
+    expect(res.status).toBe(201);
+    expect((await user.get(url)).body).toEqual(before);
+  });
+});

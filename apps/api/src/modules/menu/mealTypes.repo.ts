@@ -30,20 +30,24 @@ export async function findMealType(db: DbOrTx, householdId: string, id: string) 
   return row;
 }
 
-/** Новий прийом їжі стає в кінець списку. */
-export async function insertMealType(db: DbOrTx, householdId: string, name: string) {
+/** Позиція для нового прийому в кінці списку: max(position) + 1, у порожньому довіднику 0. */
+export async function nextMealTypePosition(db: DbOrTx, householdId: string): Promise<number> {
   const [last] = await db
     .select({ position: max(mealTypes.position) })
     .from(mealTypes)
     .where(eq(mealTypes.householdId, householdId));
+  return (last?.position ?? -1) + 1;
+}
+
+export async function insertMealType(
+  db: DbOrTx,
+  householdId: string,
+  name: string,
+  position: number,
+) {
   const [row] = await db
     .insert(mealTypes)
-    .values({
-      householdId,
-      name,
-      nameKey: productNameKey(name),
-      position: (last?.position ?? -1) + 1,
-    })
+    .values({ householdId, name, nameKey: productNameKey(name), position })
     .returning();
   return row!;
 }

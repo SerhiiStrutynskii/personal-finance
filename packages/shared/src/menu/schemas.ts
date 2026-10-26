@@ -10,7 +10,11 @@ export const dishNameSchema = z.string().trim().min(1).max(100);
 
 // --- Прийоми їжі ---
 
-export const createMealTypeSchema = z.object({ name: mealTypeNameSchema });
+/** afterId — новий прийом стає одразу після нього; без afterId — у кінець списку. */
+export const createMealTypeSchema = z.object({
+  name: mealTypeNameSchema,
+  afterId: idSchema.optional(),
+});
 export type CreateMealTypeInput = z.infer<typeof createMealTypeSchema>;
 
 export const updateMealTypeSchema = z.object({ name: mealTypeNameSchema });

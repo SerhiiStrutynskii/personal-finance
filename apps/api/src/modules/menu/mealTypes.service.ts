@@ -33,13 +33,32 @@ export async function listMealTypes(db: Db, auth: AuthContext): Promise<MealType
   return (await repo.listMealTypes(db, auth.householdId)).map(toDto);
 }
 
+/**
+ * Без afterId новий прийом стає в кінець. З afterId — одразу після нього: в одній транзакції
+ * вставляємо запис і переписуємо позиції всіх прийомів 0..n-1 (до afterId включно → новий →
+ * решта). Чужий чи неіснуючий afterId — 404, нічого не створюється.
+ */
 export async function createMealType(
   db: Db,
   auth: AuthContext,
   input: CreateMealTypeInput,
 ): Promise<MealType> {
+  const { afterId } = input;
   try {
-    return toDto(await repo.insertMealType(db, auth.householdId, input.name));
+    if (afterId === undefined) {
+      const position = await repo.nextMealTypePosition(db, auth.householdId);
+      return toDto(await repo.insertMealType(db, auth.householdId, input.name, position));
+    }
+    return await db.transaction(async (tx) => {
+      const rows = await repo.listMealTypes(tx, auth.householdId, true);
+      const index = rows.findIndex((row) => row.id === afterId);
+      if (index === -1) throw notFound('Прийом їжі');
+      const created = await repo.insertMealType(tx, auth.householdId, input.name, index + 1);
+      const ids = rows.map((row) => row.id);
+      ids.splice(index + 1, 0, created.id);
+      await repo.reorderMealTypes(tx, auth.householdId, ids);
+      return toDto({ ...created, position: index + 1 });
+    });
   } catch (error) {
     rethrowDuplicate(error);
   }
