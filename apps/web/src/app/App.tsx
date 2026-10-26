@@ -19,6 +19,7 @@ import { MenuDictionariesPage } from '../features/menu/MenuDictionariesPage.tsx'
 import { MenuPage } from '../features/menu/MenuPage.tsx';
 import { MenuPrintPage } from '../features/menu/MenuPrintPage.tsx';
 import { MenuShoppingPage } from '../features/menu/MenuShoppingPage.tsx';
+import { LegacyShoppingRedirect, MenuLayout } from '../features/menu/MenuTabs.tsx';
 import { PayoffPlanPage } from '../features/goals/PayoffPlanPage.tsx';
 import { DebtsPage } from '../features/debts/DebtsPage.tsx';
 import { ProductsPage } from '../features/shopping/ProductsPage.tsx';
@@ -47,8 +48,10 @@ export function App() {
             <Route path="/invite/:token" element={<InvitePage />} />
             <Route element={<RequireAuth />}>
               {/* Сторінка друку — без меню застосунку. */}
-              <Route path="shopping/:id/print" element={<PrintListPage />} />
+              <Route path="menu/lists/:id/print" element={<PrintListPage />} />
               <Route path="menu/print/:date" element={<MenuPrintPage />} />
+              {/* Старі адреси покупок: списки тепер у табі «Покупки» модуля «Меню». */}
+              <Route path="shopping/*" element={<LegacyShoppingRedirect />} />
               <Route element={<Layout />}>
                 <Route index element={<DashboardPage />} />
                 <Route path="expenses" element={<TransactionsPage type="expense" />} />
@@ -61,12 +64,15 @@ export function App() {
                 <Route path="debts/:id" element={<DebtPage />} />
                 <Route path="goals" element={<GoalsPage />} />
                 <Route path="goals/:id" element={<PayoffPlanPage />} />
-                <Route path="shopping" element={<ShoppingListsPage />} />
-                <Route path="shopping/products" element={<ProductsPage />} />
-                <Route path="shopping/:id" element={<ShoppingListPage />} />
-                <Route path="menu" element={<MenuPage />} />
-                <Route path="menu/dictionaries" element={<MenuDictionariesPage />} />
-                <Route path="menu/shopping" element={<MenuShoppingPage />} />
+                {/* Модуль «Меню»: таби «Планування раціону» і «Покупки». */}
+                <Route path="menu" element={<MenuLayout />}>
+                  <Route index element={<MenuPage />} />
+                  <Route path="dictionaries" element={<MenuDictionariesPage />} />
+                  <Route path="lists" element={<ShoppingListsPage />} />
+                  <Route path="lists/:id" element={<ShoppingListPage />} />
+                  <Route path="products" element={<ProductsPage />} />
+                  <Route path="shopping" element={<MenuShoppingPage />} />
+                </Route>
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="household" element={<HouseholdPage />} />
                 <Route path="*" element={<NotFoundPage />} />

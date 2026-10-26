@@ -6,7 +6,9 @@ import {
   dayTitle,
   dayTitleWithYear,
   groupDay,
-  incompleteDishesLabel,
+  entryAmountLabel,
+  entryPrintLabel,
+  incompleteEntriesLabel,
   monthGrid,
   monthRange,
   parseServingsField,
@@ -94,8 +96,9 @@ describe('groupDay', () => {
     id,
     date: '2026-10-26',
     mealTypeId,
+    kind: 'dish',
+    name: id,
     dishId: id,
-    dishName: id,
     servings: 1,
     portionPrice: 0,
     cost: 0,
@@ -129,10 +132,11 @@ describe('підписи', () => {
     expect(servingsLabel(99)).toBe('99 порцій');
   });
 
-  it('incompleteDishesLabel', () => {
-    expect(incompleteDishesLabel(1)).toBe('1 страва з неповною ціною');
-    expect(incompleteDishesLabel(3)).toBe('3 страви з неповною ціною');
-    expect(incompleteDishesLabel(5)).toBe('5 страв з неповною ціною');
+  it('incompleteEntriesLabel', () => {
+    expect(incompleteEntriesLabel(1)).toBe('1 запис з неповною ціною');
+    expect(incompleteEntriesLabel(3)).toBe('3 записи з неповною ціною');
+    expect(incompleteEntriesLabel(5)).toBe('5 записів з неповною ціною');
+    expect(incompleteEntriesLabel(11)).toBe('11 записів з неповною ціною');
   });
 
   it('дата з днем тижня, з роком і без', () => {
@@ -151,5 +155,48 @@ describe('parseServingsField', () => {
     for (const text of ['0', '100', '1,5', '1.5', 'абв', '', '-1', '2e1']) {
       expect(parseServingsField(text)).toBe('Вкажіть ціле число порцій від 1 до 99');
     }
+  });
+});
+
+describe('підпис запису меню', () => {
+  const common = {
+    id: '00000000-0000-4000-8000-000000000009',
+    date: '2026-10-26',
+    mealTypeId: '00000000-0000-4000-8000-000000000001',
+    cost: 0,
+    isPriceComplete: true,
+    unpricedCount: 0,
+  };
+  const product = (quantityMilli: number, unit: 'pcs' | 'kg' | 'l' | 'pack', name = 'Молоко') =>
+    ({
+      ...common,
+      kind: 'product',
+      name,
+      productId: '00000000-0000-4000-8000-000000000003',
+      unit,
+      isArchived: false,
+      quantityMilli,
+      unitPrice: null,
+    }) satisfies MenuEntry;
+
+  it('продукт — кількість з одиницею: «Молоко — 0,5 л», «Яйця — 10 шт»', () => {
+    expect(entryAmountLabel(product(500, 'l'))).toBe('0,5 л');
+    expect(entryPrintLabel(product(500, 'l'))).toBe('Молоко — 0,5 л');
+    expect(entryPrintLabel(product(10_000, 'pcs', 'Яйця'))).toBe('Яйця — 10 шт');
+    expect(entryAmountLabel(product(1, 'kg'))).toBe('0,001 кг');
+    expect(entryAmountLabel(product(1_250, 'pack'))).toBe('1,25 уп');
+  });
+
+  it('страва — порції: «Омлет — 2 порції»', () => {
+    const dish = {
+      ...common,
+      kind: 'dish',
+      name: 'Омлет',
+      dishId: '00000000-0000-4000-8000-000000000002',
+      servings: 2,
+      portionPrice: 0,
+    } satisfies MenuEntry;
+    expect(entryAmountLabel(dish)).toBe('2 порції');
+    expect(entryPrintLabel(dish)).toBe('Омлет — 2 порції');
   });
 });

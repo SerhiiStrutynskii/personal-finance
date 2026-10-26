@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { goTo, register } from './helpers.ts';
+import { goTo, openShopping, register } from './helpers.ts';
 
 async function addProduct(page: Page, name: string, unit: string, price: string) {
   await page.getByRole('button', { name: 'Додати продукт' }).click();
@@ -14,7 +14,7 @@ async function addProduct(page: Page, name: string, unit: string, price: string)
 
 /** Гречка (кг, 40 грн), олія (л, 90 грн) і сіль без ціни. */
 async function addPantry(page: Page) {
-  await page.goto('/shopping/products');
+  await page.goto('/menu/products');
   await expect(page.getByRole('heading', { name: 'Продукти' })).toBeVisible();
   await addProduct(page, 'Гречка', 'кг', '40');
   await addProduct(page, 'Олія', 'л', '90');
@@ -37,7 +37,7 @@ async function openDictionaries(page: Page) {
   await expect(page).toHaveURL(/\/menu$/);
   await page.getByRole('link', { name: 'Страви й прийоми їжі' }).click();
   await expect(page).toHaveURL(/\/menu\/dictionaries$/);
-  await expect(page.getByRole('heading', { name: 'Довідники меню', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Довідники меню', level: 2 })).toBeVisible();
 }
 
 test.describe('десктоп', () => {
@@ -156,7 +156,7 @@ test.describe('десктоп', () => {
     await page.keyboard.press('Escape');
 
     // Нова ціна продукту — нова ціна порції без перезавантаження.
-    await goTo(page, 'Покупки');
+    await openShopping(page);
     await page.getByRole('link', { name: 'Продукти', exact: true }).click();
     await page.getByRole('button', { name: 'Змінити «Гречка»' }).click();
     await dialog.getByLabel(/^Ціна за/).fill('50');
@@ -166,10 +166,12 @@ test.describe('десктоп', () => {
     await expect(buckwheat.getByTestId('dish-price')).toHaveText(/^8,40/);
 
     // Продукт зі складу не видаляється.
-    await page.goto('/shopping/products');
+    await page.goto('/menu/products');
     await page.getByRole('button', { name: 'Видалити продукт «Сіль»' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Видалити' }).click();
-    await expect(page.getByText(/використовується в списках покупок або стравах/)).toBeVisible();
+    await expect(
+      page.getByText(/використовується в списках покупок, стравах або меню/),
+    ).toBeVisible();
 
     await openDictionaries(page);
     await page.getByRole('button', { name: 'Видалити страву «Гречка з сіллю»' }).click();
@@ -302,9 +304,9 @@ const meal = (page: Page, name: string) => page.getByRole('region', { name, exac
 const entry = (page: Page, dish: string) =>
   page.getByTestId('menu-entry').filter({ hasText: dish });
 
-/** Додає страву в прийом їжі вибраного дня через «Додати страву». */
+/** Додає страву в прийом їжі вибраного дня через «Додати». */
 async function addEntry(page: Page, mealName: string, dish: string, servings = '1') {
-  await meal(page, mealName).getByRole('button', { name: 'Додати страву' }).click();
+  await meal(page, mealName).getByRole('button', { name: 'Додати', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox').click();
   await page.getByRole('option', { name: new RegExp(`^${dish} —`) }).click();
@@ -343,7 +345,7 @@ test.describe('календар меню, десктоп', () => {
     await expect(meal(page, 'Обід')).toContainText('Нічого не заплановано');
 
     // Некоректні порції — помилка біля поля, без запиту.
-    await meal(page, 'Обід').getByRole('button', { name: 'Додати страву' }).click();
+    await meal(page, 'Обід').getByRole('button', { name: 'Додати', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('combobox').click();
     await page.getByRole('option', { name: /^Гречка варена — 6,90/ }).click();
@@ -393,7 +395,7 @@ test.describe('календар меню, десктоп', () => {
         .locator('main')
         .getByTestId('incomplete-price')
         .filter({ hasText: /з неповною ціною/ }),
-    ).toHaveAttribute('title', '1 страва з неповною ціною');
+    ).toHaveAttribute('title', '1 запис з неповною ціною');
 
     // Страву з меню не видалити в довідниках.
     await page.getByRole('link', { name: 'Страви й прийоми їжі' }).click();
@@ -481,7 +483,7 @@ test.describe('календар меню, десктоп', () => {
   test('без страв діалог веде в довідники', async ({ page }) => {
     await register(page);
     await goTo(page, 'Меню');
-    await meal(page, 'Обід').getByRole('button', { name: 'Додати страву' }).click();
+    await meal(page, 'Обід').getByRole('button', { name: 'Додати', exact: true }).click();
     await page
       .getByRole('dialog')
       .getByRole('link', { name: 'Додати страви в довідниках' })
@@ -526,7 +528,7 @@ test.describe('календар меню, телефон', () => {
     expect(await noHorizontalScroll()).toBe(true);
 
     // Діалог додавання — шторка знизу.
-    await meal(page, 'Обід').getByRole('button', { name: 'Додати страву' }).click();
+    await meal(page, 'Обід').getByRole('button', { name: 'Додати', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect
       .poll(async () => {
@@ -553,7 +555,7 @@ test.describe('календар меню, телефон', () => {
       buckwheat.getByRole('button', { name: 'Менше порцій' }),
       buckwheat.getByRole('button', { name: 'Більше порцій' }),
       buckwheat.getByRole('button', { name: 'Прибрати' }),
-      meal(page, 'Обід').getByRole('button', { name: 'Додати страву' }),
+      meal(page, 'Обід').getByRole('button', { name: 'Додати', exact: true }),
       page.getByRole('link', { name: 'Друк' }),
     ]) {
       expect((await button.boundingBox())!.height).toBe(40);
@@ -601,7 +603,7 @@ test.describe('покупки за меню, десктоп', () => {
     await page.goto('/menu?date=2026-10-28');
     await page.getByRole('link', { name: 'Покупки за меню' }).click();
     await expect(page).toHaveURL(/\/menu\/shopping\?period=week&date=2026-10-28$/);
-    await expect(page.getByRole('heading', { name: 'Покупки за меню', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Покупки за меню', level: 2 })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Меню', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
@@ -695,7 +697,7 @@ test.describe('покупки за меню, десктоп', () => {
     await createButton.click();
     await expect(createButton).toBeDisabled();
     release();
-    await expect(page).toHaveURL(/\/shopping\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/menu\/lists\/[0-9a-f-]{36}$/);
     await expect(page.getByRole('heading', { name: 'Меню 26.10.2026–01.11.2026' })).toBeVisible();
     const items = page.getByTestId('shopping-item');
     await expect(items).toHaveCount(3);
@@ -708,7 +710,7 @@ test.describe('покупки за меню, десктоп', () => {
     await expect(page.getByTestId('shopping-totals')).toContainText('19,80');
 
     // Список видно серед списків покупок; «До календаря» повертає на /menu.
-    await goTo(page, 'Покупки');
+    await openShopping(page);
     await expect(page.getByText('Меню 26.10.2026–01.11.2026')).toBeVisible();
     await page.goto('/menu/shopping?period=week&date=2026-10-28');
     await page.getByRole('link', { name: 'До календаря' }).click();
@@ -796,8 +798,220 @@ test.describe('покупки за меню, телефон', () => {
     );
 
     await createButton.click();
-    await expect(page).toHaveURL(/\/shopping\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/menu\/lists\/[0-9a-f-]{36}$/);
     await expect(page.getByTestId('shopping-item')).toHaveCount(2);
     await expect(page.getByTestId('shopping-totals')).toContainText('12,00');
+  });
+});
+
+// --- Продукти напряму в меню ---
+
+/** Додає продукт у прийом їжі вибраного дня через «Додати» → «Продукт». */
+async function addProductEntry(page: Page, mealName: string, product: string, quantity: string) {
+  await meal(page, mealName).getByRole('button', { name: 'Додати', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Продукт', exact: true }).click();
+  await dialog.getByRole('combobox').click();
+  await page.getByRole('option', { name: new RegExp(`^${product} —`) }).click();
+  await dialog.getByLabel(/^Кількість/).fill(quantity);
+  await dialog.getByRole('button', { name: 'Додати', exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
+/** Гречка, олія, сіль, а також молоко (л, 42 грн) і яйця (шт, 6,50 грн). */
+async function addDairy(page: Page) {
+  await addPantry(page);
+  await addProduct(page, 'Молоко', 'л', '42');
+  await addProduct(page, 'Яйця', 'шт', '6,50');
+}
+
+test.describe('продукти в меню, десктоп', () => {
+  test('додавання продукту з кількістю, помилки, зміна кількості, прибирання', async ({ page }) => {
+    await register(page);
+    await addDairy(page);
+    await page.goto('/menu?date=2026-10-26');
+    let posts = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().endsWith('/api/menu/entries')) posts += 1;
+    });
+
+    await meal(page, 'Сніданок').getByRole('button', { name: 'Додати', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Додати в меню' })).toBeVisible();
+    const productKind = dialog.getByRole('button', { name: 'Продукт', exact: true });
+    await productKind.click();
+    await expect(productKind).toHaveAttribute('aria-pressed', 'true');
+    await expect(dialog.getByRole('button', { name: 'Страва', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    // У списку — неархівні продукти з ціною або «немає ціни».
+    await dialog.getByRole('combobox').click();
+    await expect(page.getByRole('option', { name: 'Сіль — немає ціни' })).toBeVisible();
+    await page.getByRole('option', { name: /^Молоко — 42,00/ }).click();
+    await expect(dialog.getByLabel('Кількість, л')).toBeVisible();
+
+    // Порожня, нульова й нечислова кількість — помилка під полем, запиту немає.
+    for (const [quantity, message] of [
+      ['', 'Вкажіть кількість'],
+      ['0', 'Кількість має бути більшою за нуль'],
+      ['абв', 'Некоректна кількість, приклад: 1,5'],
+    ] as const) {
+      await dialog.getByLabel('Кількість, л').fill(quantity);
+      await dialog.getByRole('button', { name: 'Додати', exact: true }).click();
+      await expect(dialog.getByText(message)).toBeVisible();
+    }
+    expect(posts).toBe(0);
+    await dialog.getByLabel('Кількість, л').fill('0,5');
+    await dialog.getByRole('button', { name: 'Додати', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(posts).toBe(1);
+
+    const milk = page.locator('[data-testid="menu-entry"][data-kind="product"]', {
+      hasText: 'Молоко',
+    });
+    await expect(milk.getByTestId('quantity')).toHaveText('0,5 л');
+    await expect(milk.getByTestId('entry-cost')).toHaveText(/^21,00/);
+    await expect(page.getByTestId('menu-day-total')).toHaveText(/^21,00/);
+    await expect(page.getByTestId('menu-month-total')).toHaveText(/^21,00/);
+
+    // Кількість з крапкою.
+    await addProductEntry(page, 'Сніданок', 'Олія', '1.5');
+    await expect(entry(page, 'Олія').getByTestId('quantity')).toHaveText('1,5 л');
+    await expect(entry(page, 'Олія').getByTestId('entry-cost')).toHaveText(/^135,00/);
+    await expect(page.getByTestId('menu-day-total')).toHaveText(/^156,00/);
+
+    // Зміна кількості.
+    await milk.getByRole('button', { name: 'Змінити кількість' }).click();
+    await expect(dialog.getByLabel('Кількість, л')).toHaveValue('0,5');
+    await dialog.getByLabel('Кількість, л').fill('0');
+    await dialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(dialog.getByText('Кількість має бути більшою за нуль')).toBeVisible();
+    await dialog.getByLabel('Кількість, л').fill('1');
+    await dialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(milk.getByTestId('quantity')).toHaveText('1 л');
+    await expect(milk.getByTestId('entry-cost')).toHaveText(/^42,00/);
+    await expect(page.getByTestId('menu-day-total')).toHaveText(/^177,00/);
+
+    // Прибрати продукт з дня; у довіднику він лишається.
+    await entry(page, 'Олія').getByRole('button', { name: 'Прибрати' }).click();
+    await expect(entry(page, 'Олія')).toHaveCount(0);
+    await expect(page.getByTestId('menu-day-total')).toHaveText(/^42,00/);
+    await page.reload();
+    await expect(milk.getByTestId('quantity')).toHaveText('1 л');
+    await page.goto('/menu/products');
+    await expect(page.getByText('Олія')).toBeVisible();
+  });
+
+  test('продукти поруч зі стравами: порядок, друк і покупки за меню', async ({ page }) => {
+    await register(page);
+    await addDairy(page);
+    await openDictionaries(page);
+    await addDish(page, 'Каша гречана', [['Гречка', '0,1']]);
+    await page.goto('/menu?date=2026-10-26');
+    await addProductEntry(page, 'Сніданок', 'Яйця', '10');
+    await addEntry(page, 'Сніданок', 'Каша гречана', '2');
+    await addProductEntry(page, 'Сніданок', 'Молоко', '0,5');
+    await addProductEntry(page, 'Обід', 'Гречка', '0,3');
+
+    await expect(meal(page, 'Сніданок').getByTestId('menu-entry')).toHaveText([
+      /^Каша гречана/,
+      /^Молоко/,
+      /^Яйця/,
+    ]);
+    await expect(entry(page, 'Яйця').getByTestId('quantity')).toHaveText('10 шт');
+    // 2 × 0,1 × 40 + 0,5 × 42 + 10 × 6,50 + 0,3 × 40 = 8 + 21 + 65 + 12.
+    await expect(page.getByTestId('menu-day-total')).toHaveText(/^106,00/);
+
+    // Друк: продукти з кількістю й одиницею, без сум.
+    await page.getByRole('link', { name: 'Друк' }).click();
+    await expect(page).toHaveURL(/\/menu\/print\/2026-10-26$/);
+    await expect(page.getByTestId('print-entry')).toHaveText([
+      'Каша гречана — 2 порції',
+      'Молоко — 0,5 л',
+      'Яйця — 10 шт',
+      'Гречка — 0,3 кг',
+    ]);
+    await expect(page.locator('body')).not.toContainText('грн');
+    await expect(page.locator('body')).not.toContainText('₴');
+
+    // Покупки за меню: гречка зі страви й напряму — один рядок 0,5 кг.
+    await page.goto('/menu/shopping?period=day&date=2026-10-26');
+    await expect(shoppingItems(page).getByTestId('menu-shopping-name')).toHaveText([
+      'Гречка',
+      'Молоко',
+      'Яйця',
+    ]);
+    await expect(shoppingItem(page, 'Гречка')).toContainText('0,5 кг');
+    await expect(shoppingItem(page, 'Яйця')).toContainText('10 шт');
+    await expect(page.getByTestId('menu-shopping-budget')).toContainText('106,00');
+    await page.getByRole('button', { name: 'Створити список покупок' }).click();
+    await expect(page).toHaveURL(/\/menu\/lists\/[0-9a-f-]{36}$/);
+    await expect(page.getByTestId('shopping-item')).toHaveCount(3);
+  });
+
+  test('порожній довідник продуктів — посилання на «Продукти»', async ({ page }) => {
+    await register(page);
+    await page.goto('/menu?date=2026-10-26');
+    await meal(page, 'Обід').getByRole('button', { name: 'Додати', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Продукт', exact: true }).click();
+    await expect(dialog.getByText('У довіднику ще немає продуктів')).toBeVisible();
+    await dialog.getByRole('link', { name: 'Додати продукти' }).click();
+    await expect(page).toHaveURL(/\/menu\/products$/);
+    await expect(page.getByRole('heading', { name: 'Продукти' })).toBeVisible();
+  });
+});
+
+test.describe('продукти в меню, телефон', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('шторка додавання продукту, рядок переноситься без обрізання', async ({ page }) => {
+    await register(page);
+    await addPantry(page);
+    await addProduct(page, 'Молоко пастеризоване безлактозне 2,5%', 'л', '58');
+    await page.goto('/menu?date=2026-10-26');
+    const noHorizontalScroll = () =>
+      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(await noHorizontalScroll()).toBe(true);
+
+    await meal(page, 'Обід').getByRole('button', { name: 'Додати', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect
+      .poll(async () => {
+        const box = await dialog.boundingBox();
+        return box && [box.width, Math.round(box.y + box.height)];
+      })
+      .toEqual([390, 844]);
+    await dialog.getByRole('button', { name: 'Продукт', exact: true }).click();
+    await dialog.getByRole('combobox').click();
+    await page.getByRole('option', { name: /^Молоко пастеризоване/ }).click();
+    const quantity = dialog.getByLabel('Кількість, л');
+    await expect(quantity).toBeInViewport();
+    await quantity.fill('0,75');
+    const submit = dialog.getByRole('button', { name: 'Додати', exact: true });
+    await expect(submit).toBeInViewport();
+    expect((await submit.boundingBox())!.height).toBe(40);
+    await submit.click();
+    await expect(dialog).toBeHidden();
+
+    const row = entry(page, 'Молоко пастеризоване');
+    await expect(row.getByTestId('quantity')).toHaveText('0,75 л');
+    await expect(row.getByTestId('entry-cost')).toHaveText(/^43,50/);
+    // Назва цілком у межах екрана, під нею кількість і кнопки.
+    const name = row.getByText('Молоко пастеризоване безлактозне 2,5%');
+    const nameBox = await name.boundingBox();
+    expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(390);
+    const amount = await row.getByTestId('quantity').boundingBox();
+    expect(amount!.y).toBeGreaterThan(nameBox!.y + nameBox!.height - 1);
+    for (const button of [
+      row.getByRole('button', { name: 'Змінити кількість' }),
+      row.getByRole('button', { name: 'Прибрати' }),
+    ]) {
+      await expect(button).toBeInViewport();
+      expect((await button.boundingBox())!.height).toBe(40);
+    }
+    expect(await noHorizontalScroll()).toBe(true);
   });
 });

@@ -462,3 +462,156 @@ describe('покупки за меню: доступ', () => {
     expect(await listCount(owner)).toBe(1);
   });
 });
+
+async function addProductEntry(
+  actor: Client,
+  body: { date: string; mealTypeId: string; productId: string; quantityMilli: number },
+) {
+  const res = await actor.post('/api/menu/entries', body);
+  expect(res.status).toBe(201);
+  return res.body as { id: string };
+}
+
+describe('покупки за меню: продукти напряму', () => {
+  it('AC14: прямий продукт — окремий рядок; зі страви й напряму — один рядок', async () => {
+    const { user, meals, products } = await weekOfBuckwheat();
+    const apples = await createProduct(user, { name: 'Яблука', unit: 'kg', price: 3000 });
+    // Гречка зі страви: 0,15 × 5 порцій = 0,75 кг; напряму ще 0,25 кг → 1 кг × 40 = 40 грн.
+    await addProductEntry(user, {
+      date: '2026-10-27',
+      mealTypeId: meals.breakfast,
+      productId: products.buckwheat,
+      quantityMilli: 250,
+    });
+    await addProductEntry(user, {
+      date: '2026-10-27',
+      mealTypeId: meals.dinner,
+      productId: apples,
+      quantityMilli: 1500,
+    });
+
+    const body = await getShopping(user);
+    expect(body.entryCount).toBe(5);
+    expect(body.items).toEqual([
+      {
+        productId: products.buckwheat,
+        name: 'Гречка',
+        unit: 'kg',
+        isArchived: false,
+        quantityMilli: 1000,
+        unitPrice: 4000,
+        lineTotal: 4000,
+      },
+      expect.objectContaining({ productId: products.oil, quantityMilli: 50, lineTotal: 450 }),
+      {
+        productId: apples,
+        name: 'Яблука',
+        unit: 'kg',
+        isArchived: false,
+        quantityMilli: 1500,
+        unitPrice: 3000,
+        lineTotal: 4500,
+      },
+    ]);
+    expect(body.total).toEqual({
+      cost: 4000 + 450 + 4500,
+      isPriceComplete: true,
+      unpricedCount: 0,
+    });
+  });
+
+  it('AC14: округлення від сумарної кількості й прямий продукт без ціни в unpricedCount', async () => {
+    const user = await registerUser(harness);
+    const [breakfast, lunch] = (await mealTypeIds(user)) as [string, string];
+    const salt = await createProduct(user, { name: 'Сіль', unit: 'kg', price: 500 });
+    const pepper = await createProduct(user, { name: 'Перець', unit: 'pack' });
+    const dishId = await createDish(user, 'Пучка солі', [{ productId: salt, quantityMilli: 1 }]);
+    await addEntry(user, { date: '2026-10-26', mealTypeId: lunch, dishId });
+    await addProductEntry(user, {
+      date: '2026-10-26',
+      mealTypeId: breakfast,
+      productId: salt,
+      quantityMilli: 1,
+    });
+    await addProductEntry(user, {
+      date: '2026-10-27',
+      mealTypeId: breakfast,
+      productId: salt,
+      quantityMilli: 1,
+    });
+    await addProductEntry(user, {
+      date: '2026-10-27',
+      mealTypeId: lunch,
+      productId: pepper,
+      quantityMilli: 1000,
+    });
+
+    const body = await getShopping(user);
+    expect(body.items).toMatchObject([
+      { productId: pepper, unitPrice: null, lineTotal: null },
+      // 3 × 0,001 кг × 5 грн = 0,015 → 2 коп.
+      { productId: salt, quantityMilli: 3, lineTotal: 2 },
+    ]);
+    expect(body.total).toEqual({ cost: 2, isPriceComplete: false, unpricedCount: 1 });
+  });
+
+  it('AC15: період лише з прямими продуктами — список з ними; архівний повертається', async () => {
+    const user = await registerUser(harness);
+    const [breakfast] = (await mealTypeIds(user)) as [string];
+    const milk = await createProduct(user, { name: 'Молоко', unit: 'l', price: 4200 });
+    const eggs = await createProduct(user, { name: 'Яйця', unit: 'pcs', price: 650 });
+    expect((await user.patch(`/api/products/${eggs}`, { isArchived: true })).status).toBe(200);
+    await addProductEntry(user, {
+      date: '2026-10-26',
+      mealTypeId: breakfast,
+      productId: milk,
+      quantityMilli: 500,
+    });
+    await addProductEntry(user, {
+      date: '2026-10-28',
+      mealTypeId: breakfast,
+      productId: eggs,
+      quantityMilli: 10_000,
+    });
+
+    const shopping = await getShopping(user);
+    expect(shopping.items).toHaveLength(2);
+    expect(shopping.total.cost).toBe(2100 + 6500);
+
+    const res = await user.post('/api/menu/shopping-list', WEEK);
+    expect(res.status).toBe(201);
+    expect(res.body.totals.expected).toBe(shopping.total.cost);
+    expect(res.body.items).toMatchObject([
+      { productId: milk, quantityMilli: 500, expectedUnitPrice: 4200, expectedTotal: 2100 },
+      { productId: eggs, quantityMilli: 10_000, expectedUnitPrice: 650, expectedTotal: 6500 },
+    ]);
+    const { body: active } = await user.get('/api/products');
+    expect(active.items).toContainEqual(expect.objectContaining({ id: eggs, isArchived: false }));
+  });
+
+  it('AC16: період [from, to) — прямий продукт у день to не входить', async () => {
+    const user = await registerUser(harness);
+    const [breakfast] = (await mealTypeIds(user)) as [string];
+    const milk = await createProduct(user, { name: 'Молоко', unit: 'l', price: 4200 });
+    await addProductEntry(user, {
+      date: '2026-10-26',
+      mealTypeId: breakfast,
+      productId: milk,
+      quantityMilli: 500,
+    });
+    await addProductEntry(user, {
+      date: '2026-11-02',
+      mealTypeId: breakfast,
+      productId: milk,
+      quantityMilli: 700,
+    });
+
+    const week = await getShopping(user);
+    expect(week.entryCount).toBe(1);
+    expect(week.items).toMatchObject([{ productId: milk, quantityMilli: 500 }]);
+    const nextDay = await getShopping(user, { from: '2026-11-02', to: '2026-11-03' });
+    expect(nextDay.items).toMatchObject([{ productId: milk, quantityMilli: 700 }]);
+    const before = await getShopping(user, { from: '2026-10-25', to: '2026-10-26' });
+    expect(before).toMatchObject({ entryCount: 0, items: [] });
+  });
+});

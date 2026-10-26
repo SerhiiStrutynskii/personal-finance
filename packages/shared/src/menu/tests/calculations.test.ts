@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { MoneyRangeError } from '../../money.ts';
-import { dishPortionPrice, menuCostTotal, menuEntryCost } from '../calculations.ts';
+import {
+  dishPortionPrice,
+  menuCostTotal,
+  menuEntryCost,
+  menuProductEntryCost,
+} from '../calculations.ts';
 
 describe('dishPortionPrice', () => {
   it('додає суми рядків: 0,15 кг × 40 грн + 0,01 л × 90 грн = 6,90 грн', () => {
@@ -81,6 +86,61 @@ describe('menuEntryCost', () => {
     expect(() => menuEntryCost(Math.floor(Number.MAX_SAFE_INTEGER / 99) + 1, 99)).toThrow(
       MoneyRangeError,
     );
+  });
+});
+
+describe('menuProductEntryCost', () => {
+  it('кількість × ціна з округленням «половина — вгору»', () => {
+    // 0,333 кг × 10,01 грн = 3,33333 → 3,33 грн.
+    expect(menuProductEntryCost(333, 1001)).toEqual({
+      cost: 333,
+      isPriceComplete: true,
+      unpricedCount: 0,
+    });
+    // 0,5 л × 42,00 = 21,00; 10 шт × 6,50 = 65,00.
+    expect(menuProductEntryCost(500, 4200).cost).toBe(2100);
+    expect(menuProductEntryCost(10_000, 650).cost).toBe(6500);
+  });
+
+  it('граничне округлення: рівно половина копійки — вгору, менше — вниз', () => {
+    // 0,005 × 1,00 = 0,5 коп. → 1 коп.
+    expect(menuProductEntryCost(5, 100).cost).toBe(1);
+    // 0,004 × 1,00 = 0,4 коп. → 0.
+    expect(menuProductEntryCost(4, 100).cost).toBe(0);
+    // 0,001 × 0,01 = 0,00001 коп. → 0, але ціна відома.
+    expect(menuProductEntryCost(1, 1)).toEqual({
+      cost: 0,
+      isPriceComplete: true,
+      unpricedCount: 0,
+    });
+  });
+
+  it('без ціни — 0, ціна неповна, один продукт без ціни', () => {
+    expect(menuProductEntryCost(500, null)).toEqual({
+      cost: 0,
+      isPriceComplete: false,
+      unpricedCount: 1,
+    });
+  });
+
+  it('найбільша кількість без втрати точності; понад безпечне ціле — MoneyRangeError', () => {
+    expect(menuProductEntryCost(1_000_000_000, 100).cost).toBe(100_000_000);
+    expect(() => menuProductEntryCost(1_000_000_000, Number.MAX_SAFE_INTEGER)).toThrow(
+      MoneyRangeError,
+    );
+  });
+
+  it('вартість дня зі страви й продукту — сума записів', () => {
+    const entries = [
+      { cost: menuEntryCost(690, 2), isPriceComplete: true },
+      menuProductEntryCost(333, 1001),
+      menuProductEntryCost(500, null),
+    ];
+    expect(menuCostTotal(entries)).toEqual({
+      cost: 1380 + 333,
+      isPriceComplete: false,
+      incompleteEntryCount: 1,
+    });
   });
 });
 

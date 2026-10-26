@@ -36,7 +36,7 @@ function MonthFigures({ data }: { data: ShoppingAnalytics }) {
     return (
       <Muted>
         У місяці «{monthLabel(data.month)}» за списками нічого не куплено.{' '}
-        <Link className="underline underline-offset-4" to="/shopping">
+        <Link className="underline underline-offset-4" to="/menu/lists">
           Перейти до покупок
         </Link>
       </Muted>

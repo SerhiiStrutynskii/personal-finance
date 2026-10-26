@@ -236,6 +236,12 @@ const MENU_PLAN: [day: number, meal: number, dish: string, servings: number][] =
   [3, 2, 'Бутерброд з сиром', 3],
 ];
 
+// Продукти напряму в меню тижня: [день від понеділка, прийом їжі, продукт, кількість у тисячних].
+const MENU_PLAN_PRODUCTS: [day: number, meal: number, product: string, quantityMilli: number][] = [
+  [0, 0, 'Молоко', 500],
+  [1, 1, 'Хліб', 1000],
+];
+
 /** Меню на 4 дні поточного тижня — лише якщо в домогосподарства ще немає записів меню. */
 async function seedMenuEntries(tx: DbOrTx, householdId: string): Promise<boolean> {
   if ((await tx.$count(menuEntries, eq(menuEntries.householdId, householdId))) > 0) return false;
@@ -260,6 +266,20 @@ async function seedMenuEntries(tx: DbOrTx, householdId: string): Promise<boolean
   });
   if (values.length === 0) return false;
   await tx.insert(menuEntries).values(values);
+
+  const productRows = await tx
+    .select({ id: products.id, nameKey: products.nameKey })
+    .from(products)
+    .where(eq(products.householdId, householdId));
+  const productId = new Map(productRows.map((row) => [row.nameKey, row.id]));
+  const productValues = MENU_PLAN_PRODUCTS.flatMap(([day, meal, product, quantityMilli]) => {
+    const mealTypeId = meals[meal]?.id;
+    const id = productId.get(productNameKey(product));
+    return mealTypeId && id
+      ? [{ householdId, date: addDays(monday, day), mealTypeId, productId: id, quantityMilli }]
+      : [];
+  });
+  if (productValues.length > 0) await tx.insert(menuEntries).values(productValues);
   return true;
 }
 

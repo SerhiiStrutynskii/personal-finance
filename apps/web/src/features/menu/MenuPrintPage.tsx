@@ -7,11 +7,11 @@ import { Button } from '../../shared/ui/button.tsx';
 import { ErrorText, Muted } from '../../shared/ui/controls.tsx';
 import { formatDateString } from '../../shared/ui/format.ts';
 import { useMealTypes, useMenuPeriod } from './api.ts';
-import { dayRange, dayTitleWithYear, groupDay, servingsLabel } from './calendar.ts';
+import { dayRange, dayTitleWithYear, entryPrintLabel, groupDay } from './calendar.ts';
 
 /**
  * Меню на день для друку без меню застосунку й без сум: дата, прийоми їжі з записами, страви
- * й порції. PDF — через системний діалог друку.
+ * з порціями й продукти з кількістю. PDF — через системний діалог друку.
  */
 export function MenuPrintPage() {
   const { date = '' } = useParams();
@@ -80,7 +80,7 @@ export function MenuPrintPage() {
           <ul className="list-disc space-y-0.5 pl-5 text-sm">
             {entries.map((entry) => (
               <li key={entry.id} data-testid="print-entry" className="break-words">
-                {entry.dishName} — {servingsLabel(entry.servings)}
+                {entryPrintLabel(entry)}
               </li>
             ))}
           </ul>

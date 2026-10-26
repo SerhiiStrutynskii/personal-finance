@@ -3,6 +3,7 @@ import {
   compareProductNames,
   menuCostTotal,
   menuEntryCost,
+  menuProductEntryCost,
   type CreateMenuEntryInput,
   type DishSummary,
   type MenuDay,
@@ -19,21 +20,34 @@ import {
   isForeignKeyViolation,
   notFound,
 } from '../../http/errors.ts';
+import { findProduct } from '../shopping/repo.ts';
 import { findMealType } from './mealTypes.repo.ts';
 import * as dishesRepo from './dishes.repo.ts';
 import * as repo from './entries.repo.ts';
 
 // Календар меню ведуть усі учасники домогосподарства, як і довідники меню. Назву й ціну страви
-// календар щоразу читає з довідників: вартість рахується за поточними цінами й не зберігається.
+// чи продукту календар щоразу читає з довідників: вартість рахується за поточними цінами й не
+// зберігається.
 
 function toDto(row: repo.MenuEntryWithNames, dish: DishSummary | undefined): MenuEntry {
+  const common = { id: row.id, date: row.date, mealTypeId: row.mealTypeId, name: row.name };
+  if (row.kind === 'product') {
+    return {
+      ...common,
+      kind: 'product',
+      productId: row.productId,
+      unit: row.unit,
+      isArchived: row.isArchived,
+      quantityMilli: row.quantityMilli,
+      unitPrice: row.priceMinor,
+      ...menuProductEntryCost(row.quantityMilli, row.priceMinor),
+    };
+  }
   const portionPrice = dish?.portionPrice ?? 0;
   return {
-    id: row.id,
-    date: row.date,
-    mealTypeId: row.mealTypeId,
+    ...common,
+    kind: 'dish',
     dishId: row.dishId,
-    dishName: row.dishName,
     servings: row.servings,
     portionPrice,
     cost: menuEntryCost(portionPrice, row.servings),
@@ -42,12 +56,12 @@ function toDto(row: repo.MenuEntryWithNames, dish: DishSummary | undefined): Men
   };
 }
 
-/** Порядок: дата, позиція прийому їжі, прийом їжі, назва страви, id. */
+/** Порядок: дата, позиція прийому їжі, прийом їжі, назва (страви й продукти разом), id. */
 function compareEntries(a: repo.MenuEntryWithNames, b: repo.MenuEntryWithNames): number {
   if (a.date !== b.date) return a.date < b.date ? -1 : 1;
   if (a.mealTypePosition !== b.mealTypePosition) return a.mealTypePosition - b.mealTypePosition;
   if (a.mealTypeId !== b.mealTypeId) return a.mealTypeId < b.mealTypeId ? -1 : 1;
-  return compareProductNames(a.dishName, b.dishName) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  return compareProductNames(a.name, b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
 async function toDtos(
@@ -58,9 +72,11 @@ async function toDtos(
   const prices = await repo.listDishPrices(
     db,
     auth.householdId,
-    rows.map((row) => row.dishId),
+    rows.flatMap((row) => (row.kind === 'dish' ? [row.dishId] : [])),
   );
-  return [...rows].sort(compareEntries).map((row) => toDto(row, prices.get(row.dishId)));
+  return [...rows]
+    .sort(compareEntries)
+    .map((row) => toDto(row, row.kind === 'dish' ? prices.get(row.dishId) : undefined));
 }
 
 async function loadEntry(db: DbOrTx, auth: AuthContext, id: string): Promise<MenuEntry> {
@@ -102,10 +118,12 @@ export async function getMenuPeriod(
 }
 
 const tooManyServings = () => badRequest('Не більше 99 порцій');
+const tooMuchQuantity = () => badRequest('Кількість продукту завелика');
 
 /**
- * Додає страву в прийом їжі дня. Повторне додавання тієї самої страви збільшує порції наявного
- * запису (created = false).
+ * Додає страву або продукт у прийом їжі дня. Повторне додавання тієї самої страви збільшує
+ * порції, того самого продукту — кількість наявного запису (created = false). Архівний продукт
+ * свого домогосподарства додати можна; він не розархівовується, як і в складі страви.
  */
 export async function createEntry(
   db: Db,
@@ -115,34 +133,60 @@ export async function createEntry(
   if (!(await findMealType(db, auth.householdId, input.mealTypeId))) {
     throw notFound('Прийом їжі');
   }
-  if (!(await dishesRepo.findDish(db, auth.householdId, input.dishId))) {
-    throw notFound('Страва');
-  }
   let result: { row: repo.MenuEntryRow; created: boolean };
-  try {
-    result = await repo.insertOrAddServings(db, auth.householdId, input);
-  } catch (error) {
-    if (isCheckViolation(error, 'menu_entries_servings_range')) throw tooManyServings();
-    // Прийом їжі чи страву видалили між перевіркою й вставкою.
-    if (isForeignKeyViolation(error)) throw notFound('Страва чи прийом їжі');
-    throw error;
+  if ('productId' in input) {
+    if (!(await findProduct(db, auth.householdId, input.productId))) throw notFound('Продукт');
+    try {
+      result = await repo.insertOrAddQuantity(db, auth.householdId, input);
+    } catch (error) {
+      if (isCheckViolation(error, 'menu_entries_quantity_range')) throw tooMuchQuantity();
+      // Прийом їжі чи продукт видалили між перевіркою й вставкою.
+      if (isForeignKeyViolation(error)) throw notFound('Продукт чи прийом їжі');
+      throw error;
+    }
+  } else {
+    if (!(await dishesRepo.findDish(db, auth.householdId, input.dishId))) {
+      throw notFound('Страва');
+    }
+    try {
+      result = await repo.insertOrAddServings(db, auth.householdId, input);
+    } catch (error) {
+      if (isCheckViolation(error, 'menu_entries_servings_range')) throw tooManyServings();
+      // Прийом їжі чи страву видалили між перевіркою й вставкою.
+      if (isForeignKeyViolation(error)) throw notFound('Страва чи прийом їжі');
+      throw error;
+    }
   }
   return { entry: await loadEntry(db, auth, result.row.id), created: result.created };
 }
 
+/** Порції — лише для страви, кількість — лише для продукту; інакше 400 і запис не змінюється. */
 export async function updateEntry(
   db: Db,
   auth: AuthContext,
   id: string,
   input: UpdateMenuEntryInput,
 ): Promise<MenuEntry> {
-  if (!(await repo.updateServings(db, auth.householdId, id, input.servings))) {
-    throw notFound('Запис меню');
+  const current = await repo.findEntry(db, auth.householdId, id);
+  if (!current) throw notFound('Запис меню');
+  let updated;
+  if ('servings' in input) {
+    if (current.kind !== 'dish') throw badRequest('Для продукту вказується кількість');
+    updated = await repo.updateServings(db, auth.householdId, id, input.servings);
+  } else {
+    if (current.kind !== 'product') throw badRequest('Для страви вказуються порції');
+    try {
+      updated = await repo.updateQuantity(db, auth.householdId, id, input.quantityMilli);
+    } catch (error) {
+      if (isCheckViolation(error, 'menu_entries_quantity_range')) throw tooMuchQuantity();
+      throw error;
+    }
   }
+  if (!updated) throw notFound('Запис меню');
   return loadEntry(db, auth, id);
 }
 
-/** Прибирає страву з дня; страва й прийом їжі в довідниках лишаються. */
+/** Прибирає страву чи продукт з дня; у довідниках вони лишаються. */
 export async function deleteEntry(db: Db, auth: AuthContext, id: string): Promise<void> {
   if (!(await repo.deleteEntry(db, auth.householdId, id))) throw notFound('Запис меню');
 }

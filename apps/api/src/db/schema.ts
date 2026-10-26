@@ -682,10 +682,11 @@ export const dishIngredients = pgTable(
   ],
 );
 
-// Страва в прийомі їжі одного дня меню. Дата — календарна дата домогосподарства, без часу.
-// Ціна не зберігається: вартість рахується з поточних цін продуктів страви.
-// Страву чи прийом їжі з записами в меню видалити не можна (no action → 23503 → 409); перевірка
-// no action іде в кінці оператора, тому каскадне видалення домогосподарства не падає.
+// Запис меню — страва з порціями або продукт з кількістю в прийомі їжі одного дня. Дата —
+// календарна дата домогосподарства, без часу. Ціна не зберігається: вартість рахується з
+// поточних цін продуктів. Страву, продукт чи прийом їжі з записами в меню видалити не можна
+// (no action → 23503 → 409); перевірка no action іде в кінці оператора, тому каскадне видалення
+// домогосподарства не падає.
 export const menuEntries = pgTable(
   'menu_entries',
   {
@@ -697,18 +698,27 @@ export const menuEntries = pgTable(
     mealTypeId: uuid('meal_type_id')
       .notNull()
       .references(() => mealTypes.id),
-    dishId: uuid('dish_id')
-      .notNull()
-      .references(() => dishes.id),
-    servings: integer().notNull(),
+    // Страва з порціями — або продукт з кількістю (рівно одне, див. menu_entries_kind).
+    dishId: uuid('dish_id').references(() => dishes.id),
+    servings: integer(),
+    productId: uuid('product_id').references(() => products.id),
+    // Кількість продукту в тисячних одиниці, як у shopping_list_items.
+    quantityMilli: integer('quantity_milli'),
     createdAt: createdAt(),
     updatedAt: instant().notNull().defaultNow(),
   },
   (t) => [
     unique('menu_entries_dish_unique').on(t.householdId, t.date, t.mealTypeId, t.dishId),
+    unique('menu_entries_product_unique').on(t.householdId, t.date, t.mealTypeId, t.productId),
     index().on(t.householdId, t.date),
     index().on(t.dishId),
+    index().on(t.productId),
     index().on(t.mealTypeId),
     check('menu_entries_servings_range', sql`${t.servings} between 1 and 99`),
+    check('menu_entries_quantity_range', sql`${t.quantityMilli} between 1 and 1000000000`),
+    check(
+      'menu_entries_kind',
+      sql`(${t.dishId} IS NOT NULL AND ${t.servings} IS NOT NULL AND ${t.productId} IS NULL AND ${t.quantityMilli} IS NULL) OR (${t.dishId} IS NULL AND ${t.servings} IS NULL AND ${t.productId} IS NOT NULL AND ${t.quantityMilli} IS NOT NULL)`,
+    ),
   ],
 );

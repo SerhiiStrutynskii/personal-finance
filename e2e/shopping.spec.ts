@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
-import { register } from './helpers.ts';
+import { openShopping, register } from './helpers.ts';
 
 async function openProducts(page: Page) {
-  await page.getByRole('link', { name: 'Покупки' }).click();
+  await openShopping(page);
   await page.getByRole('link', { name: 'Продукти', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Продукти' })).toBeVisible();
 }
@@ -17,8 +17,7 @@ async function addProduct(page: Page, name: string, price: string) {
 }
 
 async function createList(page: Page, name: string) {
-  await page.getByRole('link', { name: 'Покупки' }).click();
-  await expect(page.getByRole('heading', { name: 'Покупки' })).toBeVisible();
+  await openShopping(page);
   await page.getByRole('button', { name: 'Список', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Назва').fill(name);

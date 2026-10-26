@@ -3,11 +3,11 @@ import { BookOpen, ShoppingCart } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
-import { ErrorText, Muted, PageHeader } from '../../shared/ui/controls.tsx';
+import { ErrorText, Muted } from '../../shared/ui/controls.tsx';
 import { MonthSwitcher } from '../../shared/ui/month-switcher.tsx';
 import { useCurrentUser } from '../auth/authContext.ts';
 import { useMealTypes, useMenuPeriod } from './api.ts';
-import { dateForMonth, incompleteDishesLabel, monthRange, selectedDate } from './calendar.ts';
+import { dateForMonth, incompleteEntriesLabel, monthRange, selectedDate } from './calendar.ts';
 import { IncompletePriceBadge } from './IncompletePriceBadge.tsx';
 import { MenuDayPanel } from './MenuDayPanel.tsx';
 import { MonthGrid } from './MonthGrid.tsx';
@@ -32,25 +32,21 @@ export function MenuPage() {
 
   return (
     <div className="max-w-6xl space-y-4">
-      <PageHeader
-        title="Меню"
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="max-sm:h-10" asChild>
-              <Link to={`/menu/shopping?period=week&date=${selected}`}>
-                <ShoppingCart />
-                Покупки за меню
-              </Link>
-            </Button>
-            <Button variant="outline" className="max-sm:h-10" asChild>
-              <Link to="/menu/dictionaries">
-                <BookOpen />
-                Страви й прийоми їжі
-              </Link>
-            </Button>
-          </div>
-        }
-      />
+      {/* Заголовок «Меню» і таби — у MenuLayout. */}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" className="max-sm:h-10" asChild>
+          <Link to={`/menu/shopping?period=week&date=${selected}`}>
+            <ShoppingCart />
+            Покупки за меню
+          </Link>
+        </Button>
+        <Button variant="outline" className="max-sm:h-10" asChild>
+          <Link to="/menu/dictionaries">
+            <BookOpen />
+            Страви й прийоми їжі
+          </Link>
+        </Button>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <MonthSwitcher
           month={month}
@@ -64,7 +60,7 @@ export function MenuPage() {
             </span>
           </span>
           {total && !total.isPriceComplete && (
-            <IncompletePriceBadge hint={incompleteDishesLabel(total.incompleteEntryCount)} />
+            <IncompletePriceBadge hint={incompleteEntriesLabel(total.incompleteEntryCount)} />
           )}
         </div>
       </div>

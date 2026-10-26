@@ -48,6 +48,7 @@ export function MenuShoppingPage() {
   return (
     <div className="max-w-3xl space-y-4">
       <PageHeader
+        level={2}
         title="Покупки за меню"
         action={
           <Button variant="outline" className="max-sm:h-10" asChild>
@@ -150,7 +151,7 @@ export function MenuShoppingPage() {
                   onClick={() =>
                     create.mutate(
                       { from, to },
-                      { onSuccess: (list) => navigate(`/shopping/${list.id}`) },
+                      { onSuccess: (list) => navigate(`/menu/lists/${list.id}`) },
                     )
                   }
                 >

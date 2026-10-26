@@ -49,7 +49,7 @@ function PrintContent({ list }: { list: ShoppingList }) {
       <div className="space-y-3 print:hidden" data-testid="print-toolbar">
         <Link
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"
-          to={`/shopping/${list.id}`}
+          to={`/menu/lists/${list.id}`}
         >
           <ArrowLeft className="size-4" aria-hidden />
           До списку

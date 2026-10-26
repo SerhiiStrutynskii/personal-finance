@@ -5,6 +5,7 @@ import {
   menuShoppingListName,
   menuShoppingTotal,
   type MenuShoppingIngredientInput,
+  type MenuShoppingProductEntryInput,
 } from '../shopping.ts';
 
 const BUCKWHEAT = '00000000-0000-4000-8000-000000000001';
@@ -174,6 +175,94 @@ describe('menuShoppingItems', () => {
     );
     // Рівно на межі — ще можна.
     expect(menuShoppingTotal([{ lineTotal: huge - 1 }, { lineTotal: 1 }]).cost).toBe(huge);
+  });
+});
+
+const direct = (
+  productId: string,
+  name: string,
+  quantityMilli: number,
+  priceMinor: number | null,
+  extra: Partial<MenuShoppingProductEntryInput> = {},
+): MenuShoppingProductEntryInput => ({
+  productId,
+  name,
+  unit: 'kg',
+  isArchived: false,
+  quantityMilli,
+  priceMinor,
+  ...extra,
+});
+
+describe('menuShoppingItems — продукти напряму', () => {
+  it('продукт лише напряму — окремий рядок з його кількістю', () => {
+    const items = menuShoppingItems([], [], [direct(APPLE, 'Яблука', 1500, 3000)]);
+    expect(items).toEqual([
+      {
+        productId: APPLE,
+        name: 'Яблука',
+        unit: 'kg',
+        isArchived: false,
+        quantityMilli: 1500,
+        unitPrice: 3000,
+        lineTotal: 4500,
+      },
+    ]);
+    expect(menuShoppingTotal(items)).toEqual({
+      cost: 4500,
+      isPriceComplete: true,
+      unpricedCount: 0,
+    });
+  });
+
+  it('продукт і зі страви, і напряму — один рядок: на порцію × порції + пряма кількість', () => {
+    const items = menuShoppingItems(
+      [{ dishId: 'porridge', servings: 2 }],
+      [line('porridge', BUCKWHEAT, 'Гречка', 150, 4000)],
+      [direct(BUCKWHEAT, 'Гречка', 200, 4000), direct(BUCKWHEAT, 'Гречка', 50, 4000)],
+    );
+    expect(items).toHaveLength(1);
+    // 0,15 × 2 + 0,2 + 0,05 = 0,55 кг × 40 грн = 22 грн.
+    expect(items[0]).toMatchObject({ quantityMilli: 550, lineTotal: 2200 });
+  });
+
+  it('округлення від сумарної кількості, а не по записах', () => {
+    // 3 × 0,001 кг × 5 грн: окремо по 0,5 коп. → 1 коп. кожен, разом 0,015 → 2 коп.
+    const items = menuShoppingItems(
+      [{ dishId: 'a', servings: 1 }],
+      [line('a', SALT, 'Сіль', 1, 500)],
+      [direct(SALT, 'Сіль', 1, 500), direct(SALT, 'Сіль', 1, 500)],
+    );
+    expect(items[0]).toMatchObject({ quantityMilli: 3, lineTotal: 2 });
+  });
+
+  it('прямий продукт без ціни рахується в unpricedCount; архівний зберігає прапорець', () => {
+    const items = menuShoppingItems(
+      [],
+      [],
+      [
+        direct(SALT, 'Сіль', 5, null, { isArchived: true, unit: 'pack' }),
+        direct(OIL, 'Олія', 500, 9000, { unit: 'l' }),
+      ],
+    );
+    expect(items.map((item) => item.name)).toEqual(['Олія', 'Сіль']);
+    expect(items[1]).toMatchObject({ isArchived: true, unit: 'pack', lineTotal: null });
+    expect(menuShoppingTotal(items)).toEqual({
+      cost: 4500,
+      isPriceComplete: false,
+      unpricedCount: 1,
+    });
+  });
+
+  it('кидає MoneyRangeError, коли сумарна кількість виходить за безпечне ціле', () => {
+    const huge = Math.floor(Number.MAX_SAFE_INTEGER / 2) + 1;
+    expect(() =>
+      menuShoppingItems(
+        [],
+        [],
+        [direct(SALT, 'Сіль', huge, null), direct(SALT, 'Сіль', huge, null)],
+      ),
+    ).toThrow(MoneyRangeError);
   });
 });
 
