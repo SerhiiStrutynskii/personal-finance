@@ -7,6 +7,7 @@ import {
   type MealType,
   type MenuEntry,
 } from '@hf/shared';
+import { quantityLabel } from '../shopping/shoppingForm.ts';
 
 // Чисті функції календаря меню. Дати — рядки YYYY-MM-DD без часового поясу; «сьогодні»
 // визначає сторінка в часовому поясі користувача.
@@ -76,9 +77,19 @@ export function servingsLabel(count: number): string {
   return `${count} ${pluralForm(count, 'порція', 'порції', 'порцій')}`;
 }
 
-/** «1 страва з неповною ціною», «2 страви…», «5 страв…». */
-export function incompleteDishesLabel(count: number): string {
-  return `${count} ${pluralForm(count, 'страва', 'страви', 'страв')} з неповною ціною`;
+/** «1 запис з неповною ціною», «2 записи…», «5 записів…» — страви й продукти разом. */
+export function incompleteEntriesLabel(count: number): string {
+  return `${count} ${pluralForm(count, 'запис', 'записи', 'записів')} з неповною ціною`;
+}
+
+/** Скільки запису: «2 порції» для страви, «0,5 л» для продукту. */
+export function entryAmountLabel(entry: MenuEntry): string {
+  return entry.kind === 'dish' ? servingsLabel(entry.servings) : quantityLabel(entry);
+}
+
+/** Рядок запису для друку: «Омлет — 2 порції», «Молоко — 0,5 л». */
+export function entryPrintLabel(entry: MenuEntry): string {
+  return `${entry.name} — ${entryAmountLabel(entry)}`;
 }
 
 /** Порції з поля форми: ціле 1–99, інакше текст помилки. */

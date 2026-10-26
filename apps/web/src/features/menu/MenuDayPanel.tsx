@@ -1,5 +1,12 @@
-import { MAX_SERVINGS, formatMoney, type MealType, type MenuDay, type MenuEntry } from '@hf/shared';
-import { Minus, Plus, Printer, X } from 'lucide-react';
+import {
+  MAX_SERVINGS,
+  formatMoney,
+  type MealType,
+  type MenuDay,
+  type MenuEntry,
+  type MenuProductEntry,
+} from '@hf/shared';
+import { Minus, Pencil, Plus, Printer, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -7,8 +14,9 @@ import { Button } from '../../shared/ui/button.tsx';
 import { ErrorText, Muted } from '../../shared/ui/controls.tsx';
 import { AddEntryDialog } from './AddEntryDialog.tsx';
 import { useDeleteMenuEntry, useUpdateMenuEntry } from './api.ts';
-import { dayTitle, groupDay, servingsLabel } from './calendar.ts';
+import { dayTitle, entryAmountLabel, groupDay, servingsLabel } from './calendar.ts';
 import { IncompletePriceBadge } from './IncompletePriceBadge.tsx';
+import { QuantityDialog } from './QuantityDialog.tsx';
 
 interface Props {
   date: string;
@@ -19,12 +27,15 @@ interface Props {
   mealTypes: readonly MealType[];
 }
 
-/** Меню вибраного дня: прийоми їжі з їхніми стравами, порції й вартість. */
+/** Меню вибраного дня: прийоми їжі зі стравами (порції) і продуктами (кількість) та вартість. */
 export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props) {
   const update = useUpdateMenuEntry();
   const remove = useDeleteMenuEntry();
   // Вміст вікна зберігається й після закриття, щоб не змінюватися під час анімації.
   const [dialog, setDialog] = useState<{ open: boolean; mealType?: MealType }>({ open: false });
+  const [quantity, setQuantity] = useState<{ open: boolean; entry?: MenuProductEntry }>({
+    open: false,
+  });
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
 
   return (
@@ -79,7 +90,7 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
               onClick={() => setDialog({ open: true, mealType })}
             >
               <Plus />
-              Додати страву
+              Додати
             </Button>
           </div>
           {mealEntries.length === 0 ? (
@@ -87,41 +98,64 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
           ) : (
             <ul className="divide-y text-sm">
               {mealEntries.map((entry) => (
-                // Без ListRow: на телефоні рядок переноситься — назва зверху, під нею порції,
-                // вартість і «Прибрати».
+                // Без ListRow: на телефоні рядок переноситься — назва зверху, під нею порції чи
+                // кількість, вартість і «Прибрати».
                 <li
                   key={entry.id}
                   data-testid="menu-entry"
+                  data-kind={entry.kind}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
                 >
                   <span className="min-w-0 basis-full break-words md:flex-1 md:basis-0">
-                    {entry.dishName}
+                    {entry.name}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      className="max-sm:size-10"
-                      aria-label="Менше порцій"
-                      disabled={entry.servings <= 1 || update.isPending}
-                      onClick={() => update.mutate({ id: entry.id, servings: entry.servings - 1 })}
-                    >
-                      <Minus />
-                    </Button>
-                    <span className="min-w-20 text-center tabular-nums" data-testid="servings">
-                      {servingsLabel(entry.servings)}
+                  {entry.kind === 'dish' ? (
+                    <span className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="max-sm:size-10"
+                        aria-label="Менше порцій"
+                        disabled={entry.servings <= 1 || update.isPending}
+                        onClick={() =>
+                          update.mutate({ id: entry.id, servings: entry.servings - 1 })
+                        }
+                      >
+                        <Minus />
+                      </Button>
+                      <span className="min-w-20 text-center tabular-nums" data-testid="servings">
+                        {servingsLabel(entry.servings)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="max-sm:size-10"
+                        aria-label="Більше порцій"
+                        disabled={entry.servings >= MAX_SERVINGS || update.isPending}
+                        onClick={() =>
+                          update.mutate({ id: entry.id, servings: entry.servings + 1 })
+                        }
+                      >
+                        <Plus />
+                      </Button>
                     </span>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      className="max-sm:size-10"
-                      aria-label="Більше порцій"
-                      disabled={entry.servings >= MAX_SERVINGS || update.isPending}
-                      onClick={() => update.mutate({ id: entry.id, servings: entry.servings + 1 })}
-                    >
-                      <Plus />
-                    </Button>
-                  </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <span className="tabular-nums" data-testid="quantity">
+                        {entryAmountLabel(entry)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="max-sm:size-10"
+                        aria-label="Змінити кількість"
+                        title="Змінити кількість"
+                        onClick={() => setQuantity({ open: true, entry })}
+                      >
+                        <Pencil />
+                      </Button>
+                    </span>
+                  )}
                   <span className="ml-auto inline-flex items-center gap-2 tabular-nums">
                     {!entry.isPriceComplete && (
                       <IncompletePriceBadge unpricedCount={entry.unpricedCount} />
@@ -150,6 +184,11 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
         onOpenChange={(open) => setDialog({ ...dialog, open })}
         date={date}
         mealType={dialog.mealType}
+      />
+      <QuantityDialog
+        open={quantity.open}
+        onOpenChange={(open) => setQuantity({ ...quantity, open })}
+        entry={quantity.entry}
       />
     </section>
   );

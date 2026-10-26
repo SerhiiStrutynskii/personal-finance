@@ -10,6 +10,7 @@ import type {
   MenuShopping,
   ShoppingList,
   UpdateDishInput,
+  UpdateMenuEntryInput,
 } from '@hf/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
@@ -100,8 +101,8 @@ export function useAddMenuEntry() {
 
 export function useUpdateMenuEntry() {
   return useMutation({
-    mutationFn: ({ id, servings }: { id: string; servings: number }) =>
-      api.patch<MenuEntry>(`/api/menu/entries/${id}`, { servings }),
+    mutationFn: ({ id, ...input }: { id: string } & UpdateMenuEntryInput) =>
+      api.patch<MenuEntry>(`/api/menu/entries/${id}`, input),
   });
 }
 
