@@ -1,5 +1,5 @@
 import type { CreatedInvite, Household, InvitePreview, UpdateHouseholdInput } from '@hf/shared';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/index.ts';
 
 /**
@@ -35,6 +35,15 @@ export function useRevokeInvite() {
 export function useRemoveMember() {
   return useMutation({
     mutationFn: (userId: string) => api.delete(`/api/household/members/${userId}`),
+  });
+}
+
+/** Передає роль власника учаснику; відповідь — домогосподарство вже з погляду учасника. */
+export function useTransferOwnership() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.post<Household>('/api/household/owner', { userId }),
+    onSuccess: (household) => queryClient.setQueryData(['household'], household),
   });
 }
 
