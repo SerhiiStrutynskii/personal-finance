@@ -203,6 +203,7 @@ function MealTypesSection() {
         open={dialog.open}
         onOpenChange={(open) => setDialog({ ...dialog, open })}
         mealType={dialog.mealType}
+        mealTypes={items}
       />
     </section>
   );
