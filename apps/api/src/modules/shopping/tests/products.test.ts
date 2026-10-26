@@ -63,6 +63,40 @@ describe('products', () => {
     expect((await actor.patch(`/api/products/${kefir.id}`, { name: 'МОЛОКО' })).status).toBe(409);
   });
 
+  it('AC17: продукт лише в календарі меню не видаляється: 409, архівування лишає запис', async () => {
+    const actor = await createActor();
+    const [mealType] = (await actor.get('/api/meal-types')).body.items as { id: string }[];
+    const mealTypeId =
+      mealType?.id ?? ((await actor.post('/api/meal-types', { name: 'Обід' })).body.id as string);
+    const { body: milk } = await actor.post('/api/products', {
+      name: 'Молоко',
+      unit: 'l',
+      price: 4200,
+    });
+    const january = '/api/menu?from=2026-01-01&to=2026-02-01';
+    const entry = await actor.post('/api/menu/entries', {
+      date: '2026-01-10',
+      mealTypeId,
+      productId: milk.id,
+      quantityMilli: 500,
+    });
+    expect(entry.status).toBe(201);
+
+    const deleted = await actor.delete(`/api/products/${milk.id}`);
+    expect(deleted.status).toBe(409);
+    expect(deleted.body.error.message).toBe(
+      'Продукт використовується в списках покупок, стравах або меню. Заархівуйте його, щоб приховати з довідника',
+    );
+    expect((await actor.get(january)).body.entries).toMatchObject([
+      { id: entry.body.id, productId: milk.id, quantityMilli: 500, cost: 2100 },
+    ]);
+
+    expect((await actor.patch(`/api/products/${milk.id}`, { isArchived: true })).status).toBe(200);
+    const { body } = await actor.get(january);
+    expect(body.entries).toMatchObject([{ id: entry.body.id, isArchived: true, cost: 2100 }]);
+    expect(body.total.cost).toBe(2100);
+  });
+
   it('продукт зі складу страви не видаляється: 409 з поясненням, лише архівування', async () => {
     const actor = await createActor();
     const { body: rice } = await actor.post('/api/products', { name: 'Рис', unit: 'kg' });
