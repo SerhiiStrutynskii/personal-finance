@@ -4,12 +4,13 @@ import {
   type CreatedInvite,
   type Household,
   type InvitePreview,
+  type TransferOwnershipInput,
   type UpdateHouseholdInput,
 } from '@hf/shared';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Db, DbOrTx } from '../../db/client.ts';
 import { assertOwner, type AuthContext } from '../../http/auth.ts';
-import { notFound, unprocessable } from '../../http/errors.ts';
+import { notFound, ownerOnly, unprocessable } from '../../http/errors.ts';
 import { insertHouseholdWithOwner } from '../auth/repo.ts';
 import * as repo from './repo.ts';
 
@@ -104,20 +105,62 @@ export async function removeMember(db: Db, auth: AuthContext, userId: string): P
     throw unprocessable('OWNER_CANNOT_LEAVE', 'Власник не може вилучити себе');
   }
   await db.transaction(async (tx) => {
+    await repo.lockHousehold(tx, auth.householdId);
+    await assertStillOwner(tx, auth);
     if (!(await repo.findMember(tx, auth.householdId, userId))) throw notFound('Учасник');
     await moveToOwnHousehold(tx, auth.householdId, userId);
   });
 }
 
+const ownerCannotLeave = () =>
+  unprocessable('OWNER_CANNOT_LEAVE', 'Власник не може вийти з домогосподарства, яким керує');
+
 /** Учасник виходить із домогосподарства й отримує власне порожнє. */
 export async function leaveHousehold(db: Db, auth: AuthContext): Promise<void> {
-  if (auth.role === 'owner') {
-    throw unprocessable(
-      'OWNER_CANNOT_LEAVE',
-      'Власник не може вийти з домогосподарства, яким керує',
-    );
+  if (auth.role === 'owner') throw ownerCannotLeave();
+  await db.transaction(async (tx) => {
+    await repo.lockHousehold(tx, auth.householdId);
+    // Роль могли щойно передати цьому учаснику паралельним запитом.
+    const self = await repo.findMember(tx, auth.householdId, auth.userId);
+    if (!self) throw notFound('Учасник');
+    if (self.role === 'owner') throw ownerCannotLeave();
+    await moveToOwnHousehold(tx, auth.householdId, auth.userId);
+  });
+}
+
+/**
+ * Передає роль власника іншому учаснику свого домогосподарства; колишній власник стає учасником.
+ * Права обох змінюються з наступного запиту, бо роль щоразу читається з БД.
+ * Повертає домогосподарство з погляду колишнього власника.
+ */
+export async function transferOwnership(
+  db: Db,
+  auth: AuthContext,
+  input: TransferOwnershipInput,
+  now: Date,
+): Promise<Household> {
+  assertOwner(auth);
+  if (input.userId === auth.userId) {
+    throw unprocessable('ALREADY_OWNER', 'Ви вже власник цього домогосподарства');
   }
-  await db.transaction((tx) => moveToOwnHousehold(tx, auth.householdId, auth.userId));
+  await db.transaction(async (tx) => {
+    // Блокування й повторна перевірка: з двох одночасних передач пройде лише одна.
+    await repo.lockHousehold(tx, auth.householdId);
+    await assertStillOwner(tx, auth);
+    if (!(await repo.findMember(tx, auth.householdId, input.userId))) throw notFound('Учасник');
+    // Спершу понизити, потім підвищити: власник у будь-який момент лише один.
+    await repo.setMemberRole(tx, auth.householdId, auth.userId, 'member');
+    if (!(await repo.setMemberRole(tx, auth.householdId, input.userId, 'owner'))) {
+      throw notFound('Учасник');
+    }
+  });
+  return getHousehold(db, { ...auth, role: 'member' }, now);
+}
+
+/** Повторна перевірка ролі всередині транзакції, після блокування домогосподарства. */
+async function assertStillOwner(tx: DbOrTx, auth: AuthContext) {
+  const self = await repo.findMember(tx, auth.householdId, auth.userId);
+  if (self?.role !== 'owner') throw ownerOnly();
 }
 
 async function moveToOwnHousehold(tx: DbOrTx, householdId: string, userId: string) {
