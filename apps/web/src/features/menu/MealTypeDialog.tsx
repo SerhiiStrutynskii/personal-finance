@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '../../shared/ui/dialog.tsx';
 import { Input } from '../../shared/ui/input.tsx';
+import { SelectField } from '../../shared/ui/select-field.tsx';
 import { useSaveMealType } from './api.ts';
 
 interface Props {
@@ -19,14 +20,22 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** Прийом їжі для перейменування; без нього форма створює новий. */
   mealType?: MealType | undefined;
+  /** Прийоми їжі довідника в їхньому порядку: з них обирається місце нового запису. */
+  mealTypes: readonly MealType[];
 }
 
 /** Назва нового прийому їжі або перейменування наявного. */
-export function MealTypeDialog({ open, onOpenChange, mealType }: Props) {
+export function MealTypeDialog({ open, onOpenChange, mealType, mealTypes }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        {open && <MealTypeForm mealType={mealType} onDone={() => onOpenChange(false)} />}
+        {open && (
+          <MealTypeForm
+            mealType={mealType}
+            mealTypes={mealTypes}
+            onDone={() => onOpenChange(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -34,13 +43,18 @@ export function MealTypeDialog({ open, onOpenChange, mealType }: Props) {
 
 function MealTypeForm({
   mealType,
+  mealTypes,
   onDone,
 }: {
   mealType?: MealType | undefined;
+  mealTypes: readonly MealType[];
   onDone: () => void;
 }) {
   const save = useSaveMealType();
   const [name, setName] = useState(mealType?.name ?? '');
+  // Місце обирається лише для нового запису; за замовчуванням — після останнього, тобто в кінці.
+  const showAfter = !mealType && mealTypes.length > 0;
+  const [afterId, setAfterId] = useState(mealTypes.at(-1)?.id ?? '');
   const [error, setError] = useState<string>();
 
   function handleSubmit(event: FormEvent) {
@@ -51,7 +65,10 @@ function MealTypeForm({
       return;
     }
     setError(undefined);
-    save.mutate({ id: mealType?.id, name: trimmed }, { onSuccess: onDone });
+    save.mutate(
+      { id: mealType?.id, name: trimmed, afterId: showAfter ? afterId : undefined },
+      { onSuccess: onDone },
+    );
   }
 
   return (
@@ -68,6 +85,15 @@ function MealTypeForm({
           onChange={(e) => setName(e.target.value)}
         />
       </Field>
+      {showAfter && (
+        <Field label="Після">
+          <SelectField
+            value={afterId}
+            onChange={setAfterId}
+            options={mealTypes.map((item) => ({ value: item.id, label: item.name }))}
+          />
+        </Field>
+      )}
       <ErrorText>{save.isError && errorMessage(save.error)}</ErrorText>
       <DialogFooter>
         <DialogClose asChild>

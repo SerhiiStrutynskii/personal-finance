@@ -68,8 +68,9 @@ export function MenuPage() {
       <ErrorText>{period.isError && errorMessage(period.error)}</ErrorText>
       <ErrorText>{mealTypes.isError && errorMessage(mealTypes.error)}</ErrorText>
 
-      {/* Від lg — панель дня праворуч від сітки; вужче — під нею. */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start">
+      {/* Панель дня на всіх ширинах під сіткою й на всю ширину: назви страв і продуктів
+          поміщаються в один рядок, коли є місце. */}
+      <div className="grid gap-6">
         <MonthGrid
           month={month}
           days={period.data?.days ?? []}

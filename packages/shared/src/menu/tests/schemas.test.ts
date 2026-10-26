@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_SERVINGS,
+  createMealTypeSchema,
   createMenuEntrySchema,
   createMenuShoppingListSchema,
   menuEntrySchema,
@@ -8,6 +9,7 @@ import {
   menuShoppingQuerySchema,
   menuShoppingSchema,
   servingsSchema,
+  updateMealTypeSchema,
   updateMenuEntrySchema,
 } from '../schemas.ts';
 
@@ -211,5 +213,29 @@ describe('menuEntrySchema', () => {
     expect(menuEntrySchema.safeParse(dish).success).toBe(true);
     expect(menuEntrySchema.safeParse({ ...dish, kind: 'product' }).success).toBe(false);
     expect(menuEntrySchema.safeParse({ ...product, kind: 'other' }).success).toBe(false);
+  });
+});
+
+describe('createMealTypeSchema', () => {
+  const afterId = '00000000-0000-4000-8000-000000000001';
+
+  it('afterId необов’язковий', () => {
+    expect(createMealTypeSchema.parse({ name: ' Перекус ' })).toEqual({ name: 'Перекус' });
+    expect(createMealTypeSchema.parse({ name: 'Сніданок 2', afterId })).toEqual({
+      name: 'Сніданок 2',
+      afterId,
+    });
+  });
+
+  it('відхиляє afterId, що не є uuid', () => {
+    for (const value of ['abc', '', 1, null]) {
+      expect(createMealTypeSchema.safeParse({ name: 'Перекус', afterId: value }).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it('зміна назви не приймає afterId', () => {
+    expect(updateMealTypeSchema.parse({ name: 'Обід', afterId })).toEqual({ name: 'Обід' });
   });
 });

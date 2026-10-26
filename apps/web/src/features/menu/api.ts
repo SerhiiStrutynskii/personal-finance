@@ -32,10 +32,19 @@ export function useMealTypes() {
 /** Створює прийом їжі або перейменовує наявний, якщо передано id. */
 export function useSaveMealType() {
   return useMutation({
-    mutationFn: ({ id, name }: { id?: string | undefined; name: string }) =>
+    mutationFn: ({
+      id,
+      name,
+      afterId,
+    }: {
+      id?: string | undefined;
+      name: string;
+      /** Лише для нового: стати одразу після цього прийому; без нього — у кінець. */
+      afterId?: string | undefined;
+    }) =>
       id
         ? api.patch<MealType>(`/api/meal-types/${id}`, { name })
-        : api.post<MealType>('/api/meal-types', { name }),
+        : api.post<MealType>('/api/meal-types', afterId ? { name, afterId } : { name }),
   });
 }
 

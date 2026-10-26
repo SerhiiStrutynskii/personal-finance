@@ -1015,3 +1015,174 @@ test.describe('продукти в меню, телефон', () => {
     expect(await noHorizontalScroll()).toBe(true);
   });
 });
+
+const panelMeals = (page: Page) =>
+  page.getByTestId('menu-day-panel').getByRole('heading', { level: 3 });
+
+test.describe('місце нового прийому їжі, десктоп', () => {
+  test('поле «Після»: вставка після обраного, за замовчуванням у кінець, стрілки', async ({
+    page,
+  }) => {
+    await register(page);
+    await openDictionaries(page);
+    await expect(mealTypes(page)).toHaveText(['Сніданок', 'Обід', 'Вечеря']);
+
+    // «Після» — усі прийоми в порядку довідника, обрано останній.
+    await page.getByRole('button', { name: 'Додати прийом їжі' }).click();
+    const dialog = page.getByRole('dialog');
+    const after = dialog.getByRole('combobox', { name: 'Після' });
+    await expect(after).toHaveText('Вечеря');
+    await after.click();
+    await expect(page.getByRole('option')).toHaveText(['Сніданок', 'Обід', 'Вечеря']);
+    await page.getByRole('option', { name: 'Сніданок', exact: true }).click();
+    await expect(after).toHaveText('Сніданок');
+    await dialog.getByLabel('Назва').fill('Сніданок 2');
+    await dialog.getByRole('button', { name: 'Додати' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(mealTypes(page)).toHaveText(['Сніданок', 'Сніданок 2', 'Обід', 'Вечеря']);
+
+    // Без зміни «Після» — у кінець, як і раніше.
+    await page.getByRole('button', { name: 'Додати прийом їжі' }).click();
+    await expect(after).toHaveText('Вечеря');
+    await dialog.getByLabel('Назва').fill('Перекус');
+    await dialog.getByRole('button', { name: 'Додати' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(mealTypes(page)).toHaveText([
+      'Сніданок',
+      'Сніданок 2',
+      'Обід',
+      'Вечеря',
+      'Перекус',
+    ]);
+
+    // Перейменування — без «Після» і без зміни місця.
+    await page.getByRole('button', { name: 'Перейменувати «Сніданок 2»' }).click();
+    await expect(dialog.getByLabel('Назва')).toHaveValue('Сніданок 2');
+    await expect(dialog.getByRole('combobox')).toHaveCount(0);
+    await dialog.getByLabel('Назва').fill('Другий сніданок');
+    await dialog.getByRole('button', { name: 'Зберегти' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(mealTypes(page)).toHaveText([
+      'Сніданок',
+      'Другий сніданок',
+      'Обід',
+      'Вечеря',
+      'Перекус',
+    ]);
+
+    // Стрілки працюють і для вставленого запису.
+    await page.getByRole('button', { name: 'Вниз «Другий сніданок»' }).click();
+    await expect(mealTypes(page)).toHaveText([
+      'Сніданок',
+      'Обід',
+      'Другий сніданок',
+      'Вечеря',
+      'Перекус',
+    ]);
+    await page.getByRole('button', { name: 'Вгору «Другий сніданок»' }).click();
+    await expect(mealTypes(page)).toHaveText([
+      'Сніданок',
+      'Другий сніданок',
+      'Обід',
+      'Вечеря',
+      'Перекус',
+    ]);
+
+    // У панелі дня календаря — той самий порядок.
+    await page.goto('/menu?date=2026-10-26');
+    await expect(panelMeals(page)).toHaveText([
+      'Сніданок',
+      'Другий сніданок',
+      'Обід',
+      'Вечеря',
+      'Перекус',
+    ]);
+  });
+
+  test('порожній довідник: поля «Після» немає, доданий прийом — єдиний', async ({ page }) => {
+    await register(page);
+    await openDictionaries(page);
+    for (const name of ['Сніданок', 'Обід', 'Вечеря']) {
+      await page.getByRole('button', { name: `Видалити прийом їжі «${name}»` }).click();
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Видалити' }).click();
+      await expect(page.getByRole('alertdialog')).toBeHidden();
+    }
+    await expect(mealTypes(page)).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Додати прийом їжі' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Назва')).toBeVisible();
+    await expect(dialog.getByRole('combobox')).toHaveCount(0);
+    await expect(dialog.getByText('Після')).toHaveCount(0);
+    await dialog.getByLabel('Назва').fill('Обід');
+    await dialog.getByRole('button', { name: 'Додати' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(mealTypes(page)).toHaveText(['Обід']);
+  });
+});
+
+test.describe('панель дня, десктоп', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('панель під сіткою на всю ширину, назва страви в один рядок', async ({ page }) => {
+    const name = 'Гречка варена з грибами й цибулею';
+    await register(page);
+    await addPantry(page);
+    await openDictionaries(page);
+    await addDish(page, name, [['Гречка', '0,15']]);
+    await page.goto('/menu?date=2026-10-26');
+    await addEntry(page, 'Обід', name, '2');
+
+    const grid = await page.getByRole('group', { name: 'Дні місяця' }).boundingBox();
+    const lastCell = await day(page, '2026-10-31').boundingBox();
+    const panel = await page.getByTestId('menu-day-panel').boundingBox();
+    expect(panel!.y).toBeGreaterThan(lastCell!.y + lastCell!.height - 1);
+    expect(Math.abs(panel!.width - grid!.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(panel!.x - grid!.x)).toBeLessThanOrEqual(1);
+    expect(panel!.width).toBeGreaterThan(24 * 16 + 1);
+
+    // Назва — один рядок тексту.
+    const title = entry(page, name).getByText(name, { exact: true });
+    const lineHeight = await title.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+    const box = await title.boundingBox();
+    expect(box!.height).toBeLessThan(lineHeight * 1.5);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
+});
+
+test.describe('місце нового прийому їжі, телефон', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('шторка з полем «Після» без прокрутки вбік', async ({ page }) => {
+    await register(page);
+    await openDictionaries(page);
+    const noHorizontalScroll = () =>
+      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+
+    await page.getByRole('button', { name: 'Додати прийом їжі' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect
+      .poll(async () => {
+        const box = await dialog.boundingBox();
+        return box && [box.width, Math.round(box.y + box.height)];
+      })
+      .toEqual([390, 844]);
+    const after = dialog.getByRole('combobox', { name: 'Після' });
+    await expect(after).toHaveText('Вечеря');
+    await after.click();
+    const listbox = page.getByRole('listbox');
+    await expect(listbox).toBeVisible();
+    const list = await listbox.boundingBox();
+    expect(list!.x).toBeGreaterThanOrEqual(0);
+    expect(list!.x + list!.width).toBeLessThanOrEqual(390);
+    expect(await noHorizontalScroll()).toBe(true);
+    await page.getByRole('option', { name: 'Сніданок', exact: true }).click();
+    await dialog.getByLabel('Назва').fill('Сніданок 2');
+    await dialog.getByRole('button', { name: 'Додати' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(mealTypes(page)).toHaveText(['Сніданок', 'Сніданок 2', 'Обід', 'Вечеря']);
+    expect(await noHorizontalScroll()).toBe(true);
+  });
+});
