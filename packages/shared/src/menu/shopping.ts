@@ -5,7 +5,7 @@ import { compareProductNames } from '../shopping/names.ts';
 import type { ProductUnit } from '../shopping/schemas.ts';
 import type { MenuShoppingItem, MenuShoppingTotal } from './schemas.ts';
 
-// Покупки за меню: які продукти й скільки потрібно для страв періоду та орієнтовний бюджет на них.
+// Покупки за меню: які продукти й скільки потрібно для страв і продуктів періоду та орієнтовний бюджет на них.
 // Рахується щоразу з поточного меню, складу страв і цін продуктів; ніде не зберігається.
 
 export interface MenuShoppingEntryInput {
@@ -25,6 +25,17 @@ export interface MenuShoppingIngredientInput {
   priceMinor: number | null;
 }
 
+/** Продукт, доданий у запис меню напряму, з кількістю в тисячних одиниці. */
+export interface MenuShoppingProductEntryInput {
+  productId: string;
+  name: string;
+  unit: ProductUnit;
+  isArchived: boolean;
+  quantityMilli: number;
+  /** Поточна ціна продукту за одиницю; null — невідома. */
+  priceMinor: number | null;
+}
+
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 
 function toSafeNumber(value: bigint): number {
@@ -34,13 +45,15 @@ function toSafeNumber(value: bigint): number {
 
 /**
  * Перелік продуктів для записів меню: кількість продукту — сума «кількість на порцію × порції»
- * по всіх записах (страва в кількох записах рахується кожного разу). Сума рядка рахується від
+ * по всіх записах зі стравою (страва в кількох записах рахується кожного разу) плюс кількість
+ * продукту, доданого напряму. Продукт і зі страви, і напряму — один рядок. Сума рядка рахується від
  * сумарної кількості з округленням «половина — вгору», як у списку покупок. Продукти, яких немає
  * в жодному записі, не потрапляють; порядок — за назвою продукту, далі за id.
  */
 export function menuShoppingItems(
   entries: readonly MenuShoppingEntryInput[],
   ingredients: readonly MenuShoppingIngredientInput[],
+  productEntries: readonly MenuShoppingProductEntryInput[] = [],
 ): MenuShoppingItem[] {
   const servingsByDish = new Map<string, bigint>();
   for (const entry of entries) {
@@ -50,14 +63,20 @@ export function menuShoppingItems(
     );
   }
 
-  const byProduct = new Map<string, { line: MenuShoppingIngredientInput; quantity: bigint }>();
+  const byProduct = new Map<string, { line: MenuShoppingProductEntryInput; quantity: bigint }>();
+  const add = (line: MenuShoppingProductEntryInput, quantity: bigint) => {
+    const current = byProduct.get(line.productId);
+    byProduct.set(line.productId, {
+      line: current?.line ?? line,
+      quantity: (current?.quantity ?? 0n) + quantity,
+    });
+  };
   for (const line of ingredients) {
     const servings = servingsByDish.get(line.dishId);
     if (servings === undefined) continue;
-    const current = byProduct.get(line.productId);
-    const quantity = (current?.quantity ?? 0n) + BigInt(line.quantityMilli) * servings;
-    byProduct.set(line.productId, { line: current?.line ?? line, quantity });
+    add(line, BigInt(line.quantityMilli) * servings);
   }
+  for (const entry of productEntries) add(entry, BigInt(entry.quantityMilli));
 
   return [...byProduct.values()]
     .map(({ line, quantity }): MenuShoppingItem => {

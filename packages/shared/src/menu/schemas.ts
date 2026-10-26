@@ -136,31 +136,76 @@ export const menuPeriodQuerySchema = withPeriodChecks(
 );
 export type MenuPeriodQuery = z.infer<typeof menuPeriodQuerySchema>;
 
-export const createMenuEntrySchema = z.object({
+/** Страва в прийомі їжі дня; порції за замовчуванням — 1. */
+export const createMenuDishEntrySchema = z.strictObject({
   date: dateStringSchema,
   mealTypeId: idSchema,
   dishId: idSchema,
   servings: servingsSchema.default(1),
 });
+export type CreateMenuDishEntryInput = z.infer<typeof createMenuDishEntrySchema>;
+
+/** Продукт з довідника напряму в прийомі їжі дня; кількість у тисячних одиниці продукту. */
+export const createMenuProductEntrySchema = z.strictObject({
+  date: dateStringSchema,
+  mealTypeId: idSchema,
+  productId: idSchema,
+  quantityMilli: quantityMilliSchema,
+});
+export type CreateMenuProductEntryInput = z.infer<typeof createMenuProductEntrySchema>;
+
+/**
+ * Запис меню — страва з порціями або продукт з кількістю. Обидва dishId і productId разом,
+ * жодного з них чи порції для продукту — помилка (форми строгі).
+ */
+export const createMenuEntrySchema = z.union([
+  createMenuDishEntrySchema,
+  createMenuProductEntrySchema,
+]);
 export type CreateMenuEntryInput = z.infer<typeof createMenuEntrySchema>;
 
-export const updateMenuEntrySchema = z.object({ servings: servingsSchema });
+/** Зміна запису: порції — для страви, кількість — для продукту; рівно одне з полів. */
+export const updateMenuEntrySchema = z.union([
+  z.strictObject({ servings: servingsSchema }),
+  z.strictObject({ quantityMilli: quantityMilliSchema }),
+]);
 export type UpdateMenuEntryInput = z.infer<typeof updateMenuEntrySchema>;
 
-export const menuEntrySchema = z.object({
+const menuEntryBaseSchema = z.object({
   id: idSchema,
   date: dateStringSchema,
   mealTypeId: idSchema,
-  dishId: idSchema,
-  dishName: z.string(),
-  servings: servingsSchema,
-  /** Поточна ціна порції страви; продукти без ціни дають 0. */
-  portionPrice: amountSchema,
-  /** portionPrice × servings. */
+  /** Поточна назва страви чи продукту. */
+  name: z.string(),
   cost: amountSchema,
   isPriceComplete: z.boolean(),
   unpricedCount: amountSchema,
 });
+
+export const menuDishEntrySchema = menuEntryBaseSchema.extend({
+  kind: z.literal('dish'),
+  dishId: idSchema,
+  servings: servingsSchema,
+  /** Поточна ціна порції страви; продукти без ціни дають 0. cost = portionPrice × servings. */
+  portionPrice: amountSchema,
+});
+export type MenuDishEntry = z.infer<typeof menuDishEntrySchema>;
+
+export const menuProductEntrySchema = menuEntryBaseSchema.extend({
+  kind: z.literal('product'),
+  productId: idSchema,
+  unit: productUnitSchema,
+  isArchived: z.boolean(),
+  quantityMilli: amountSchema,
+  /** Поточна ціна продукту за одиницю; null — невідома. cost = кількість × ціна, half-up. */
+  unitPrice: amountSchema.nullable(),
+});
+export type MenuProductEntry = z.infer<typeof menuProductEntrySchema>;
+
+export const menuEntrySchema = z.discriminatedUnion('kind', [
+  menuDishEntrySchema,
+  menuProductEntrySchema,
+]);
 export type MenuEntry = z.infer<typeof menuEntrySchema>;
 
 export const menuDaySchema = z.object({
@@ -175,7 +220,7 @@ export const menuPeriodSchema = z.object({
   from: dateStringSchema,
   to: dateStringSchema,
   currency: currencySchema,
-  /** За датою, position прийому їжі й назвою страви. */
+  /** За датою, position прийому їжі й назвою (страви й продукти разом). */
   entries: z.array(menuEntrySchema),
   /** Лише дні з записами, за датою. */
   days: z.array(menuDaySchema),
@@ -226,7 +271,7 @@ export const menuShoppingSchema = z.object({
   from: dateStringSchema,
   to: dateStringSchema,
   currency: currencySchema,
-  /** Кількість записів меню в періоді. */
+  /** Кількість записів меню в періоді (страви й продукти). */
   entryCount: amountSchema,
   /** За назвою продукту. */
   items: z.array(menuShoppingItemSchema),

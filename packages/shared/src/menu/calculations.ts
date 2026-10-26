@@ -43,6 +43,26 @@ export function menuEntryCost(portionPrice: number, servings: number): number {
   return Number(cost);
 }
 
+export interface MenuProductEntryCost {
+  /** Кількість × ціна, округлена до копійки «половина — вгору»; без ціни — 0. */
+  cost: number;
+  /** false — ціна продукту невідома. */
+  isPriceComplete: boolean;
+  unpricedCount: number;
+}
+
+/**
+ * Вартість продукту, доданого в меню напряму: кількість (тисячні одиниці) × поточна ціна за
+ * одиницю з округленням до копійки, як рядок списку покупок. Без ціни — 0 і неповна ціна.
+ */
+export function menuProductEntryCost(
+  quantityMilli: number,
+  unitPrice: number | null,
+): MenuProductEntryCost {
+  if (unitPrice === null) return { cost: 0, isPriceComplete: false, unpricedCount: 1 };
+  return { cost: lineTotal(quantityMilli, unitPrice), isPriceComplete: true, unpricedCount: 0 };
+}
+
 export interface MenuCostTotal {
   cost: number;
   /** false — хоча б в одному записі ціна страви неповна. */
