@@ -45,7 +45,7 @@ export function ShoppingListPage() {
     <div className="max-w-4xl space-y-6">
       <Link
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"
-        to="/shopping"
+        to="/menu/lists"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Усі списки
@@ -72,7 +72,7 @@ function ListContent({ list }: { list: ShoppingList }) {
   return (
     <>
       <div className="flex items-center gap-2">
-        <h1 className="font-heading text-xl font-semibold">{list.name}</h1>
+        <h2 className="font-heading text-xl font-semibold">{list.name}</h2>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -84,7 +84,7 @@ function ListContent({ list }: { list: ShoppingList }) {
         </Button>
         <div className="ml-auto flex items-center gap-1">
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/shopping/${list.id}/print`}>
+            <Link to={`/menu/lists/${list.id}/print`}>
               <Printer />
               Друк і PDF
             </Link>
@@ -93,7 +93,7 @@ function ListContent({ list }: { list: ShoppingList }) {
             title={`Видалити список «${list.name}»?`}
             description="Куплені в ньому продукти зникнуть з історії цін і аналітики."
             disabled={remove.isPending}
-            onConfirm={() => remove.mutate(list.id, { onSuccess: () => navigate('/shopping') })}
+            onConfirm={() => remove.mutate(list.id, { onSuccess: () => navigate('/menu/lists') })}
           />
         </div>
       </div>

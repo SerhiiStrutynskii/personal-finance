@@ -44,7 +44,7 @@ export function MenuDictionariesPage() {
           <ArrowLeft className="size-4" aria-hidden />
           До календаря
         </Link>
-        <PageHeader title="Довідники меню" />
+        <PageHeader title="Довідники меню" level={2} />
       </div>
       <MealTypesSection />
       <DishesSection />

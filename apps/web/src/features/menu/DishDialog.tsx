@@ -244,7 +244,7 @@ function DishForm({
         ) : (
           <Muted>
             У довіднику ще немає продуктів.{' '}
-            <Link className="underline" to="/shopping/products">
+            <Link className="underline" to="/menu/products">
               Додайте їх на сторінці «Продукти»
             </Link>
             .

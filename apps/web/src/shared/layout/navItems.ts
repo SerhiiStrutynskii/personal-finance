@@ -4,7 +4,6 @@ import {
   CreditCard,
   HandCoins,
   Home,
-  ShoppingCart,
   Tags,
   Target,
   TrendingUp,
@@ -29,13 +28,12 @@ export const navItems: NavItem[] = [
   { title: 'Бюджет', icon: Calculator, route: '/budget' },
   { title: 'Борги', icon: Wallet, route: '/debts' },
   { title: 'Цілі', icon: Target, route: '/goals' },
-  { title: 'Покупки', icon: ShoppingCart, route: '/shopping' },
   { title: 'Меню', icon: UtensilsCrossed, route: '/menu' },
   { title: 'Аналітика', icon: ChartArea, route: '/analytics' },
   { title: 'Домогосподарство', icon: Users, route: '/household' },
 ];
 
-/** Розділ меню, до якого належить сторінка: `/shopping/42` → «Покупки». */
+/** Розділ меню, до якого належить сторінка: `/menu/lists/42` → «Меню». */
 export function currentNavItem(pathname: string): NavItem | undefined {
   return navItems.find((item) =>
     item.route === '/'

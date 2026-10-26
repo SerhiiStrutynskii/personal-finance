@@ -30,10 +30,20 @@ export function ErrorText({ children }: { children: ReactNode }) {
   );
 }
 
-export function PageHeader({ title, action }: { title: ReactNode; action?: ReactNode }) {
+/** level 2 — для сторінок усередині модуля зі спільним заголовком (як «Меню» з табами). */
+export function PageHeader({
+  title,
+  action,
+  level = 1,
+}: {
+  title: ReactNode;
+  action?: ReactNode;
+  level?: 1 | 2;
+}) {
+  const Heading = level === 1 ? 'h1' : 'h2';
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-      <h1 className="font-heading text-xl font-semibold">{title}</h1>
+      <Heading className="font-heading text-xl font-semibold">{title}</Heading>
       {action}
     </div>
   );

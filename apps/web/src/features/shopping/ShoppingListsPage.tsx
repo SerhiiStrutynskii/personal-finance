@@ -1,5 +1,5 @@
 import { formatMoney } from '@hf/shared';
-import { Plus } from 'lucide-react';
+import { Package, Plus, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
@@ -23,13 +23,23 @@ export function ShoppingListsPage() {
   return (
     <div className="max-w-3xl space-y-4">
       <PageHeader
-        title="Покупки"
+        level={2}
+        title="Списки покупок"
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/shopping/products">Продукти</Link>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="max-sm:h-10" asChild>
+              <Link to="/menu/products">
+                <Package />
+                Продукти
+              </Link>
             </Button>
-            <Button onClick={() => setCreating(true)}>
+            <Button variant="outline" className="max-sm:h-10" asChild>
+              <Link to="/menu/shopping?period=week">
+                <ShoppingCart />
+                Покупки за меню
+              </Link>
+            </Button>
+            <Button className="max-sm:h-10" onClick={() => setCreating(true)}>
               <Plus />
               Список
             </Button>
@@ -60,7 +70,7 @@ export function ShoppingListsPage() {
               >
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex items-baseline justify-between gap-2">
-                    <Link className="font-medium hover:underline" to={`/shopping/${list.id}`}>
+                    <Link className="font-medium hover:underline" to={`/menu/lists/${list.id}`}>
                       {list.name}
                     </Link>
                     <span className="text-xs text-muted-foreground">
@@ -96,7 +106,7 @@ export function ShoppingListsPage() {
       <ListNameDialog
         open={creating}
         onOpenChange={setCreating}
-        onSaved={(list) => navigate(`/shopping/${list.id}`)}
+        onSaved={(list) => navigate(`/menu/lists/${list.id}`)}
       />
     </div>
   );

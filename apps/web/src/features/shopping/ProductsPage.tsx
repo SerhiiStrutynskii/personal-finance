@@ -52,12 +52,13 @@ export function ProductsPage() {
     <div className="max-w-3xl space-y-4">
       <Link
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline"
-        to="/shopping"
+        to="/menu/lists"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Списки покупок
       </Link>
       <PageHeader
+        level={2}
         title="Продукти"
         action={<Button onClick={() => setDialog({ open: true })}>Додати продукт</Button>}
       />
