@@ -20,7 +20,8 @@ import { listWithIngredients } from './dishes.repo.ts';
 import { listEntries } from './entries.repo.ts';
 
 // Покупки за меню ведуть усі учасники домогосподарства, як меню й списки покупок. Перелік і бюджет
-// рахуються щоразу з меню, складу страв і поточних цін продуктів і ніде не зберігаються.
+// рахуються щоразу з меню (страв і продуктів, доданих напряму), складу страв і поточних цін
+// продуктів і ніде не зберігаються.
 
 /** Перелік продуктів для записів меню періоду [from, to) домогосподарства. */
 async function computeItems(
@@ -29,10 +30,15 @@ async function computeItems(
   { from, to }: MenuShoppingQuery,
 ): Promise<{ entryCount: number; items: MenuShoppingItem[] }> {
   const entries = await listEntries(db, householdId, from, to);
+  const dishEntries = entries.filter((entry) => entry.kind === 'dish');
+  const productEntries = entries.filter((entry) => entry.kind === 'product');
   const { ingredients } = await listWithIngredients(db, householdId, [
-    ...new Set(entries.map((entry) => entry.dishId)),
+    ...new Set(dishEntries.map((entry) => entry.dishId)),
   ]);
-  return { entryCount: entries.length, items: menuShoppingItems(entries, ingredients) };
+  return {
+    entryCount: entries.length,
+    items: menuShoppingItems(dishEntries, ingredients, productEntries),
+  };
 }
 
 /** Які продукти й скільки потрібно для меню періоду та орієнтовний бюджет на них. */
@@ -55,7 +61,7 @@ export async function getMenuShopping(
 /**
  * Створює звичайний список покупок із переліку продуктів меню. Очікувана ціна рядка — знімок
  * поточної ціни продукту; після створення список із меню не пов'язаний. Архівний продукт зі
- * складу страви повертається в довідник, як і при додаванні в список вручну.
+ * складу страви чи доданий напряму повертається в довідник, як і при додаванні в список вручну.
  */
 export async function createShoppingListFromMenu(
   db: Db,

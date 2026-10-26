@@ -66,8 +66,9 @@ describe('календар меню', () => {
       id: expect.any(String),
       date: '2026-10-26',
       mealTypeId: meals.lunch,
+      kind: 'dish',
+      name: 'Гречка варена',
       dishId: dishes.buckwheat,
-      dishName: 'Гречка варена',
       servings: 1,
       portionPrice: 690,
       cost: 690,
@@ -177,7 +178,7 @@ describe('календар меню', () => {
     ).toBe(200);
     const { body } = await user.get(january);
     expect(body.entries[0]).toMatchObject({
-      dishName: 'Гречка з салом',
+      name: 'Гречка з салом',
       portionPrice: 0,
       cost: 0,
       isPriceComplete: false,
@@ -359,8 +360,8 @@ describe('календар меню', () => {
 
     const order = async () =>
       (await user.get(OCTOBER)).body.entries.map(
-        (e: { date: string; mealTypeId: string; dishName: string }) =>
-          `${e.date} ${e.mealTypeId === meals.breakfast ? 'С' : e.mealTypeId === meals.lunch ? 'О' : 'В'} ${e.dishName}`,
+        (e: { date: string; mealTypeId: string; name: string }) =>
+          `${e.date} ${e.mealTypeId === meals.breakfast ? 'С' : e.mealTypeId === meals.lunch ? 'О' : 'В'} ${e.name}`,
       );
     expect(await order()).toEqual([
       '2026-10-20 В Каша молочна',

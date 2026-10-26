@@ -74,7 +74,7 @@ describe('products', () => {
     const deleted = await actor.delete(`/api/products/${rice.id}`);
     expect(deleted.status).toBe(409);
     expect(deleted.body.error.message).toBe(
-      'Продукт використовується в списках покупок або стравах. Заархівуйте його, щоб приховати з довідника',
+      'Продукт використовується в списках покупок, стравах або меню. Заархівуйте його, щоб приховати з довідника',
     );
 
     expect((await actor.patch(`/api/products/${rice.id}`, { isArchived: true })).status).toBe(200);
