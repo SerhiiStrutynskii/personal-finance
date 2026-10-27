@@ -69,7 +69,7 @@ export async function updateProduct(
 }
 
 /**
- * Продукт, який уже є в списках покупок, у складі страв чи в меню, не видаляється: історія цін,
+ * Продукт, який уже є в списках покупок, у складі страв, у меню чи в шаблонах меню, не видаляється: історія цін,
  * склад страв і меню лишаються цілими.
  */
 export async function deleteProduct(db: Db, auth: AuthContext, id: string): Promise<void> {
@@ -79,7 +79,7 @@ export async function deleteProduct(db: Db, auth: AuthContext, id: string): Prom
   } catch (error) {
     if (isForeignKeyViolation(error)) {
       throw conflict(
-        'Продукт використовується в списках покупок, стравах або меню. Заархівуйте його, щоб приховати з довідника',
+        'Продукт використовується в списках покупок, стравах, меню або шаблонах меню. Заархівуйте його, щоб приховати з довідника',
       );
     }
     throw error;

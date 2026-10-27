@@ -722,3 +722,58 @@ export const menuEntries = pgTable(
     ),
   ],
 );
+
+// Іменований шаблон меню дня: копія записів дня на момент збереження. Застосування замінює
+// записи цільового дня позиціями шаблону; день не пам'ятає, з якого шаблону його заповнили.
+export const menuDayTemplates = pgTable(
+  'menu_day_templates',
+  {
+    id: id(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    // Назва в нижньому регістрі для унікальності, як у страв.
+    nameKey: text('name_key').notNull(),
+    createdAt: createdAt(),
+    updatedAt: instant().notNull().defaultNow(),
+  },
+  (t) => [unique('menu_day_templates_household_name_unique').on(t.householdId, t.nameKey)],
+);
+
+// Позиція шаблону — страва з порціями або продукт з кількістю в прийомі їжі. Ціни й назви не
+// зберігаються. Видалення страви чи прийому їжі прибирає їхні позиції з шаблонів (cascade);
+// продукт із позицією шаблону видалити не можна (no action → 409), лише заархівувати.
+export const menuDayTemplateItems = pgTable(
+  'menu_day_template_items',
+  {
+    id: id(),
+    templateId: uuid('template_id')
+      .notNull()
+      .references(() => menuDayTemplates.id, { onDelete: 'cascade' }),
+    mealTypeId: uuid('meal_type_id')
+      .notNull()
+      .references(() => mealTypes.id, { onDelete: 'cascade' }),
+    dishId: uuid('dish_id').references(() => dishes.id, { onDelete: 'cascade' }),
+    servings: integer(),
+    productId: uuid('product_id').references(() => products.id),
+    quantityMilli: integer('quantity_milli'),
+  },
+  (t) => [
+    unique('menu_day_template_items_dish_unique').on(t.templateId, t.mealTypeId, t.dishId),
+    unique('menu_day_template_items_product_unique').on(t.templateId, t.mealTypeId, t.productId),
+    index().on(t.templateId),
+    index().on(t.dishId),
+    index().on(t.productId),
+    index().on(t.mealTypeId),
+    check('menu_day_template_items_servings_range', sql`${t.servings} between 1 and 99`),
+    check(
+      'menu_day_template_items_quantity_range',
+      sql`${t.quantityMilli} between 1 and 1000000000`,
+    ),
+    check(
+      'menu_day_template_items_kind',
+      sql`(${t.dishId} IS NOT NULL AND ${t.servings} IS NOT NULL AND ${t.productId} IS NULL AND ${t.quantityMilli} IS NULL) OR (${t.dishId} IS NULL AND ${t.servings} IS NULL AND ${t.productId} IS NOT NULL AND ${t.quantityMilli} IS NOT NULL)`,
+    ),
+  ],
+);

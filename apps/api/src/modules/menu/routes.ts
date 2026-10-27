@@ -1,6 +1,8 @@
 import {
+  applyMenuDayTemplateSchema,
   createDishSchema,
   createMealTypeSchema,
+  createMenuDayTemplateSchema,
   createMenuEntrySchema,
   createMenuShoppingListSchema,
   idParamsSchema,
@@ -9,6 +11,7 @@ import {
   reorderMealTypesSchema,
   updateDishSchema,
   updateMealTypeSchema,
+  updateMenuDayTemplateSchema,
   updateMenuEntrySchema,
 } from '@hf/shared';
 import { Router } from 'express';
@@ -18,6 +21,7 @@ import * as dishes from './dishes.service.ts';
 import * as entries from './entries.service.ts';
 import * as mealTypes from './mealTypes.service.ts';
 import * as shopping from './shopping.service.ts';
+import * as templates from './templates.service.ts';
 
 export function mealTypesRouter(db: Db): Router {
   const router = Router();
@@ -120,6 +124,34 @@ export function menuRouter(db: Db): Router {
   router.post('/shopping-list', async (req, res) => {
     const input = createMenuShoppingListSchema.parse(req.body);
     res.status(201).json(await shopping.createShoppingListFromMenu(db, getAuth(res), input));
+  });
+
+  // Шаблони меню дня: зберегти день як шаблон і замінити ним записи іншого дня.
+  router.get('/templates', async (_req, res) => {
+    res.json({ items: await templates.listTemplates(db, getAuth(res)) });
+  });
+
+  router.post('/templates', async (req, res) => {
+    const input = createMenuDayTemplateSchema.parse(req.body);
+    res.status(201).json(await templates.createTemplate(db, getAuth(res), input));
+  });
+
+  router.patch('/templates/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = updateMenuDayTemplateSchema.parse(req.body);
+    res.json(await templates.renameTemplate(db, getAuth(res), id, input));
+  });
+
+  router.delete('/templates/:id', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    await templates.deleteTemplate(db, getAuth(res), id);
+    res.status(204).end();
+  });
+
+  router.post('/templates/:id/apply', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const input = applyMenuDayTemplateSchema.parse(req.body);
+    res.json(await templates.applyTemplate(db, getAuth(res), id, input));
   });
 
   return router;

@@ -6,17 +6,19 @@ import {
   type MenuEntry,
   type MenuProductEntry,
 } from '@hf/shared';
-import { Minus, Pencil, Plus, Printer, X } from 'lucide-react';
+import { LayoutTemplate, Minus, Pencil, Plus, Printer, Save, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { Button } from '../../shared/ui/button.tsx';
 import { ErrorText, Muted } from '../../shared/ui/controls.tsx';
 import { AddEntryDialog } from './AddEntryDialog.tsx';
+import { ApplyTemplateDialog } from './ApplyTemplateDialog.tsx';
 import { useDeleteMenuEntry, useUpdateMenuEntry } from './api.ts';
 import { dayTitle, entryAmountLabel, groupDay, servingsLabel } from './calendar.ts';
 import { IncompletePriceBadge } from './IncompletePriceBadge.tsx';
 import { QuantityDialog } from './QuantityDialog.tsx';
+import { SaveTemplateDialog } from './SaveTemplateDialog.tsx';
 
 interface Props {
   date: string;
@@ -36,6 +38,7 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
   const [quantity, setQuantity] = useState<{ open: boolean; entry?: MenuProductEntry }>({
     open: false,
   });
+  const [templateDialog, setTemplateDialog] = useState<'save' | 'apply' | undefined>();
   const money = (amountMinor: number) => formatMoney({ amountMinor, currency });
 
   return (
@@ -55,12 +58,29 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
             {day && !day.isPriceComplete && <IncompletePriceBadge hint="Ціна неповна" />}
           </div>
         </div>
-        <Button variant="outline" className="max-sm:h-10" asChild>
-          <Link to={`/menu/print/${date}`}>
-            <Printer />
-            Друк
-          </Link>
-        </Button>
+        {/* На телефоні кнопки — окремим рядком під заголовком, три в ряд; довгі підписи
+            переносяться всередині кнопки, щоб панель не ставала вищою на ще один рядок. */}
+        <div className="flex flex-wrap gap-2 max-sm:grid max-sm:basis-full max-sm:grid-cols-[1fr_1fr_auto] max-sm:items-center max-sm:*:h-auto max-sm:*:min-h-10 max-sm:*:px-2 max-sm:*:whitespace-normal">
+          <Button
+            variant="outline"
+            disabled={entries.length === 0}
+            title={entries.length === 0 ? 'У дні немає страв чи продуктів' : undefined}
+            onClick={() => setTemplateDialog('save')}
+          >
+            <Save />
+            Зберегти як шаблон
+          </Button>
+          <Button variant="outline" onClick={() => setTemplateDialog('apply')}>
+            <LayoutTemplate />
+            Застосувати шаблон
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to={`/menu/print/${date}`}>
+              <Printer />
+              Друк
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <ErrorText>{update.isError && errorMessage(update.error)}</ErrorText>
@@ -184,6 +204,17 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
         onOpenChange={(open) => setDialog({ ...dialog, open })}
         date={date}
         mealType={dialog.mealType}
+      />
+      <SaveTemplateDialog
+        open={templateDialog === 'save'}
+        onOpenChange={(open) => !open && setTemplateDialog(undefined)}
+        date={date}
+      />
+      <ApplyTemplateDialog
+        open={templateDialog === 'apply'}
+        onOpenChange={(open) => !open && setTemplateDialog(undefined)}
+        date={date}
+        entryCount={entries.length}
       />
       <QuantityDialog
         open={quantity.open}
