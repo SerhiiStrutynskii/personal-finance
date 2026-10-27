@@ -58,11 +58,11 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
             {day && !day.isPriceComplete && <IncompletePriceBadge hint="Ціна неповна" />}
           </div>
         </div>
-        {/* На телефоні кнопки переносяться в окремий рядок під заголовком. */}
-        <div className="flex flex-wrap gap-2 max-sm:basis-full">
+        {/* На телефоні кнопки — окремим рядком під заголовком, три в ряд; довгі підписи
+            переносяться всередині кнопки, щоб панель не ставала вищою на ще один рядок. */}
+        <div className="flex flex-wrap gap-2 max-sm:grid max-sm:basis-full max-sm:grid-cols-[1fr_1fr_auto] max-sm:items-center max-sm:*:h-auto max-sm:*:min-h-10 max-sm:*:px-2 max-sm:*:whitespace-normal">
           <Button
             variant="outline"
-            className="max-sm:h-10"
             disabled={entries.length === 0}
             title={entries.length === 0 ? 'У дні немає страв чи продуктів' : undefined}
             onClick={() => setTemplateDialog('save')}
@@ -70,15 +70,11 @@ export function MenuDayPanel({ date, entries, day, currency, mealTypes }: Props)
             <Save />
             Зберегти як шаблон
           </Button>
-          <Button
-            variant="outline"
-            className="max-sm:h-10"
-            onClick={() => setTemplateDialog('apply')}
-          >
+          <Button variant="outline" onClick={() => setTemplateDialog('apply')}>
             <LayoutTemplate />
             Застосувати шаблон
           </Button>
-          <Button variant="outline" className="max-sm:h-10" asChild>
+          <Button variant="outline" asChild>
             <Link to={`/menu/print/${date}`}>
               <Printer />
               Друк
