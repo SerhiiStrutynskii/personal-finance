@@ -102,7 +102,7 @@ export async function reorderMealTypes(
 
 /**
  * Видалення остаточне; позиції решти не перераховуються. Прийом їжі, у якому є страви календаря
- * меню, видалити не можна (409).
+ * меню, видалити не можна (409). Позиції шаблонів дня в цьому прийомі їжі зникають (cascade).
  */
 export async function deleteMealType(db: Db, auth: AuthContext, id: string): Promise<void> {
   let deleted: boolean;

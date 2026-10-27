@@ -127,6 +127,13 @@
       "when": 1793017940483,
       "tag": "0017_menu_product_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793095342847,
+      "tag": "0018_menu_day_templates",
+      "breakpoints": true
     }
   ]
 }

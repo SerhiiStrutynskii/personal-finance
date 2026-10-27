@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_SERVINGS,
+  applyMenuDayTemplateSchema,
+  createMenuDayTemplateSchema,
   createMealTypeSchema,
   createMenuEntrySchema,
   createMenuShoppingListSchema,
+  menuDayTemplateSchema,
   menuEntrySchema,
   menuPeriodQuerySchema,
   menuShoppingQuerySchema,
   menuShoppingSchema,
   servingsSchema,
   updateMealTypeSchema,
+  updateMenuDayTemplateSchema,
   updateMenuEntrySchema,
 } from '../schemas.ts';
 
@@ -237,5 +241,54 @@ describe('createMealTypeSchema', () => {
 
   it('зміна назви не приймає afterId', () => {
     expect(updateMealTypeSchema.parse({ name: 'Обід', afterId })).toEqual({ name: 'Обід' });
+  });
+});
+
+describe('схеми шаблонів меню дня', () => {
+  const date = '2026-10-26';
+
+  it('назва обрізається, 1–100 символів', () => {
+    expect(createMenuDayTemplateSchema.parse({ name: '  Будній день ', date })).toEqual({
+      name: 'Будній день',
+      date,
+    });
+    expect(createMenuDayTemplateSchema.safeParse({ name: 'я'.repeat(100), date }).success).toBe(
+      true,
+    );
+    for (const name of ['', '   ', 'я'.repeat(101)]) {
+      expect(createMenuDayTemplateSchema.safeParse({ name, date }).success).toBe(false);
+      expect(updateMenuDayTemplateSchema.safeParse({ name }).success).toBe(false);
+    }
+    expect(updateMenuDayTemplateSchema.parse({ name: ' Вихідний ' })).toEqual({
+      name: 'Вихідний',
+    });
+  });
+
+  it('невалідна чи відсутня дата — помилка', () => {
+    for (const bad of ['2026-02-30', '26-10-2026', '2026-10-26T00:00:00Z', undefined]) {
+      expect(createMenuDayTemplateSchema.safeParse({ name: 'День', date: bad }).success).toBe(
+        false,
+      );
+      expect(applyMenuDayTemplateSchema.safeParse({ date: bad }).success).toBe(false);
+    }
+    expect(applyMenuDayTemplateSchema.parse({ date })).toEqual({ date });
+  });
+
+  it('зайві поля — помилка', () => {
+    expect(createMenuDayTemplateSchema.safeParse({ name: 'День', date, items: [] }).success).toBe(
+      false,
+    );
+    expect(updateMenuDayTemplateSchema.safeParse({ name: 'День', date }).success).toBe(false);
+    expect(applyMenuDayTemplateSchema.safeParse({ date, force: true }).success).toBe(false);
+  });
+
+  it('відповідь API', () => {
+    const template = {
+      id: '00000000-0000-4000-8000-000000000001',
+      name: 'Будній день',
+      itemCount: 2,
+      createdAt: '2026-10-26T10:00:00.000Z',
+    };
+    expect(menuDayTemplateSchema.parse(template)).toEqual(template);
   });
 });

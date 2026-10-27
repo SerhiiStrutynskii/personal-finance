@@ -85,7 +85,7 @@ describe('products', () => {
     const deleted = await actor.delete(`/api/products/${milk.id}`);
     expect(deleted.status).toBe(409);
     expect(deleted.body.error.message).toBe(
-      'Продукт використовується в списках покупок, стравах або меню. Заархівуйте його, щоб приховати з довідника',
+      'Продукт використовується в списках покупок, стравах, меню або шаблонах меню. Заархівуйте його, щоб приховати з довідника',
     );
     expect((await actor.get(january)).body.entries).toMatchObject([
       { id: entry.body.id, productId: milk.id, quantityMilli: 500, cost: 2100 },
@@ -108,7 +108,7 @@ describe('products', () => {
     const deleted = await actor.delete(`/api/products/${rice.id}`);
     expect(deleted.status).toBe(409);
     expect(deleted.body.error.message).toBe(
-      'Продукт використовується в списках покупок, стравах або меню. Заархівуйте його, щоб приховати з довідника',
+      'Продукт використовується в списках покупок, стравах, меню або шаблонах меню. Заархівуйте його, щоб приховати з довідника',
     );
 
     expect((await actor.patch(`/api/products/${rice.id}`, { isArchived: true })).status).toBe(200);

@@ -259,3 +259,53 @@ export async function listDishPrices(
   const { dishes: rows, ingredients } = await listWithIngredients(db, householdId, ids);
   return new Map(toSummaries(rows, ingredients).map((dish) => [dish.id, dish]));
 }
+
+/** Вміст запису без назв і цін: прийом їжі й страва з порціями або продукт з кількістю. */
+export interface MenuEntryContent {
+  mealTypeId: string;
+  dishId: string | null;
+  servings: number | null;
+  productId: string | null;
+  quantityMilli: number | null;
+}
+
+const dayOf = (householdId: string, date: string) =>
+  and(eq(menuEntries.householdId, householdId), eq(menuEntries.date, date));
+
+/** Сирі записи дня свого домогосподарства, без join на назви (для збереження шаблону). */
+export function listDayEntryRows(
+  db: DbOrTx,
+  householdId: string,
+  date: string,
+): Promise<MenuEntryContent[]> {
+  return db
+    .select({
+      mealTypeId: menuEntries.mealTypeId,
+      dishId: menuEntries.dishId,
+      servings: menuEntries.servings,
+      productId: menuEntries.productId,
+      quantityMilli: menuEntries.quantityMilli,
+    })
+    .from(menuEntries)
+    .where(dayOf(householdId, date));
+}
+
+/** Прибирає всі записи дня; повертає їхню кількість. Викликається в транзакції. */
+export async function deleteDayEntries(db: DbOrTx, householdId: string, date: string) {
+  const rows = await db
+    .delete(menuEntries)
+    .where(dayOf(householdId, date))
+    .returning({ id: menuEntries.id });
+  return rows.length;
+}
+
+/** Нові записи дня з переданого вмісту. Викликається в транзакції. */
+export async function insertEntries(
+  db: DbOrTx,
+  householdId: string,
+  date: string,
+  items: readonly MenuEntryContent[],
+) {
+  if (items.length === 0) return;
+  await db.insert(menuEntries).values(items.map((item) => ({ ...item, householdId, date })));
+}

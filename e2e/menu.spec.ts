@@ -170,7 +170,7 @@ test.describe('десктоп', () => {
     await page.getByRole('button', { name: 'Видалити продукт «Сіль»' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Видалити' }).click();
     await expect(
-      page.getByText(/використовується в списках покупок, стравах або меню/),
+      page.getByText(/використовується в списках покупок, стравах, меню або шаблонах меню/),
     ).toBeVisible();
 
     await openDictionaries(page);

@@ -282,3 +282,30 @@ export const menuShoppingSchema = z.object({
   total: menuShoppingTotalSchema,
 });
 export type MenuShopping = z.infer<typeof menuShoppingSchema>;
+
+// --- Шаблони меню дня ---
+
+export const menuDayTemplateNameSchema = z.string().trim().min(1).max(100);
+
+/** Зберегти записи дня date як шаблон з назвою name. */
+export const createMenuDayTemplateSchema = z.strictObject({
+  name: menuDayTemplateNameSchema,
+  date: dateStringSchema,
+});
+export type CreateMenuDayTemplateInput = z.infer<typeof createMenuDayTemplateSchema>;
+
+export const updateMenuDayTemplateSchema = z.strictObject({ name: menuDayTemplateNameSchema });
+export type UpdateMenuDayTemplateInput = z.infer<typeof updateMenuDayTemplateSchema>;
+
+/** Замінити записи дня date позиціями шаблону. */
+export const applyMenuDayTemplateSchema = z.strictObject({ date: dateStringSchema });
+export type ApplyMenuDayTemplateInput = z.infer<typeof applyMenuDayTemplateSchema>;
+
+export const menuDayTemplateSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  /** Кількість позицій (страв і продуктів у прийомах їжі). */
+  itemCount: amountSchema,
+  createdAt: z.iso.datetime({ offset: true }),
+});
+export type MenuDayTemplate = z.infer<typeof menuDayTemplateSchema>;
