@@ -1,7 +1,7 @@
-import { formatMoney, type DishSummary, type MealType } from '@hf/shared';
+import { formatMoney, type DishSummary, type MealType, type MenuDayTemplate } from '@hf/shared';
 import { ArrowDown, ArrowLeft, ArrowUp, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/index.ts';
 import { useMediaQuery, WIDE_SCREEN } from '../../shared/lib/useMediaQuery.ts';
 import { Button } from '../../shared/ui/button.tsx';
@@ -18,21 +18,26 @@ import { ListRow } from '../../shared/ui/list-row.tsx';
 import {
   useDeleteDish,
   useDeleteMealType,
+  useDeleteMenuTemplate,
   useDishes,
   useMealTypes,
+  useMenuTemplates,
   useReorderMealTypes,
 } from './api.ts';
 import { DishDialog } from './DishDialog.tsx';
 import { ingredientCountLabel } from './dishForm.ts';
 import { IncompletePriceBadge } from './IncompletePriceBadge.tsx';
 import { MealTypeDialog } from './MealTypeDialog.tsx';
+import { SaveTemplateDialog } from './SaveTemplateDialog.tsx';
+import { templateItemCountLabel } from './templates.ts';
 
 const DELETE_MEAL_TYPE =
-  'Прийом їжі зникне з довідника меню. Якщо в ньому є страви в меню, спершу приберіть їх з календаря.';
+  'Прийом їжі зникне з довідника меню. Якщо в ньому є страви в меню, спершу приберіть їх з календаря. Позиції з ним зникнуть із шаблонів дня.';
 const DELETE_DISH =
-  'Страва зникне разом зі складом. Продукти лишаться в довіднику. Якщо страва є в меню, спершу приберіть її з календаря.';
+  'Страва зникне разом зі складом. Продукти лишаться в довіднику. Якщо страва є в меню, спершу приберіть її з календаря. Позиції з нею зникнуть із шаблонів дня.';
+const DELETE_TEMPLATE = 'Шаблон зникне. Дні, до яких його застосували, не зміняться.';
 
-/** Довідники меню: прийоми їжі та страви з ціною порції. */
+/** Довідники меню: прийоми їжі, страви з ціною порції й шаблони дня. */
 export function MenuDictionariesPage() {
   return (
     <div className="max-w-3xl space-y-8">
@@ -48,11 +53,12 @@ export function MenuDictionariesPage() {
       </div>
       <MealTypesSection />
       <DishesSection />
+      <TemplatesSection />
     </div>
   );
 }
 
-function SectionHeader({ title, action }: { title: string; action: ReactNode }) {
+function SectionHeader({ title, action }: { title: string; action?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <h2 className="font-heading text-lg font-semibold">{title}</h2>
@@ -302,6 +308,95 @@ function DishesSection() {
         open={dialog.open}
         onOpenChange={(open) => setDialog({ ...dialog, open })}
         dishId={dialog.dishId}
+      />
+    </section>
+  );
+}
+
+function TemplatesSection() {
+  const templates = useMenuTemplates();
+  const remove = useDeleteMenuTemplate();
+  const isWide = useMediaQuery(WIDE_SCREEN);
+  const { hash } = useLocation();
+  const [rename, setRename] = useState<{ open: boolean; template?: MenuDayTemplate }>({
+    open: false,
+  });
+  const [deletion, setDeletion] = useState<{ open: boolean; template?: MenuDayTemplate }>({
+    open: false,
+  });
+  const loaded = templates.data !== undefined;
+
+  // Посилання «Керувати шаблонами» веде на /menu/dictionaries#templates: прокручуємо до секції,
+  // коли вона вже має висоту.
+  useEffect(() => {
+    if (hash === '#templates' && loaded) {
+      document.getElementById('templates')?.scrollIntoView({ block: 'start' });
+    }
+  }, [hash, loaded]);
+
+  return (
+    <section id="templates" className="scroll-mt-4 space-y-3" aria-label="Шаблони дня">
+      <SectionHeader title="Шаблони дня" />
+      <ErrorText>{templates.isError && errorMessage(templates.error)}</ErrorText>
+      <ErrorText>{remove.isError && errorMessage(remove.error)}</ErrorText>
+      {templates.isPending && <Muted>Завантаження…</Muted>}
+      {templates.data?.length === 0 && (
+        <Muted>Шаблонів ще немає. Збережіть меню дня в календарі</Muted>
+      )}
+      {templates.data && templates.data.length > 0 && (
+        <ul className="divide-y text-sm">
+          {templates.data.map((template) => (
+            <ListRow
+              key={template.id}
+              data-testid="menu-template"
+              className="py-2"
+              meta={templateItemCountLabel(template.itemCount)}
+              amount={null}
+              actions={
+                isWide ? (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Перейменувати «${template.name}»`}
+                      title={`Перейменувати «${template.name}»`}
+                      onClick={() => setRename({ open: true, template })}
+                    >
+                      <Pencil />
+                    </Button>
+                    <ConfirmButton
+                      title={`Видалити шаблон «${template.name}»?`}
+                      description={DELETE_TEMPLATE}
+                      disabled={remove.isPending}
+                      onConfirm={() => remove.mutate(template.id)}
+                    />
+                  </div>
+                ) : (
+                  <RowMenu
+                    label={`Дії з шаблоном «${template.name}»`}
+                    editLabel="Перейменувати"
+                    onEdit={() => setRename({ open: true, template })}
+                    onDelete={() => setDeletion({ open: true, template })}
+                  />
+                )
+              }
+            >
+              {template.name}
+            </ListRow>
+          ))}
+        </ul>
+      )}
+      <ConfirmDialog
+        open={deletion.open}
+        onOpenChange={(open) => setDeletion({ ...deletion, open })}
+        title={`Видалити шаблон «${deletion.template?.name ?? ''}»?`}
+        description={DELETE_TEMPLATE}
+        onConfirm={() => deletion.template && remove.mutate(deletion.template.id)}
+      />
+      <SaveTemplateDialog
+        open={rename.open}
+        onOpenChange={(open) => setRename({ ...rename, open })}
+        template={rename.template}
       />
     </section>
   );

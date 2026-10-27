@@ -5,6 +5,7 @@ import type {
   Dish,
   DishSummary,
   MealType,
+  MenuDayTemplate,
   MenuEntry,
   MenuPeriod,
   MenuShopping,
@@ -20,6 +21,7 @@ import { api } from '../../shared/api/index.ts';
 
 const MEAL_TYPES_KEY = ['meal-types'];
 const DISHES_KEY = ['dishes'];
+const TEMPLATES_KEY = ['menu-templates'];
 
 /** Прийоми їжі в порядку position. */
 export function useMealTypes() {
@@ -133,5 +135,44 @@ export function useCreateShoppingListFromMenu() {
   return useMutation({
     mutationFn: (input: CreateMenuShoppingListInput) =>
       api.post<ShoppingList>('/api/menu/shopping-list', input),
+  });
+}
+
+/** Шаблони меню дня за назвою, з кількістю позицій. */
+export function useMenuTemplates() {
+  return useQuery({
+    queryKey: TEMPLATES_KEY,
+    queryFn: async () => (await api.get<{ items: MenuDayTemplate[] }>('/api/menu/templates')).items,
+  });
+}
+
+/** Зберігає записи дня як шаблон з назвою. */
+export function useCreateMenuTemplate() {
+  return useMutation({
+    mutationFn: (input: { name: string; date: string }) =>
+      api.post<MenuDayTemplate>('/api/menu/templates', input),
+  });
+}
+
+export function useRenameMenuTemplate() {
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch<MenuDayTemplate>(`/api/menu/templates/${id}`, { name }),
+  });
+}
+
+export function useDeleteMenuTemplate() {
+  return useMutation({ mutationFn: (id: string) => api.delete(`/api/menu/templates/${id}`) });
+}
+
+/**
+ * Замінює записи дня позиціями шаблону. Місяць календаря (['menu', from, to]) і шаблони, як і
+ * itemCount після видалення страви чи прийому їжі, перечитує загальне правило кешу
+ * (app/queryClient.ts: будь-яка успішна мутація робить застарілими всі запити).
+ */
+export function useApplyMenuTemplate() {
+  return useMutation({
+    mutationFn: ({ id, date }: { id: string; date: string }) =>
+      api.post<MenuPeriod>(`/api/menu/templates/${id}/apply`, { date }),
   });
 }
